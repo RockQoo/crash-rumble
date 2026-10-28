@@ -38,6 +38,12 @@ private:
 	void OnLook(const FInputActionValue& Value);
 	void OnToggleView();
 	void OnToggleOptions();
+	void OnFirePressed();
+	void OnFireReleased();
+	void OnSelectSword();
+	void OnSelectLaser();
+	void OnSelectProjectile();
+	void SetTriggerHeld(bool bHeld);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> MappingContext;
@@ -53,6 +59,18 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> OptionsAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> FireAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> SwordAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> LaserAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> ProjectileAction;
 
 	TSharedPtr<SSBTuningPanel> OptionsPanel;
 	TSharedPtr<SWidget> HelpOverlay;

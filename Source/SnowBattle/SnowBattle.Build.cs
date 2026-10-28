@@ -18,7 +18,7 @@ public class SnowBattle : ModuleRules
 			"GameplayTasks"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "DeveloperSettings" });
 
 		PublicIncludePaths.Add(ModuleDirectory);
 	}

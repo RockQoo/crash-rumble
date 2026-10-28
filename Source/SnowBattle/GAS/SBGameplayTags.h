@@ -1,0 +1,12 @@
+#pragma once
+
+#include "NativeGameplayTags.h"
+
+namespace SBTags
+{
+	/** SetByCaller 데미지 양. */
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Data_Damage);
+
+	/** 쓰러진 상태. */
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Dead);
+}

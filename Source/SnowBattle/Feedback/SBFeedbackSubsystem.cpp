@@ -1,0 +1,335 @@
+#include "Feedback/SBFeedbackSubsystem.h"
+
+#include "Camera/SBViewComponent.h"
+#include "Character/SBSnowmanCharacter.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Core/SBGameSettings.h"
+#include "Core/SBTuningSettings.h"
+#include "Core/SBTuningSubsystem.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/World.h"
+#include "HAL/PlatformTime.h"
+#include "Kismet/GameplayStatics.h"
+#include "Misc/App.h"
+
+namespace
+{
+	constexpr int32 MaxDamageNumbers = 64;
+	constexpr int32 ParticlesPerBatch = 128;
+	constexpr float ParticleGravity = 600.f;
+	constexpr float ParticleDrag = 3.f;
+
+	const FLinearColor SnowColor(0.9f, 0.95f, 1.f);
+
+	FLinearColor GetWeaponColor(ESBWeaponType Weapon)
+	{
+		switch (Weapon)
+		{
+		case ESBWeaponType::Sword: return FLinearColor(1.f, 0.85f, 0.5f);
+		case ESBWeaponType::Laser: return FLinearColor(0.2f, 0.85f, 1.f);
+		case ESBWeaponType::Projectile: return FLinearColor(1.f, 0.55f, 0.15f);
+		default: return FLinearColor::White;
+		}
+	}
+}
+
+USBFeedbackSubsystem* USBFeedbackSubsystem::Get(const UObject* WorldContext)
+{
+	const UWorld* World = WorldContext ? WorldContext->GetWorld() : nullptr;
+	return World ? World->GetSubsystem<USBFeedbackSubsystem>() : nullptr;
+}
+
+bool USBFeedbackSubsystem::DoesSupportWorldType(const EWorldType::Type WorldType) const
+{
+	return WorldType == EWorldType::Game || WorldType == EWorldType::PIE;
+}
+
+TStatId USBFeedbackSubsystem::GetStatId() const
+{
+	RETURN_QUICK_DECLARE_CYCLE_STAT(USBFeedbackSubsystem, STATGROUP_Tickables);
+}
+
+void USBFeedbackSubsystem::Deinitialize()
+{
+	for (const FHitStopEntry& Entry : HitStops)
+	{
+		if (AActor* Actor = Entry.Actor.Get())
+		{
+			Actor->CustomTimeDilation = 1.f;
+		}
+	}
+	HitStops.Reset();
+	Super::Deinitialize();
+}
+
+void USBFeedbackSubsystem::OnHit(AActor* Attacker, ASBSnowmanCharacter* Victim, ESBWeaponType Weapon, const FSBWeaponFeel& Feel,
+	const FVector& HitLocation, const FVector& Direction)
+{
+	if (!Victim)
+	{
+		return;
+	}
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(Victim);
+
+	if (Tuning.bHitFlash)
+	{
+		Victim->PlayHitFlash(Tuning.HitFlashDuration, Tuning.HitFlashIntensity);
+	}
+
+	if (Tuning.bDamageNumbers)
+	{
+		AddDamageNumber(HitLocation, Feel.Damage, Weapon);
+	}
+
+	if (Tuning.bHitStop && Feel.HitStop > 0.f)
+	{
+		StartHitStop(Attacker, Victim, Feel.HitStop);
+	}
+
+	if (Tuning.bKnockback && Feel.Knockback > 0.f)
+	{
+		Victim->ApplyKnockback(Direction * Feel.Knockback + FVector::UpVector * Feel.Knockback * Tuning.KnockbackUpRatio);
+	}
+
+	if (Tuning.bCameraShake && Feel.Shake > 0.f)
+	{
+		// 때린 쪽(플레이어) 카메라를 흔든다
+		const ASBSnowmanCharacter* Shooter = Cast<ASBSnowmanCharacter>(Attacker);
+		if (Shooter && Shooter->IsLocallyControlled() && Shooter->GetViewComponent())
+		{
+			Shooter->GetViewComponent()->AddShake(Feel.Shake);
+		}
+	}
+
+	if (Tuning.bHitParticles)
+	{
+		EmitParticles(GetWeaponColor(Weapon), HitLocation, Direction, Tuning.HitParticleCount, 1.f);
+		EmitParticles(SnowColor, HitLocation, Direction, Tuning.HitParticleCount / 2, 0.6f);
+	}
+}
+
+void USBFeedbackSubsystem::SpawnImpactParticles(const FVector& Location, const FVector& Normal, const FLinearColor& Color, float CountScale)
+{
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
+	if (Tuning.bHitParticles)
+	{
+		EmitParticles(Color, Location, Normal, FMath::RoundToInt(Tuning.HitParticleCount * CountScale), 0.7f);
+	}
+}
+
+void USBFeedbackSubsystem::StartHitStop(AActor* Attacker, AActor* Victim, float Duration)
+{
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
+	const double EndTime = FPlatformTime::Seconds() + Duration;
+
+	if (Tuning.bHitStopGlobal)
+	{
+		UGameplayStatics::SetGlobalTimeDilation(this, FMath::Max(Tuning.HitStopTimeScale, 0.0001f));
+		GlobalHitStopEnd = FMath::Max(GlobalHitStopEnd, EndTime);
+		return;
+	}
+
+	// 때린 쪽과 맞은 쪽만 멈춘다
+	for (AActor* Actor : { Attacker, Victim })
+	{
+		if (!Actor)
+		{
+			continue;
+		}
+		Actor->CustomTimeDilation = Tuning.HitStopTimeScale;
+		FHitStopEntry* Existing = HitStops.FindByPredicate([Actor](const FHitStopEntry& Entry) { return Entry.Actor.Get() == Actor; });
+		if (Existing)
+		{
+			Existing->EndTime = FMath::Max(Existing->EndTime, EndTime);
+		}
+		else
+		{
+			HitStops.Add({ Actor, EndTime });
+		}
+	}
+}
+
+void USBFeedbackSubsystem::UpdateHitStop()
+{
+	const double Now = FPlatformTime::Seconds();
+
+	for (int32 i = HitStops.Num() - 1; i >= 0; --i)
+	{
+		if (Now >= HitStops[i].EndTime || !HitStops[i].Actor.IsValid())
+		{
+			if (AActor* Actor = HitStops[i].Actor.Get())
+			{
+				Actor->CustomTimeDilation = 1.f;
+			}
+			HitStops.RemoveAtSwap(i);
+		}
+	}
+
+	if (GlobalHitStopEnd > 0.0 && Now >= GlobalHitStopEnd)
+	{
+		GlobalHitStopEnd = 0.0;
+		UGameplayStatics::SetGlobalTimeDilation(this, 1.f);
+	}
+}
+
+void USBFeedbackSubsystem::AddDamageNumber(const FVector& Location, float Value, ESBWeaponType Weapon)
+{
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
+
+	FSBDamageNumber Number;
+	Number.WorldLocation = Location;
+	Number.Value = Value;
+	Number.Duration = Tuning.DamageNumberDuration;
+	Number.ScreenJitter = FVector2D(FMath::FRandRange(-20.f, 20.f), FMath::FRandRange(-8.f, 8.f));
+	Number.Color = GetWeaponColor(Weapon);
+
+	if (DamageNumbers.Num() < MaxDamageNumbers)
+	{
+		DamageNumbers.Add(Number);
+	}
+	else
+	{
+		DamageNumbers[NextDamageNumber] = Number;
+		NextDamageNumber = (NextDamageNumber + 1) % MaxDamageNumbers;
+	}
+}
+
+USBFeedbackSubsystem::FParticleBatch* USBFeedbackSubsystem::GetParticleBatch(const FLinearColor& Color)
+{
+	for (FParticleBatch& Batch : ParticleBatches)
+	{
+		if (Batch.Color.Equals(Color, 0.01f))
+		{
+			return &Batch;
+		}
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return nullptr;
+	}
+
+	if (!ParticleActor)
+	{
+		FActorSpawnParameters Params;
+		Params.ObjectFlags |= RF_Transient;
+		ParticleActor = World->SpawnActor<AActor>(AActor::StaticClass(), FTransform::Identity, Params);
+		USceneComponent* Root = NewObject<USceneComponent>(ParticleActor, TEXT("Root"));
+		ParticleActor->SetRootComponent(Root);
+		Root->RegisterComponent();
+	}
+
+	UInstancedStaticMeshComponent* Component = NewObject<UInstancedStaticMeshComponent>(ParticleActor);
+	Component->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere")));
+	Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Component->SetCastShadow(false);
+	Component->SetCanEverAffectNavigation(false);
+	Component->SetupAttachment(ParticleActor->GetRootComponent());
+	Component->SetMobility(EComponentMobility::Movable);
+	Component->RegisterComponent();
+	if (UMaterialInterface* Glow = USBGameSettings::LoadGlowMaterial())
+	{
+		Component->SetMaterial(0, Glow);
+		Component->SetCustomPrimitiveDataVector4(SBMaterialData::ColorIndex, FVector4(Color.R, Color.G, Color.B, 1.f));
+		Component->SetCustomPrimitiveDataFloat(SBMaterialData::FlashIndex, 6.f);
+	}
+
+	TArray<FTransform> Hidden;
+	Hidden.Init(FTransform(FQuat::Identity, FVector::ZeroVector, FVector::ZeroVector), ParticlesPerBatch);
+	Component->AddInstances(Hidden, false, true);
+
+	FParticleBatch& Batch = ParticleBatches.AddDefaulted_GetRef();
+	Batch.Color = Color;
+	Batch.ComponentIndex = ParticleComponents.Add(Component);
+	Batch.Particles.SetNum(ParticlesPerBatch);
+	return &Batch;
+}
+
+void USBFeedbackSubsystem::EmitParticles(const FLinearColor& Color, const FVector& Location, const FVector& Direction, int32 Count, float SpeedScale)
+{
+	if (Count <= 0)
+	{
+		return;
+	}
+	FParticleBatch* Batch = GetParticleBatch(Color);
+	if (!Batch)
+	{
+		return;
+	}
+
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
+	for (int32 i = 0; i < Count; ++i)
+	{
+		FParticle& P = Batch->Particles[Batch->Next];
+		Batch->Next = (Batch->Next + 1) % ParticlesPerBatch;
+
+		const FVector Dir = (Direction + FMath::VRand() * 0.9f + FVector::UpVector * 0.5f).GetSafeNormal();
+		P.Location = Location;
+		P.Velocity = Dir * Tuning.HitParticleSpeed * SpeedScale * FMath::FRandRange(0.5f, 1.2f);
+		P.Age = 0.f;
+		P.Lifetime = Tuning.HitParticleLifetime * FMath::FRandRange(0.7f, 1.2f);
+		P.Size = Tuning.HitParticleSize * FMath::FRandRange(0.6f, 1.3f);
+		P.bAlive = true;
+	}
+	Batch->bAnyAlive = true;
+}
+
+void USBFeedbackSubsystem::UpdateParticles(float DeltaTime)
+{
+	for (FParticleBatch& Batch : ParticleBatches)
+	{
+		if (!Batch.bAnyAlive)
+		{
+			continue;
+		}
+		UInstancedStaticMeshComponent* Component = ParticleComponents[Batch.ComponentIndex];
+		if (!Component)
+		{
+			continue;
+		}
+
+		bool bAnyAlive = false;
+		for (int32 i = 0; i < Batch.Particles.Num(); ++i)
+		{
+			FParticle& P = Batch.Particles[i];
+			if (!P.bAlive)
+			{
+				continue;
+			}
+
+			P.Age += DeltaTime;
+			FTransform Transform(FQuat::Identity, P.Location, FVector::ZeroVector);
+			if (P.Age >= P.Lifetime)
+			{
+				P.bAlive = false;
+			}
+			else
+			{
+				P.Velocity.Z -= ParticleGravity * DeltaTime;
+				P.Velocity *= FMath::Max(0.f, 1.f - ParticleDrag * DeltaTime);
+				P.Location += P.Velocity * DeltaTime;
+				Transform.SetLocation(P.Location);
+				Transform.SetScale3D(FVector(P.Size * (1.f - P.Age / P.Lifetime)));
+				bAnyAlive = true;
+			}
+			Component->UpdateInstanceTransform(i, Transform, true, false, true);
+		}
+		Component->MarkRenderStateDirty();
+		Batch.bAnyAlive = bAnyAlive;
+	}
+}
+
+void USBFeedbackSubsystem::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	UpdateHitStop();
+
+	const float RealDelta = FApp::GetDeltaTime();
+	for (FSBDamageNumber& Number : DamageNumbers)
+	{
+		Number.Age += RealDelta;
+	}
+	UpdateParticles(DeltaTime);
+}

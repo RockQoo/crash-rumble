@@ -47,12 +47,24 @@ public:
 	/** 캐릭터가 바라봐야 할 Yaw. 탑다운에서 커서가 너무 가까우면 false. */
 	bool GetDesiredFacingYaw(float& OutYaw) const;
 
+	/** 카메라 흔들림 (Scale은 튜닝 세기에 곱해짐). */
+	void AddShake(float Scale);
+
+	/** 카메라 반동: 위로 튀었다가 복귀. */
+	void AddRecoil(float PitchDegrees);
+
 	FSBOnViewModeChanged OnViewModeChanged;
 
 private:
 	void UpdateCamera(float DeltaTime);
+	void UpdateCameraOffset(float RealDeltaTime);
 	void UpdateAim();
 	FRotator GetControlRotation() const;
+
+	float ShakeTimeLeft = 0.f;
+	float ShakeAmplitude = 0.f;
+	float ShakeClock = 0.f;
+	float RecoilPitchOffset = 0.f;
 
 	UPROPERTY()
 	TObjectPtr<USpringArmComponent> SpringArm;

@@ -2,15 +2,39 @@
 
 #include "Camera/SBViewComponent.h"
 #include "Character/SBSnowmanCharacter.h"
+#include "Core/SBTuningSettings.h"
+#include "Core/SBTuningSubsystem.h"
 #include "Engine/Canvas.h"
+#include "Engine/Engine.h"
+#include "Engine/Font.h"
+#include "EngineUtils.h"
+#include "Feedback/SBFeedbackSubsystem.h"
 #include "GameFramework/PlayerController.h"
+
+namespace
+{
+	constexpr float HealthBarWidth = 80.f;
+	constexpr float HealthBarHeight = 7.f;
+	constexpr float HealthBarHeightAboveActor = 130.f;
+}
 
 void ASBHUD::DrawHUD()
 {
 	Super::DrawHUD();
 
+	if (!Canvas)
+	{
+		return;
+	}
+	DrawHealthBars();
+	DrawDamageNumbers();
+	DrawCrosshair();
+}
+
+void ASBHUD::DrawCrosshair()
+{
 	const ASBSnowmanCharacter* Snowman = PlayerOwner ? PlayerOwner->GetPawn<ASBSnowmanCharacter>() : nullptr;
-	if (!Snowman || !Canvas)
+	if (!Snowman)
 	{
 		return;
 	}
@@ -33,4 +57,75 @@ void ASBHUD::DrawHUD()
 	DrawLine(Center.X, Center.Y - Gap - Length, Center.X, Center.Y - Gap, Color, Thickness);
 	DrawLine(Center.X, Center.Y + Gap, Center.X, Center.Y + Gap + Length, Color, Thickness);
 	DrawRect(Color, Center.X - 1.f, Center.Y - 1.f, 2.f, 2.f);
+}
+
+void ASBHUD::DrawHealthBars()
+{
+	const APawn* LocalPawn = PlayerOwner ? PlayerOwner->GetPawn() : nullptr;
+
+	for (TActorIterator<ASBSnowmanCharacter> It(GetWorld()); It; ++It)
+	{
+		const ASBSnowmanCharacter* Snowman = *It;
+		if (Snowman == LocalPawn || Snowman->GetMaxHealth() <= 0.f)
+		{
+			continue;
+		}
+
+		const FVector WorldPos = Snowman->GetActorLocation() + FVector(0.f, 0.f, HealthBarHeightAboveActor);
+		const FVector Screen = Project(WorldPos, true);
+		if (Screen.Z <= 0.f)
+		{
+			continue; // 카메라 뒤
+		}
+
+		const float Ratio = FMath::Clamp(Snowman->GetHealth() / Snowman->GetMaxHealth(), 0.f, 1.f);
+		const float X = Screen.X - HealthBarWidth * 0.5f;
+		const float Y = Screen.Y;
+		DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.6f), X - 1.f, Y - 1.f, HealthBarWidth + 2.f, HealthBarHeight + 2.f);
+		const FLinearColor Fill = FLinearColor::LerpUsingHSV(FLinearColor(1.f, 0.15f, 0.1f), FLinearColor(0.3f, 1.f, 0.3f), Ratio);
+		DrawRect(Fill, X, Y, HealthBarWidth * Ratio, HealthBarHeight);
+	}
+}
+
+void ASBHUD::DrawDamageNumbers()
+{
+	const USBFeedbackSubsystem* Feedback = USBFeedbackSubsystem::Get(this);
+	if (!Feedback || !GEngine)
+	{
+		return;
+	}
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
+	UFont* Font = GEngine->GetLargeFont();
+
+	for (const FSBDamageNumber& Number : Feedback->GetDamageNumbers())
+	{
+		if (Number.Age >= Number.Duration)
+		{
+			continue;
+		}
+		const float T = Number.Age / FMath::Max(Number.Duration, 0.01f);
+
+		// 위로 떠오르며 감속, 처음엔 크게 튀었다가 줄어듦, 마지막 40%에서 사라짐
+		const float Rise = Tuning.DamageNumberRise * (1.f - FMath::Square(1.f - T));
+		const FVector Screen = Project(Number.WorldLocation + FVector(0.f, 0.f, 40.f + Rise), true);
+		if (Screen.Z <= 0.f)
+		{
+			continue;
+		}
+		const float Pop = T < 0.12f ? FMath::Lerp(1.6f, 1.f, T / 0.12f) : 1.f;
+		const float Alpha = T > 0.6f ? 1.f - (T - 0.6f) / 0.4f : 1.f;
+		const float Scale = Tuning.DamageNumberScale * Pop;
+
+		const FString Text = FString::Printf(TEXT("%d"), FMath::RoundToInt(Number.Value));
+		float Width = 0.f, Height = 0.f;
+		Canvas->TextSize(Font, Text, Width, Height, Scale, Scale);
+
+		FCanvasTextItem Item(
+			FVector2D(Screen.X + Number.ScreenJitter.X - Width * 0.5f, Screen.Y + Number.ScreenJitter.Y - Height * 0.5f),
+			FText::FromString(Text), Font, FLinearColor(Number.Color.R, Number.Color.G, Number.Color.B, Alpha));
+		Item.Scale = FVector2D(Scale, Scale);
+		Item.bOutlined = true;
+		Item.OutlineColor = FLinearColor(0.f, 0.f, 0.f, Alpha);
+		Canvas->DrawItem(Item);
+	}
 }

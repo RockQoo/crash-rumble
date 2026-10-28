@@ -1,0 +1,37 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Engine/DeveloperSettings.h"
+#include "SBGameSettings.generated.h"
+
+class UMaterialInterface;
+
+/**
+ * 에셋 참조 모음 (프로젝트 설정 > Game > Snow Battle).
+ * 머티리얼 커스텀 프리미티브 데이터 규약: [0..3] Color(RGBA), [4] Flash/Intensity.
+ */
+UCLASS(config = Game, defaultconfig, meta = (DisplayName = "Snow Battle"))
+class SNOWBATTLE_API USBGameSettings : public UDeveloperSettings
+{
+	GENERATED_BODY()
+
+public:
+	USBGameSettings();
+
+	/** 눈사람/무기 기본 머티리얼. Color + Flash(피격 번쩍임). */
+	UPROPERTY(config, EditAnywhere, Category = "Materials")
+	TSoftObjectPtr<UMaterialInterface> CharacterMaterial;
+
+	/** 발광 머티리얼 (빔, 탄, 총구 화염, 파티클). Color * Intensity. */
+	UPROPERTY(config, EditAnywhere, Category = "Materials")
+	TSoftObjectPtr<UMaterialInterface> GlowMaterial;
+
+	static UMaterialInterface* LoadCharacterMaterial();
+	static UMaterialInterface* LoadGlowMaterial();
+};
+
+namespace SBMaterialData
+{
+	constexpr int32 ColorIndex = 0;
+	constexpr int32 FlashIndex = 4;
+}

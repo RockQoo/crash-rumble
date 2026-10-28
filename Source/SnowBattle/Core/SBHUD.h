@@ -4,7 +4,10 @@
 #include "GameFramework/HUD.h"
 #include "SBHUD.generated.h"
 
-/** 숄더뷰 십자선. 탑다운에서는 마우스 커서가 조준점이라 그리지 않는다. */
+/**
+ * 숄더뷰 십자선, 데미지 숫자, 머리 위 체력바.
+ * 데미지 숫자는 USBFeedbackSubsystem의 고정 버퍼를 읽어 캔버스에 그린다 (위젯 생성 없음).
+ */
 UCLASS()
 class SNOWBATTLE_API ASBHUD : public AHUD
 {
@@ -12,4 +15,9 @@ class SNOWBATTLE_API ASBHUD : public AHUD
 
 public:
 	virtual void DrawHUD() override;
+
+private:
+	void DrawCrosshair();
+	void DrawHealthBars();
+	void DrawDamageNumbers();
 };

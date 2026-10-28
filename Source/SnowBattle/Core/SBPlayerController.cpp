@@ -13,6 +13,7 @@
 #include "InputMappingContext.h"
 #include "InputModifiers.h"
 #include "Styling/CoreStyle.h"
+#include "Weapon/SBWeaponComponent.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -50,7 +51,7 @@ void ASBPlayerController::BeginPlay()
 			.Padding(16.f)
 			[
 				SNew(STextBlock)
-				.Text(FText::FromString(TEXT("WASD 이동 · 마우스 시점 · V 시점 전환 · Tab 튜닝 옵션")))
+				.Text(FText::FromString(TEXT("WASD 이동 · 마우스 시점 · 좌클릭 공격(꾹 누르면 연사) · 1 칼 / 2 레이저 / 3 투사체 · V 시점 전환 · Tab 튜닝 옵션")))
 				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 11))
 				.ColorAndOpacity(FLinearColor(1.f, 1.f, 1.f, 0.7f))
 				.ShadowOffset(FVector2D(1.f, 1.f))
@@ -93,6 +94,10 @@ void ASBPlayerController::CreateInputAssets()
 	LookAction = MakeAction(TEXT("IA_Look"), EInputActionValueType::Axis2D);
 	ToggleViewAction = MakeAction(TEXT("IA_ToggleView"), EInputActionValueType::Boolean);
 	OptionsAction = MakeAction(TEXT("IA_Options"), EInputActionValueType::Boolean, true);
+	FireAction = MakeAction(TEXT("IA_Fire"), EInputActionValueType::Boolean);
+	SwordAction = MakeAction(TEXT("IA_Weapon1"), EInputActionValueType::Boolean);
+	LaserAction = MakeAction(TEXT("IA_Weapon2"), EInputActionValueType::Boolean);
+	ProjectileAction = MakeAction(TEXT("IA_Weapon3"), EInputActionValueType::Boolean);
 
 	MappingContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Default"));
 
@@ -117,6 +122,10 @@ void ASBPlayerController::CreateInputAssets()
 	MappingContext->MapKey(LookAction, EKeys::Mouse2D);
 	MappingContext->MapKey(ToggleViewAction, EKeys::V);
 	MappingContext->MapKey(OptionsAction, EKeys::Tab);
+	MappingContext->MapKey(FireAction, EKeys::LeftMouseButton);
+	MappingContext->MapKey(SwordAction, EKeys::One);
+	MappingContext->MapKey(LaserAction, EKeys::Two);
+	MappingContext->MapKey(ProjectileAction, EKeys::Three);
 }
 
 void ASBPlayerController::SetupInputComponent()
@@ -131,6 +140,54 @@ void ASBPlayerController::SetupInputComponent()
 		Input->BindAction(LookAction, ETriggerEvent::Triggered, this, &ASBPlayerController::OnLook);
 		Input->BindAction(ToggleViewAction, ETriggerEvent::Started, this, &ASBPlayerController::OnToggleView);
 		Input->BindAction(OptionsAction, ETriggerEvent::Started, this, &ASBPlayerController::OnToggleOptions);
+		Input->BindAction(FireAction, ETriggerEvent::Started, this, &ASBPlayerController::OnFirePressed);
+		Input->BindAction(FireAction, ETriggerEvent::Completed, this, &ASBPlayerController::OnFireReleased);
+		Input->BindAction(FireAction, ETriggerEvent::Canceled, this, &ASBPlayerController::OnFireReleased);
+		Input->BindAction(SwordAction, ETriggerEvent::Started, this, &ASBPlayerController::OnSelectSword);
+		Input->BindAction(LaserAction, ETriggerEvent::Started, this, &ASBPlayerController::OnSelectLaser);
+		Input->BindAction(ProjectileAction, ETriggerEvent::Started, this, &ASBPlayerController::OnSelectProjectile);
+	}
+}
+
+void ASBPlayerController::SetTriggerHeld(bool bHeld)
+{
+	if (ASBSnowmanCharacter* Snowman = GetPawn<ASBSnowmanCharacter>())
+	{
+		Snowman->GetWeaponComponent()->SetTriggerHeld(bHeld);
+	}
+}
+
+void ASBPlayerController::OnFirePressed()
+{
+	SetTriggerHeld(true);
+}
+
+void ASBPlayerController::OnFireReleased()
+{
+	SetTriggerHeld(false);
+}
+
+void ASBPlayerController::OnSelectSword()
+{
+	if (ASBSnowmanCharacter* Snowman = GetPawn<ASBSnowmanCharacter>())
+	{
+		Snowman->GetWeaponComponent()->Equip(ESBWeaponType::Sword);
+	}
+}
+
+void ASBPlayerController::OnSelectLaser()
+{
+	if (ASBSnowmanCharacter* Snowman = GetPawn<ASBSnowmanCharacter>())
+	{
+		Snowman->GetWeaponComponent()->Equip(ESBWeaponType::Laser);
+	}
+}
+
+void ASBPlayerController::OnSelectProjectile()
+{
+	if (ASBSnowmanCharacter* Snowman = GetPawn<ASBSnowmanCharacter>())
+	{
+		Snowman->GetWeaponComponent()->Equip(ESBWeaponType::Projectile);
 	}
 }
 
@@ -193,6 +250,7 @@ void ASBPlayerController::ToggleOptions()
 	}
 	else
 	{
+		SetTriggerHeld(false);
 		OptionsPanel = SNew(SSBTuningPanel)
 			.Subsystem(USBTuningSubsystem::Get(this))
 			.OnCloseRequested(FSimpleDelegate::CreateUObject(this, &ASBPlayerController::ToggleOptions));

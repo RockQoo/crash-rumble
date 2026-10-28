@@ -7,6 +7,8 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "GAS/SBCombat.h"
+#include "Misc/App.h"
 
 namespace
 {
@@ -41,8 +43,47 @@ void USBViewComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 	if (SpringArm && Camera)
 	{
 		UpdateCamera(DeltaTime);
+		// 히트스톱으로 오너 시간이 멈춰도 흔들림/반동은 실시간으로 진행
+		UpdateCameraOffset(FApp::GetDeltaTime());
 		UpdateAim();
 	}
+}
+
+void USBViewComponent::AddShake(float Scale)
+{
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
+	ShakeAmplitude = FMath::Max(ShakeAmplitude * (ShakeTimeLeft > 0.f ? 1.f : 0.f), Tuning.CameraShakeIntensity * Scale);
+	ShakeTimeLeft = Tuning.CameraShakeDuration;
+}
+
+void USBViewComponent::AddRecoil(float PitchDegrees)
+{
+	RecoilPitchOffset = FMath::Min(RecoilPitchOffset + PitchDegrees, 10.f);
+}
+
+void USBViewComponent::UpdateCameraOffset(float RealDeltaTime)
+{
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
+
+	FRotator Offset(RecoilPitchOffset, 0.f, 0.f);
+	RecoilPitchOffset = FMath::FInterpTo(RecoilPitchOffset, 0.f, RealDeltaTime, Tuning.CameraRecoilRecover);
+
+	if (ShakeTimeLeft > 0.f)
+	{
+		ShakeClock += RealDeltaTime * Tuning.CameraShakeFrequency;
+		const float Fade = FMath::Square(ShakeTimeLeft / FMath::Max(Tuning.CameraShakeDuration, 0.001f));
+		const float Amp = ShakeAmplitude * Fade;
+		Offset.Pitch += FMath::PerlinNoise1D(ShakeClock) * Amp;
+		Offset.Yaw += FMath::PerlinNoise1D(ShakeClock + 37.f) * Amp;
+		Offset.Roll += FMath::PerlinNoise1D(ShakeClock + 71.f) * Amp * 0.5f;
+		ShakeTimeLeft -= RealDeltaTime;
+		if (ShakeTimeLeft <= 0.f)
+		{
+			ShakeAmplitude = 0.f;
+		}
+	}
+
+	Camera->SetRelativeRotation(Offset);
 }
 
 void USBViewComponent::ToggleViewMode()
@@ -122,13 +163,15 @@ void USBViewComponent::UpdateAim()
 	}
 
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(SBAim), false, GetOwner());
+	const FCollisionObjectQueryParams ObjectParams = SBCombat::GetWeaponQueryParams();
 	FHitResult Hit;
 
 	if (ViewMode == ESBViewMode::Shoulder)
 	{
-		const FVector Start = Camera->GetComponentLocation();
-		const FVector End = Start + Camera->GetForwardVector() * AimTraceDistance;
-		AimPoint = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params) ? Hit.ImpactPoint : End;
+		// 반동/흔들림 오프셋을 뺀 기준 방향으로 조준
+		const FVector Start = SpringArm->GetSocketTransform(USpringArmComponent::SocketName).GetLocation();
+		const FVector End = Start + SpringArm->GetComponentRotation().Vector() * AimTraceDistance;
+		AimPoint = GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, ObjectParams, Params) ? FVector(Hit.ImpactPoint) : End;
 		return;
 	}
 
@@ -138,7 +181,7 @@ void USBViewComponent::UpdateAim()
 		return;
 	}
 	const FVector End = Origin + Direction * AimTraceDistance;
-	if (GetWorld()->LineTraceSingleByChannel(Hit, Origin, End, ECC_Visibility, Params))
+	if (GetWorld()->LineTraceSingleByObjectType(Hit, Origin, End, ObjectParams, Params))
 	{
 		AimPoint = Hit.ImpactPoint;
 	}
