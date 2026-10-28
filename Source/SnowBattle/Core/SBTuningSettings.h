@@ -141,6 +141,14 @@ public:
 	UPROPERTY() float MuzzleLightIntensity = 8000.f;
 
 	// 다수 타격 테스트
+	UPROPERTY() float MonsterMaxHealth = 100.f;
 	UPROPERTY() float MonsterMoveSpeed = 0.f;
 	UPROPERTY() float SpawnRadius = 1500.f;
+
+	// 팀 전투 (레드 vs 블루)
+	UPROPERTY() float BattleMoveSpeed = 350.f;
+	UPROPERTY() float BattleAttackRange = 150.f;
+	UPROPERTY() float BattleTeamDistance = 700.f;
+	UPROPERTY() float BattleSpread = 350.f;
+	UPROPERTY() bool bBattleSpectate = true;
 };

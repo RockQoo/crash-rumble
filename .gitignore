@@ -23,3 +23,5 @@ Plugins/*/Intermediate/
 *.log
 .claude/settings.local.json
 Packaged/
+
+Recordings/

@@ -146,8 +146,15 @@ const TArray<FSBTuningItem>& USBTuningSettings::GetItems()
 		SB_TUNE("사격 반동", MuzzleFlashDuration, "화염 시간(초)", 0.01f, 0.3f, 0.005f);
 		SB_TUNE("사격 반동", MuzzleLightIntensity, "화염 빛 세기", 0.f, 50000.f, 500.f);
 
+		SB_TUNE("다수 타격 테스트", MonsterMaxHealth, "몬스터 최대 체력", 1.f, 5000.f, 10.f);
 		SB_TUNE("다수 타격 테스트", MonsterMoveSpeed, "몬스터 이동 속도 (0 = 정지)", 0.f, 1000.f, 10.f);
 		SB_TUNE("다수 타격 테스트", SpawnRadius, "생성 반경", 300.f, 3800.f, 50.f);
+
+		SB_TUNE("팀 전투", BattleMoveSpeed, "이동 속도", 50.f, 1000.f, 10.f);
+		SB_TUNE("팀 전투", BattleAttackRange, "공격 시작 거리", 80.f, 400.f, 5.f);
+		SB_TUNE("팀 전투", BattleTeamDistance, "진영 간 거리(절반)", 200.f, 2000.f, 50.f);
+		SB_TUNE("팀 전투", BattleSpread, "진영 퍼짐 반경", 50.f, 1500.f, 25.f);
+		SB_TUNE_BOOL("팀 전투", bBattleSpectate, "관전 (플레이어 숨김)");
 	}
 	return Items;
 }

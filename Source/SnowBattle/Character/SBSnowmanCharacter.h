@@ -16,6 +16,15 @@ class USpringArmComponent;
 class UStaticMeshComponent;
 struct FOnAttributeChangeData;
 
+/** 팀 전투용. None은 플레이어/일반 몬스터. */
+UENUM()
+enum class ESBTeam : uint8
+{
+	None,
+	Red,
+	Blue,
+};
+
 /**
  * 스태틱 메시 파츠로 조립하는 눈사람. 충돌은 캡슐 하나.
  * 플레이어와 허수아비가 같은 클래스를 쓴다 (허수아비는 컨트롤러 입력이 없을 뿐).
@@ -38,10 +47,18 @@ public:
 	virtual void OnPoolAcquired() override;
 	virtual void OnPoolReleased() override;
 
-	/** 풀에서 꺼낸 몬스터로 설정: 색 변경, 플레이어 추적, 죽으면 하늘에서 재등장. */
-	void SetupAsMonster(const FLinearColor& InAccentColor);
+	/**
+	 * 풀에서 꺼낸 몬스터로 설정: 색 변경, 죽으면 하늘에서 재등장.
+	 * 팀이 없으면 플레이어를 쫓고, 팀이 있으면 가장 가까운 적 팀을 찾아 칼로 공격한다.
+	 */
+	void SetupAsMonster(const FLinearColor& InAccentColor, ESBTeam InTeam = ESBTeam::None);
 	bool IsMonster() const { return bMonster; }
+	bool IsInPool() const { return bInPool; }
+	ESBTeam GetTeam() const { return Team; }
 	void SetAccentColor(const FLinearColor& InAccentColor);
+
+	/** 관전: 숨기고 다른 눈사람과 부딪히지 않게 한다. */
+	void SetSpectating(bool bSpectating);
 
 	/** 이동 입력. X = 오른쪽, Y = 앞 (카메라 기준). */
 	void MoveInput(const FVector2D& Axis);
@@ -105,6 +122,8 @@ private:
 	void ResetPose();
 	void Respawn(); // 몬스터: 하늘에서 / 그 외: 처음 위치로
 	void UpdateChase(float DeltaSeconds);
+	void UpdateBattle(float DeltaSeconds);
+	float GetTunedMaxHealth() const;
 
 	void UpdateHands(float DeltaSeconds);
 	void UpdateFacing(float DeltaSeconds);
@@ -123,6 +142,10 @@ private:
 	bool bMonster = false;
 	bool bInPool = false;
 	FVector HomeLocation = FVector::ZeroVector;
+
+	ESBTeam Team = ESBTeam::None;
+	TWeakObjectPtr<ASBSnowmanCharacter> TargetEnemy;
+	float RetargetTimeLeft = 0.f;
 
 	// 쓰러짐: 0 = 서 있음, 1 = 완전히 누움
 	bool bDead = false;

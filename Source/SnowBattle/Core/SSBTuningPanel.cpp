@@ -18,6 +18,7 @@ void SSBTuningPanel::Construct(const FArguments& InArgs)
 	OnCloseRequested = InArgs._OnCloseRequested;
 	OnSpawnTargets = InArgs._OnSpawnTargets;
 	OnClearTargets = InArgs._OnClearTargets;
+	OnStartBattle = InArgs._OnStartBattle;
 
 	const FSlateFontInfo TitleFont = FCoreStyle::GetDefaultFontStyle("Bold", 18);
 	const FSlateFontInfo HeaderFont = FCoreStyle::GetDefaultFontStyle("Bold", 13);
@@ -64,6 +65,24 @@ void SSBTuningPanel::Construct(const FArguments& InArgs)
 			})
 		];
 		Rows->AddSlot().AutoHeight()[ Buttons ];
+
+		// 팀 전투: 기존 몬스터를 정리하고 레드/블루 진영 생성
+		TSharedRef<SHorizontalBox> BattleButtons = SNew(SHorizontalBox);
+		for (const int32 PerTeam : { 10, 25, 50, 100 })
+		{
+			BattleButtons->AddSlot().FillWidth(1.f).Padding(0.f, 0.f, 4.f, 0.f)
+			[
+				SNew(SButton)
+				.HAlign(HAlign_Center)
+				.Text(FText::FromString(FString::Printf(TEXT("팀전 %d vs %d"), PerTeam, PerTeam)))
+				.OnClicked_Lambda([this, PerTeam]()
+				{
+					OnStartBattle.ExecuteIfBound(PerTeam);
+					return FReply::Handled();
+				})
+			];
+		}
+		Rows->AddSlot().AutoHeight().Padding(0.f, 4.f, 0.f, 0.f)[ BattleButtons ];
 	}
 
 	for (const FSBTuningItem& Item : USBTuningSettings::GetItems())

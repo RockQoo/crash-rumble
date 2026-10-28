@@ -33,6 +33,23 @@ public:
 	UFUNCTION(Exec)
 	void SBClear();
 
+	/** 레드 vs 블루 팀 전투 시작 (팀당 PerTeam 마리). */
+	UFUNCTION(Exec)
+	void SBBattle(int32 PerTeam);
+
+	/** V 키와 같음 (녹화/자동 테스트용). */
+	UFUNCTION(Exec)
+	void SBToggleView();
+
+	/**
+	 * 타격감 시연(녹화용): 가장 가까운 몬스터를 자동 조준해 공격하며
+	 * SecondsPerWeapon마다 칼 → 레이저 → 투사체로 바꾼다. 0이면 끈다.
+	 */
+	UFUNCTION(Exec)
+	void SBDemo(float SecondsPerWeapon);
+
+	virtual void PlayerTick(float DeltaTime) override;
+
 	/** Weapon: 1 칼, 2 레이저, 3 투사체. Seconds 동안 공격 버튼을 누르고 있는다. */
 	UFUNCTION(Exec)
 	void SBAutoFire(int32 Weapon, float Seconds);
@@ -89,5 +106,8 @@ private:
 	TSharedPtr<SSBTuningPanel> OptionsPanel;
 	TSharedPtr<SWidget> HelpOverlay;
 	FTimerHandle AutoFireTimer;
+	float DemoWeaponSeconds = 0.f;
+	float DemoTime = 0.f;
+	int32 DemoWeaponIndex = -1;
 	float SmoothedFrameMs = 0.f;
 };

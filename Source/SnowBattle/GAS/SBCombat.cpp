@@ -16,6 +16,13 @@ bool SBCombat::ApplyWeaponHit(AActor* Attacker, AActor* Victim, ESBWeaponType We
 	{
 		return false;
 	}
+	// 팀 전투원은 상대 팀만 때린다 (같은 팀, 관전 중인 플레이어 제외)
+	const ASBSnowmanCharacter* Source = Cast<ASBSnowmanCharacter>(Attacker);
+	if (Source && Source->GetTeam() != ESBTeam::None
+		&& (Target->GetTeam() == ESBTeam::None || Target->GetTeam() == Source->GetTeam()))
+	{
+		return false;
+	}
 
 	UAbilitySystemComponent* SourceASC = UAbilitySystemGlobals::GetAbilitySystemComponentFromActor(Attacker);
 	UAbilitySystemComponent* TargetASC = Target->GetAbilitySystemComponent();

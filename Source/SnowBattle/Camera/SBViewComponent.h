@@ -41,6 +41,10 @@ public:
 	/** 현재 조준점 (월드). */
 	const FVector& GetAimPoint() const { return AimPoint; }
 
+	/** 마우스 대신 지정한 지점을 조준 (자동 시연용). ClearAimOverride로 해제. */
+	void SetAimOverride(const FVector& Point) { AimOverride = Point; bAimOverride = true; }
+	void ClearAimOverride() { bAimOverride = false; }
+
 	/** 이동 입력 기준이 되는 카메라 Yaw. */
 	float GetMovementYaw() const;
 
@@ -76,4 +80,6 @@ private:
 	float BlendAlpha = 0.f;
 	float TopDownYaw = 0.f;
 	FVector AimPoint = FVector::ZeroVector;
+	FVector AimOverride = FVector::ZeroVector;
+	bool bAimOverride = false;
 };

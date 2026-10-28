@@ -19,6 +19,7 @@ public:
 		SLATE_EVENT(FSimpleDelegate, OnCloseRequested)
 		SLATE_EVENT(FSBOnSpawnTargets, OnSpawnTargets)
 		SLATE_EVENT(FSimpleDelegate, OnClearTargets)
+		SLATE_EVENT(FSBOnSpawnTargets, OnStartBattle)
 		SLATE_ATTRIBUTE(FText, StatusText)
 	SLATE_END_ARGS()
 
@@ -32,4 +33,5 @@ private:
 	FSimpleDelegate OnCloseRequested;
 	FSBOnSpawnTargets OnSpawnTargets;
 	FSimpleDelegate OnClearTargets;
+	FSBOnSpawnTargets OnStartBattle;
 };

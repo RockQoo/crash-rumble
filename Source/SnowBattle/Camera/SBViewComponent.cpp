@@ -175,6 +175,12 @@ void USBViewComponent::UpdateAim()
 		return;
 	}
 
+	if (bAimOverride)
+	{
+		AimPoint = AimOverride;
+		return;
+	}
+
 	FVector Origin, Direction;
 	if (!PC->DeprojectMousePositionToWorld(Origin, Direction))
 	{

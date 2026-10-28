@@ -46,9 +46,95 @@ FText ASBPlayerController::GetStatsText()
 	const int32 BulletsIdle = Pool ? Pool->GetFreeCount(ASBProjectile::StaticClass()) : 0;
 	const int32 Spawned = Pool ? Pool->GetTotalSpawned() : 0;
 
-	return FText::FromString(FString::Printf(
+	FString Text = FString::Printf(
 		TEXT("FPS %.0f (%.1f ms)\n몬스터 %d\n총알 비행 중 %d / 풀 대기 %d\n풀이 생성한 액터 누적 %d"),
-		SmoothedFrameMs > 0.f ? 1000.f / SmoothedFrameMs : 0.f, SmoothedFrameMs, Monsters, Bullets, BulletsIdle, Spawned));
+		SmoothedFrameMs > 0.f ? 1000.f / SmoothedFrameMs : 0.f, SmoothedFrameMs, Monsters, Bullets, BulletsIdle, Spawned);
+	if (Spawner && Spawner->IsBattleActive())
+	{
+		Text += FString::Printf(TEXT("\n\n레드  생존 %d · 처치 %d\n블루  생존 %d · 처치 %d"),
+			Spawner->GetAliveCount(ESBTeam::Red), Spawner->GetKills(ESBTeam::Red),
+			Spawner->GetAliveCount(ESBTeam::Blue), Spawner->GetKills(ESBTeam::Blue));
+	}
+	return FText::FromString(Text);
+}
+
+void ASBPlayerController::SBBattle(int32 PerTeam)
+{
+	if (!GetPawn())
+	{
+		FTimerHandle Retry;
+		GetWorldTimerManager().SetTimer(Retry, FTimerDelegate::CreateWeakLambda(this, [this, PerTeam]() { SBBattle(PerTeam); }), 0.5f, false);
+		return;
+	}
+	if (USBTargetSpawnerSubsystem* Spawner = USBTargetSpawnerSubsystem::Get(this))
+	{
+		Spawner->StartBattle(PerTeam);
+	}
+}
+
+void ASBPlayerController::SBToggleView()
+{
+	OnToggleView();
+}
+
+void ASBPlayerController::SBDemo(float SecondsPerWeapon)
+{
+	DemoWeaponSeconds = FMath::Max(SecondsPerWeapon, 0.f);
+	DemoTime = 0.f;
+	DemoWeaponIndex = -1;
+	if (DemoWeaponSeconds <= 0.f)
+	{
+		SetTriggerHeld(false);
+		if (ASBSnowmanCharacter* Snowman = GetPawn<ASBSnowmanCharacter>())
+		{
+			Snowman->GetViewComponent()->ClearAimOverride();
+		}
+	}
+}
+
+void ASBPlayerController::PlayerTick(float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+
+	ASBSnowmanCharacter* Snowman = GetPawn<ASBSnowmanCharacter>();
+	if (DemoWeaponSeconds <= 0.f || !Snowman || IsOptionsOpen())
+	{
+		return;
+	}
+
+	// 무기 순환: 칼 → 레이저 → 투사체
+	DemoTime += DeltaTime;
+	const int32 Index = FMath::FloorToInt(DemoTime / DemoWeaponSeconds) % 3;
+	if (Index != DemoWeaponIndex)
+	{
+		DemoWeaponIndex = Index;
+		static const ESBWeaponType Order[] = { ESBWeaponType::Sword, ESBWeaponType::Laser, ESBWeaponType::Projectile };
+		Snowman->GetWeaponComponent()->Equip(Order[Index]);
+	}
+
+	// 가장 가까운 몬스터 조준: 숄더뷰는 카메라를 돌리고, 탑다운은 조준점을 직접 지정
+	const USBTargetSpawnerSubsystem* Spawner = USBTargetSpawnerSubsystem::Get(this);
+	const ASBSnowmanCharacter* Target = Spawner ? Spawner->FindNearestTarget(Snowman->GetActorLocation()) : nullptr;
+	if (!Target)
+	{
+		SetTriggerHeld(false);
+		return;
+	}
+	const FVector TargetPoint = Target->GetActorLocation() + FVector(0.f, 0.f, 20.f);
+	if (Snowman->GetViewComponent()->GetViewMode() == ESBViewMode::TopDown)
+	{
+		Snowman->GetViewComponent()->SetAimOverride(TargetPoint);
+	}
+	else
+	{
+		Snowman->GetViewComponent()->ClearAimOverride();
+		const FVector From = PlayerCameraManager ? PlayerCameraManager->GetCameraLocation() : Snowman->GetActorLocation();
+		SetControlRotation(FMath::RInterpTo(GetControlRotation(), (TargetPoint - From).Rotation(), DeltaTime, 12.f));
+	}
+
+	const float Distance = FVector::Dist2D(Snowman->GetActorLocation(), Target->GetActorLocation());
+	const bool bSword = Snowman->GetWeaponComponent()->GetEquipped() == ESBWeaponType::Sword;
+	SetTriggerHeld(!bSword || Distance < 220.f);
 }
 
 void ASBPlayerController::SBSpawn(int32 Count)
@@ -337,6 +423,7 @@ void ASBPlayerController::ToggleOptions()
 			.OnCloseRequested(FSimpleDelegate::CreateUObject(this, &ASBPlayerController::ToggleOptions))
 			.OnSpawnTargets(FSBOnSpawnTargets::CreateUObject(this, &ASBPlayerController::SBSpawn))
 			.OnClearTargets(FSimpleDelegate::CreateUObject(this, &ASBPlayerController::SBClear))
+			.OnStartBattle(FSBOnSpawnTargets::CreateUObject(this, &ASBPlayerController::SBBattle))
 			.StatusText_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetStatsText() : FText::GetEmpty(); });
 		GEngine->GameViewport->AddViewportWidgetContent(OptionsPanel.ToSharedRef(), OptionsZOrder);
 		// 기본은 게임이 계속 진행 → 바꾼 값이 바로 보인다

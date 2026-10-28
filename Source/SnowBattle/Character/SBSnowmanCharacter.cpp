@@ -155,9 +155,7 @@ void ASBSnowmanCharacter::InitAbilitySystem()
 		bAbilitiesGranted = true;
 	}
 
-	const float MaxHealth = USBTuningSubsystem::GetSettings(this).MaxHealth;
-	AbilitySystem->SetNumericAttributeBase(USBAttributeSet::GetMaxHealthAttribute(), MaxHealth);
-	AbilitySystem->SetNumericAttributeBase(USBAttributeSet::GetHealthAttribute(), MaxHealth);
+	RestoreFullHealth();
 	AbilitySystem->GetGameplayAttributeValueChangeDelegate(USBAttributeSet::GetHealthAttribute())
 		.AddUObject(this, &ASBSnowmanCharacter::HandleHealthChanged);
 }
@@ -170,6 +168,12 @@ float ASBSnowmanCharacter::GetHealth() const
 float ASBSnowmanCharacter::GetMaxHealth() const
 {
 	return Attributes ? Attributes->GetMaxHealth() : 0.f;
+}
+
+float ASBSnowmanCharacter::GetTunedMaxHealth() const
+{
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
+	return bMonster ? Tuning.MonsterMaxHealth : Tuning.MaxHealth;
 }
 
 void ASBSnowmanCharacter::HandleHealthChanged(const FOnAttributeChangeData& Data)
@@ -185,6 +189,15 @@ void ASBSnowmanCharacter::Die()
 	bDead = true;
 	AbilitySystem->AddLooseGameplayTag(SBTags::State_Dead);
 	WeaponComponent->SetTriggerHeld(false);
+	TargetEnemy.Reset();
+
+	if (Team != ESBTeam::None)
+	{
+		if (USBTargetSpawnerSubsystem* Spawner = USBTargetSpawnerSubsystem::Get(this))
+		{
+			Spawner->NotifyTeamMemberDied(Team);
+		}
+	}
 
 	// 마지막으로 밀려난 방향(없으면 뒤)으로 넘어진다
 	FVector FallDirection = GetVelocity().GetSafeNormal2D();
@@ -214,7 +227,7 @@ void ASBSnowmanCharacter::Revive()
 
 void ASBSnowmanCharacter::RestoreFullHealth()
 {
-	const float MaxHealth = USBTuningSubsystem::GetSettings(this).MaxHealth;
+	const float MaxHealth = GetTunedMaxHealth();
 	AbilitySystem->SetNumericAttributeBase(USBAttributeSet::GetMaxHealthAttribute(), MaxHealth);
 	AbilitySystem->SetNumericAttributeBase(USBAttributeSet::GetHealthAttribute(), MaxHealth);
 }
@@ -232,7 +245,7 @@ void ASBSnowmanCharacter::Respawn()
 	{
 		if (const USBTargetSpawnerSubsystem* Spawner = USBTargetSpawnerSubsystem::Get(this))
 		{
-			Spawner->FindSpawnLocation(SkyDropHeight, Location);
+			Spawner->FindRespawnLocation(Team, SkyDropHeight, Location);
 		}
 	}
 	SetActorLocation(Location, false, nullptr, ETeleportType::TeleportPhysics);
@@ -273,6 +286,11 @@ void ASBSnowmanCharacter::UpdateChase(float DeltaSeconds)
 	{
 		return;
 	}
+	if (Team != ESBTeam::None)
+	{
+		UpdateBattle(DeltaSeconds);
+		return;
+	}
 	const float Speed = USBTuningSubsystem::GetSettings(this).MonsterMoveSpeed;
 	const APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
 	if (Speed <= 0.f || !Player)
@@ -295,16 +313,64 @@ void ASBSnowmanCharacter::UpdateChase(float DeltaSeconds)
 	}
 }
 
-void ASBSnowmanCharacter::SetupAsMonster(const FLinearColor& InAccentColor)
+void ASBSnowmanCharacter::UpdateBattle(float DeltaSeconds)
+{
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
+
+	// 가장 가까운 적은 가끔만 다시 찾는다 (다 같이 같은 프레임에 찾지 않도록 간격을 흩뜨림)
+	RetargetTimeLeft -= DeltaSeconds;
+	ASBSnowmanCharacter* Enemy = TargetEnemy.Get();
+	if (RetargetTimeLeft <= 0.f || !Enemy || Enemy->IsDead() || Enemy->IsInPool())
+	{
+		const USBTargetSpawnerSubsystem* Spawner = USBTargetSpawnerSubsystem::Get(this);
+		Enemy = Spawner ? Spawner->FindNearestEnemy(this) : nullptr;
+		TargetEnemy = Enemy;
+		RetargetTimeLeft = FMath::FRandRange(0.2f, 0.4f);
+	}
+	if (!Enemy)
+	{
+		WeaponComponent->SetTriggerHeld(false);
+		return;
+	}
+
+	FVector ToEnemy = Enemy->GetActorLocation() - GetActorLocation();
+	ToEnemy.Z = 0.f;
+	const float Distance = ToEnemy.Size();
+	const FVector Direction = Distance > 1.f ? ToEnemy / Distance : GetActorForwardVector();
+	SetActorRotation(FMath::RInterpTo(GetActorRotation(), FRotator(0.f, Direction.Rotation().Yaw, 0.f), DeltaSeconds, 10.f));
+
+	// 사거리 안이면 휘두르고(간격은 무기 쪽에서), 너무 붙지 않게 조금 앞에서 멈춘다
+	WeaponComponent->SetTriggerHeld(Distance <= Tuning.BattleAttackRange);
+	if (Distance > Tuning.BattleAttackRange * 0.8f)
+	{
+		AddMovementInput(Direction, FMath::Clamp(Tuning.BattleMoveSpeed / GetCharacterMovement()->MaxWalkSpeed, 0.f, 1.f));
+	}
+}
+
+void ASBSnowmanCharacter::SetupAsMonster(const FLinearColor& InAccentColor, ESBTeam InTeam)
 {
 	bMonster = true;
+	Team = InTeam;
+	TargetEnemy.Reset();
+	RetargetTimeLeft = 0.f;
 	SetAccentColor(InAccentColor);
 
-	// 몬스터에겐 카메라/무기가 필요 없다 (수백 마리일 때 틱 비용 절약)
+	// 몬스터에겐 카메라가 필요 없다 (수백 마리일 때 틱 비용 절약). 무기는 팀 전투일 때만.
 	SpringArm->SetComponentTickEnabled(false);
 	ViewComponent->SetComponentTickEnabled(false);
-	WeaponComponent->SetComponentTickEnabled(false);
+	const bool bArmed = Team != ESBTeam::None;
+	WeaponComponent->SetTriggerHeld(false);
+	WeaponComponent->Equip(bArmed ? ESBWeaponType::Sword : ESBWeaponType::None);
+	WeaponComponent->SetComponentTickEnabled(bArmed);
 	ApplyTuning();
+	RestoreFullHealth();
+}
+
+void ASBSnowmanCharacter::SetSpectating(bool bSpectating)
+{
+	SetActorHiddenInGame(bSpectating);
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, bSpectating ? ECR_Ignore : ECR_Block);
+	WeaponComponent->SetTriggerHeld(false);
 }
 
 void ASBSnowmanCharacter::SetAccentColor(const FLinearColor& InAccentColor)
@@ -351,6 +417,9 @@ void ASBSnowmanCharacter::OnPoolAcquired()
 void ASBSnowmanCharacter::OnPoolReleased()
 {
 	bInPool = true;
+	Team = ESBTeam::None;
+	TargetEnemy.Reset();
+	WeaponComponent->SetTriggerHeld(false);
 	GetWorldTimerManager().ClearTimer(ReviveTimer);
 	SetActorHiddenInGame(true);
 	SetActorEnableCollision(false);
@@ -478,18 +547,21 @@ void ASBSnowmanCharacter::ApplyTuning()
 {
 	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
 	// 몬스터는 이동 입력 크기로 속도를 줄이므로 최대 속도는 둘 중 큰 값
-	GetCharacterMovement()->MaxWalkSpeed = bMonster ? FMath::Max(Tuning.MoveSpeed, Tuning.MonsterMoveSpeed) : Tuning.MoveSpeed;
+	GetCharacterMovement()->MaxWalkSpeed = bMonster
+		? FMath::Max3(Tuning.MoveSpeed, Tuning.MonsterMoveSpeed, Tuning.BattleMoveSpeed)
+		: Tuning.MoveSpeed;
 	GetCharacterMovement()->MaxAcceleration = Tuning.MaxAcceleration;
 
 	// 최대 체력이 바뀌면 비율 유지
 	if (AbilitySystem && AbilitySystem->AbilityActorInfo.IsValid() && !bDead)
 	{
 		const float OldMax = GetMaxHealth();
-		if (!FMath::IsNearlyEqual(OldMax, Tuning.MaxHealth) && OldMax > 0.f)
+		const float NewMax = GetTunedMaxHealth();
+		if (!FMath::IsNearlyEqual(OldMax, NewMax) && OldMax > 0.f)
 		{
 			const float Ratio = GetHealth() / OldMax;
-			AbilitySystem->SetNumericAttributeBase(USBAttributeSet::GetMaxHealthAttribute(), Tuning.MaxHealth);
-			AbilitySystem->SetNumericAttributeBase(USBAttributeSet::GetHealthAttribute(), FMath::Max(1.f, Tuning.MaxHealth * Ratio));
+			AbilitySystem->SetNumericAttributeBase(USBAttributeSet::GetMaxHealthAttribute(), NewMax);
+			AbilitySystem->SetNumericAttributeBase(USBAttributeSet::GetHealthAttribute(), FMath::Max(1.f, NewMax * Ratio));
 		}
 	}
 }
