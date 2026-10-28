@@ -22,3 +22,4 @@ Plugins/*/Intermediate/
 # 기타
 *.log
 .claude/settings.local.json
+Packaged/
