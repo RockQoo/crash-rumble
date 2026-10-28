@@ -14,13 +14,78 @@
 #include "InputModifiers.h"
 #include "Styling/CoreStyle.h"
 #include "Weapon/SBWeaponComponent.h"
+#include "Core/SBActorPool.h"
+#include "Core/SBTargetSpawner.h"
+#include "Core/SBTuningSettings.h"
+#include "Misc/App.h"
+#include "TimerManager.h"
+#include "Weapon/SBProjectile.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/SOverlay.h"
 #include "Widgets/Text/STextBlock.h"
 
 namespace
 {
 	constexpr int32 OptionsZOrder = 100;
 	constexpr int32 HelpZOrder = 10;
+}
+
+FText ASBPlayerController::GetStatsText()
+{
+	// FPS는 지수 평활 (실시간 기준)
+	const double Delta = FApp::GetDeltaTime();
+	if (Delta > 0.0)
+	{
+		SmoothedFrameMs = SmoothedFrameMs <= 0.f ? Delta * 1000.0 : FMath::Lerp(SmoothedFrameMs, float(Delta * 1000.0), 0.05f);
+	}
+
+	const USBTargetSpawnerSubsystem* Spawner = USBTargetSpawnerSubsystem::Get(this);
+	const USBActorPoolSubsystem* Pool = USBActorPoolSubsystem::Get(this);
+	const int32 Monsters = Spawner ? Spawner->GetActiveCount() : 0;
+	const int32 Bullets = Pool ? Pool->GetActiveCount(ASBProjectile::StaticClass()) : 0;
+	const int32 BulletsIdle = Pool ? Pool->GetFreeCount(ASBProjectile::StaticClass()) : 0;
+	const int32 Spawned = Pool ? Pool->GetTotalSpawned() : 0;
+
+	return FText::FromString(FString::Printf(
+		TEXT("FPS %.0f (%.1f ms)\n몬스터 %d\n총알 비행 중 %d / 풀 대기 %d\n풀이 생성한 액터 누적 %d"),
+		SmoothedFrameMs > 0.f ? 1000.f / SmoothedFrameMs : 0.f, SmoothedFrameMs, Monsters, Bullets, BulletsIdle, Spawned));
+}
+
+void ASBPlayerController::SBSpawn(int32 Count)
+{
+	// 시작 명령(-ExecCmds)처럼 플레이어가 생기기 전이면 잠시 뒤 다시 시도
+	if (!GetPawn())
+	{
+		FTimerHandle Retry;
+		GetWorldTimerManager().SetTimer(Retry, FTimerDelegate::CreateWeakLambda(this, [this, Count]() { SBSpawn(Count); }), 0.5f, false);
+		return;
+	}
+	if (USBTargetSpawnerSubsystem* Spawner = USBTargetSpawnerSubsystem::Get(this))
+	{
+		Spawner->SpawnTargets(Count);
+	}
+}
+
+void ASBPlayerController::SBClear()
+{
+	if (USBTargetSpawnerSubsystem* Spawner = USBTargetSpawnerSubsystem::Get(this))
+	{
+		Spawner->ClearTargets();
+	}
+}
+
+void ASBPlayerController::SBAutoFire(int32 Weapon, float Seconds)
+{
+	ASBSnowmanCharacter* Snowman = GetPawn<ASBSnowmanCharacter>();
+	if (!Snowman)
+	{
+		return;
+	}
+	const ESBWeaponType Type = Weapon == 2 ? ESBWeaponType::Laser : Weapon == 3 ? ESBWeaponType::Projectile : ESBWeaponType::Sword;
+	Snowman->GetWeaponComponent()->Equip(Type);
+	SetTriggerHeld(true);
+	GetWorldTimerManager().SetTimer(AutoFireTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SetTriggerHeld(false); }),
+		FMath::Max(Seconds, 0.1f), false);
 }
 
 void ASBPlayerController::BeginPlay()
@@ -45,13 +110,28 @@ void ASBPlayerController::BeginPlay()
 
 	if (GEngine && GEngine->GameViewport)
 	{
-		HelpOverlay = SNew(SBox)
+		TWeakObjectPtr<ASBPlayerController> WeakThis(this);
+		HelpOverlay = SNew(SOverlay)
+			// 왼쪽 위: 성능/개체 수
+			+ SOverlay::Slot()
+			.HAlign(HAlign_Left)
+			.VAlign(VAlign_Top)
+			.Padding(16.f)
+			[
+				SNew(STextBlock)
+				.Text_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetStatsText() : FText::GetEmpty(); })
+				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 13))
+				.ColorAndOpacity(FLinearColor(1.f, 1.f, 0.6f, 0.95f))
+				.ShadowOffset(FVector2D(1.f, 1.f))
+			]
+			// 왼쪽 아래: 조작법
+			+ SOverlay::Slot()
 			.HAlign(HAlign_Left)
 			.VAlign(VAlign_Bottom)
 			.Padding(16.f)
 			[
 				SNew(STextBlock)
-				.Text(FText::FromString(TEXT("WASD 이동 · 마우스 시점 · 좌클릭 공격(꾹 누르면 연사) · 1 칼 / 2 레이저 / 3 투사체 · V 시점 전환 · Tab 튜닝 옵션")))
+				.Text(FText::FromString(TEXT("WASD 이동 · 마우스 시점 · 좌클릭 공격(꾹 누르면 연사) · 1 칼 / 2 레이저 / 3 투사체 · V 시점 전환 · Tab 튜닝 옵션 / 몬스터 생성")))
 				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 11))
 				.ColorAndOpacity(FLinearColor(1.f, 1.f, 1.f, 0.7f))
 				.ShadowOffset(FVector2D(1.f, 1.f))
@@ -251,11 +331,16 @@ void ASBPlayerController::ToggleOptions()
 	else
 	{
 		SetTriggerHeld(false);
+		TWeakObjectPtr<ASBPlayerController> WeakThis(this);
 		OptionsPanel = SNew(SSBTuningPanel)
 			.Subsystem(USBTuningSubsystem::Get(this))
-			.OnCloseRequested(FSimpleDelegate::CreateUObject(this, &ASBPlayerController::ToggleOptions));
+			.OnCloseRequested(FSimpleDelegate::CreateUObject(this, &ASBPlayerController::ToggleOptions))
+			.OnSpawnTargets(FSBOnSpawnTargets::CreateUObject(this, &ASBPlayerController::SBSpawn))
+			.OnClearTargets(FSimpleDelegate::CreateUObject(this, &ASBPlayerController::SBClear))
+			.StatusText_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetStatsText() : FText::GetEmpty(); });
 		GEngine->GameViewport->AddViewportWidgetContent(OptionsPanel.ToSharedRef(), OptionsZOrder);
-		SetPause(true);
+		// 기본은 게임이 계속 진행 → 바꾼 값이 바로 보인다
+		SetPause(USBTuningSubsystem::GetSettings(this).bPauseOnOptions);
 	}
 	RefreshInputMode();
 }

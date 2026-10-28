@@ -47,7 +47,8 @@ public:
 
 	// 어빌리티에서 호출
 	void StartSwing(FSBSwingHitDelegate InOnHit, FSimpleDelegate InOnFinished);
-	bool FireLaser(FHitResult& OutHit);
+	/** 맞힌 눈사람 목록을 채우고 개수를 돌려준다 (관통 수 반영). */
+	int32 FireLaser(TArray<FHitResult>& OutTargetHits);
 	void FireProjectile();
 
 	/** 오른손 포즈 (캡슐 기준). false면 기본 자세. */

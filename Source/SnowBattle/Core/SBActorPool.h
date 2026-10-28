@@ -53,7 +53,12 @@ public:
 	void Release(AActor* Actor);
 	void Prewarm(UClass* Class, int32 Count);
 
+	/** 풀이 지금까지 실제로 스폰한 액터 수 (재사용이 잘 되면 거의 늘지 않는다). */
 	int32 GetTotalSpawned() const { return TotalSpawned; }
+
+	/** 클래스별: 지금 꺼내 쓰는 중 / 풀에서 대기 중. */
+	int32 GetActiveCount(UClass* Class) const { return ActiveCounts.FindRef(Class); }
+	int32 GetFreeCount(UClass* Class) const;
 
 private:
 	AActor* SpawnPooled(UClass* Class);
@@ -61,5 +66,6 @@ private:
 	UPROPERTY()
 	TMap<TObjectPtr<UClass>, FSBActorPoolList> FreeActors;
 
+	TMap<UClass*, int32> ActiveCounts;
 	int32 TotalSpawned = 0;
 };

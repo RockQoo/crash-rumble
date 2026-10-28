@@ -71,10 +71,17 @@ void USBTuningSubsystem::ResetToDefaults()
 
 void USBTuningSubsystem::Save()
 {
+	// 기본값과 다른 값만 저장 → 코드 기본값을 바꾸면 손대지 않은 항목은 새 기본값을 따른다
 	USBTuningSave* SaveObject = NewObject<USBTuningSave>(this);
+	SaveObject->Version = USBTuningSave::CurrentVersion;
+	const USBTuningSettings* Defaults = GetDefault<USBTuningSettings>();
 	for (const FSBTuningItem& Item : USBTuningSettings::GetItems())
 	{
-		SaveObject->Values.Add(Item.GetName(), Item.GetValue(Settings));
+		const float Value = Item.GetValue(Settings);
+		if (!FMath::IsNearlyEqual(Value, Item.GetValue(Defaults), 1e-4f))
+		{
+			SaveObject->Values.Add(Item.GetName(), Value);
+		}
 	}
 	UGameplayStatics::SaveGameToSlot(SaveObject, SaveSlotName, 0);
 }
@@ -85,7 +92,9 @@ void USBTuningSubsystem::Load()
 	{
 		return;
 	}
-	if (const USBTuningSave* SaveObject = Cast<USBTuningSave>(UGameplayStatics::LoadGameFromSlot(SaveSlotName, 0)))
+	const USBTuningSave* SaveObject = Cast<USBTuningSave>(UGameplayStatics::LoadGameFromSlot(SaveSlotName, 0));
+	// 버전 0은 모든 값을 통째로 저장해 기본값 변경을 가리므로 버린다
+	if (SaveObject && SaveObject->Version >= USBTuningSave::CurrentVersion)
 	{
 		for (const TPair<FName, float>& Pair : SaveObject->Values)
 		{

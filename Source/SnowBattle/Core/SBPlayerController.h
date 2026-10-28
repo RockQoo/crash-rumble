@@ -23,6 +23,20 @@ public:
 	void ToggleOptions();
 	bool IsOptionsOpen() const { return OptionsPanel.IsValid(); }
 
+	/** 화면 왼쪽 위 통계: FPS, 몬스터 수, 총알 수, 풀 생성 수. */
+	FText GetStatsText();
+
+	// 테스트용 콘솔 명령 (Shipping 제외)
+	UFUNCTION(Exec)
+	void SBSpawn(int32 Count);
+
+	UFUNCTION(Exec)
+	void SBClear();
+
+	/** Weapon: 1 칼, 2 레이저, 3 투사체. Seconds 동안 공격 버튼을 누르고 있는다. */
+	UFUNCTION(Exec)
+	void SBAutoFire(int32 Weapon, float Seconds);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -74,4 +88,6 @@ private:
 
 	TSharedPtr<SSBTuningPanel> OptionsPanel;
 	TSharedPtr<SWidget> HelpOverlay;
+	FTimerHandle AutoFireTimer;
+	float SmoothedFrameMs = 0.f;
 };

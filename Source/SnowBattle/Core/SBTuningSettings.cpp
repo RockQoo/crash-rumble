@@ -54,6 +54,8 @@ const TArray<FSBTuningItem>& USBTuningSettings::GetItems()
 	static TArray<FSBTuningItem> Items;
 	if (Items.Num() == 0)
 	{
+		SB_TUNE_BOOL("옵션창", bPauseOnOptions, "옵션창 열면 일시정지");
+
 		SB_TUNE("이동", MoveSpeed, "이동 속도", 100.f, 2000.f, 10.f);
 		SB_TUNE("이동", MaxAcceleration, "가속도", 200.f, 20000.f, 100.f);
 		SB_TUNE("이동", TurnSpeed, "회전 속도", 1.f, 40.f, 0.5f);
@@ -86,6 +88,7 @@ const TArray<FSBTuningItem>& USBTuningSettings::GetItems()
 		SB_TUNE("칼", SwordShake, "카메라 흔들림 배율", 0.f, 5.f, 0.05f);
 
 		SB_TUNE("레이저총", LaserDamage, "데미지", 0.f, 200.f, 1.f);
+		SB_TUNE("레이저총", LaserPierce, "관통 수", 0.f, 50.f, 1.f);
 		SB_TUNE("레이저총", LaserInterval, "연사 간격(초)", 0.02f, 1.f, 0.005f);
 		SB_TUNE("레이저총", LaserRange, "사거리", 500.f, 20000.f, 100.f);
 		SB_TUNE("레이저총", LaserBeamDuration, "빔 표시 시간(초)", 0.01f, 0.5f, 0.005f);
@@ -95,6 +98,7 @@ const TArray<FSBTuningItem>& USBTuningSettings::GetItems()
 		SB_TUNE("레이저총", LaserShake, "카메라 흔들림 배율", 0.f, 5.f, 0.05f);
 
 		SB_TUNE("투사체총", ProjectileDamage, "데미지", 0.f, 200.f, 1.f);
+		SB_TUNE("투사체총", ProjectilePierce, "관통 수", 0.f, 50.f, 1.f);
 		SB_TUNE("투사체총", ProjectileInterval, "연사 간격(초)", 0.02f, 2.f, 0.01f);
 		SB_TUNE("투사체총", ProjectileSpeed, "탄속", 200.f, 15000.f, 50.f);
 		SB_TUNE("투사체총", ProjectileGravity, "중력 배율", 0.f, 3.f, 0.05f);
@@ -124,7 +128,10 @@ const TArray<FSBTuningItem>& USBTuningSettings::GetItems()
 		SB_TUNE("타격감", HitParticleCount, "파티클 개수", 0.f, 64.f, 1.f);
 		SB_TUNE("타격감", HitParticleSpeed, "파티클 속도", 0.f, 3000.f, 10.f);
 		SB_TUNE("타격감", HitParticleLifetime, "파티클 수명(초)", 0.05f, 2.f, 0.01f);
-		SB_TUNE("타격감", HitParticleSize, "파티클 크기", 0.01f, 0.5f, 0.01f);
+		SB_TUNE("타격감", HitParticleSize, "파티클 크기", 0.01f, 1.f, 0.01f);
+		SB_TUNE_BOOL("타격감", bHitBurst, "피격 섬광");
+		SB_TUNE("타격감", HitBurstSize, "섬광 크기", 0.05f, 3.f, 0.05f);
+		SB_TUNE("타격감", HitBurstDuration, "섬광 시간(초)", 0.01f, 0.5f, 0.01f);
 
 		SB_TUNE_BOOL("사격 반동", bWeaponRecoil, "총 반동 (킥백)");
 		SB_TUNE("사격 반동", RecoilKickback, "킥백 거리", 0.f, 60.f, 0.5f);
@@ -138,6 +145,9 @@ const TArray<FSBTuningItem>& USBTuningSettings::GetItems()
 		SB_TUNE_BOOL("사격 반동", bMuzzleFlash, "총구 화염");
 		SB_TUNE("사격 반동", MuzzleFlashDuration, "화염 시간(초)", 0.01f, 0.3f, 0.005f);
 		SB_TUNE("사격 반동", MuzzleLightIntensity, "화염 빛 세기", 0.f, 50000.f, 500.f);
+
+		SB_TUNE("다수 타격 테스트", MonsterMoveSpeed, "몬스터 이동 속도 (0 = 정지)", 0.f, 1000.f, 10.f);
+		SB_TUNE("다수 타격 테스트", SpawnRadius, "생성 반경", 300.f, 3800.f, 50.f);
 	}
 	return Items;
 }

@@ -11,4 +11,7 @@ class SNOWBATTLE_API ASBGameMode : public AGameModeBase
 
 public:
 	ASBGameMode();
+
+protected:
+	virtual void BeginPlay() override;
 };

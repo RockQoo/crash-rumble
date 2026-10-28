@@ -10,6 +10,7 @@
 #include "Engine/World.h"
 #include "HAL/PlatformTime.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/App.h"
 
 namespace
@@ -18,6 +19,7 @@ namespace
 	constexpr int32 ParticlesPerBatch = 128;
 	constexpr float ParticleGravity = 600.f;
 	constexpr float ParticleDrag = 3.f;
+	constexpr float ParticleGlowIntensity = 6.f;
 
 	const FLinearColor SnowColor(0.9f, 0.95f, 1.f);
 
@@ -106,6 +108,30 @@ void USBFeedbackSubsystem::OnHit(AActor* Attacker, ASBSnowmanCharacter* Victim, 
 		EmitParticles(GetWeaponColor(Weapon), HitLocation, Direction, Tuning.HitParticleCount, 1.f);
 		EmitParticles(SnowColor, HitLocation, Direction, Tuning.HitParticleCount / 2, 0.6f);
 	}
+	if (Tuning.bHitBurst)
+	{
+		EmitBurst(GetWeaponColor(Weapon), HitLocation, 1.f);
+	}
+}
+
+void USBFeedbackSubsystem::EmitBurst(const FLinearColor& Color, const FVector& Location, float SizeScale)
+{
+	FParticleBatch* Batch = GetParticleBatch(Color);
+	if (!Batch)
+	{
+		return;
+	}
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
+	FParticle& P = Batch->Particles[Batch->Next];
+	Batch->Next = (Batch->Next + 1) % ParticlesPerBatch;
+	P.Location = Location;
+	P.Velocity = FVector::ZeroVector;
+	P.Age = 0.f;
+	P.Lifetime = Tuning.HitBurstDuration;
+	P.Size = Tuning.HitBurstSize * SizeScale;
+	P.bStatic = true;
+	P.bAlive = true;
+	Batch->bAnyAlive = true;
 }
 
 void USBFeedbackSubsystem::SpawnImpactParticles(const FVector& Location, const FVector& Normal, const FLinearColor& Color, float CountScale)
@@ -114,6 +140,10 @@ void USBFeedbackSubsystem::SpawnImpactParticles(const FVector& Location, const F
 	if (Tuning.bHitParticles)
 	{
 		EmitParticles(Color, Location, Normal, FMath::RoundToInt(Tuning.HitParticleCount * CountScale), 0.7f);
+	}
+	if (Tuning.bHitBurst)
+	{
+		EmitBurst(Color, Location, 0.5f);
 	}
 }
 
@@ -228,11 +258,13 @@ USBFeedbackSubsystem::FParticleBatch* USBFeedbackSubsystem::GetParticleBatch(con
 	Component->SetupAttachment(ParticleActor->GetRootComponent());
 	Component->SetMobility(EComponentMobility::Movable);
 	Component->RegisterComponent();
-	if (UMaterialInterface* Glow = USBGameSettings::LoadGlowMaterial())
+	// 인스턴스 메시는 Custom Primitive Data가 적용되지 않으므로 색별 MID를 쓴다
+	if (UMaterialInterface* ParticleMaterial = USBGameSettings::LoadParticleMaterial())
 	{
-		Component->SetMaterial(0, Glow);
-		Component->SetCustomPrimitiveDataVector4(SBMaterialData::ColorIndex, FVector4(Color.R, Color.G, Color.B, 1.f));
-		Component->SetCustomPrimitiveDataFloat(SBMaterialData::FlashIndex, 6.f);
+		UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(ParticleMaterial, Component);
+		Material->SetVectorParameterValue(TEXT("Color"), Color);
+		Material->SetScalarParameterValue(TEXT("Intensity"), ParticleGlowIntensity);
+		Component->SetMaterial(0, Material);
 	}
 
 	TArray<FTransform> Hidden;
@@ -270,6 +302,7 @@ void USBFeedbackSubsystem::EmitParticles(const FLinearColor& Color, const FVecto
 		P.Age = 0.f;
 		P.Lifetime = Tuning.HitParticleLifetime * FMath::FRandRange(0.7f, 1.2f);
 		P.Size = Tuning.HitParticleSize * FMath::FRandRange(0.6f, 1.3f);
+		P.bStatic = false;
 		P.bAlive = true;
 	}
 	Batch->bAnyAlive = true;
@@ -306,9 +339,12 @@ void USBFeedbackSubsystem::UpdateParticles(float DeltaTime)
 			}
 			else
 			{
-				P.Velocity.Z -= ParticleGravity * DeltaTime;
-				P.Velocity *= FMath::Max(0.f, 1.f - ParticleDrag * DeltaTime);
-				P.Location += P.Velocity * DeltaTime;
+				if (!P.bStatic)
+				{
+					P.Velocity.Z -= ParticleGravity * DeltaTime;
+					P.Velocity *= FMath::Max(0.f, 1.f - ParticleDrag * DeltaTime);
+					P.Location += P.Velocity * DeltaTime;
+				}
 				Transform.SetLocation(P.Location);
 				Transform.SetScale3D(FVector(P.Size * (1.f - P.Age / P.Lifetime)));
 				bAnyAlive = true;

@@ -34,6 +34,9 @@ public:
 	static const TArray<FSBTuningItem>& GetItems();
 	static const FSBTuningItem* FindItem(FName Name);
 
+	// 옵션창
+	UPROPERTY() bool bPauseOnOptions = false;
+
 	// 이동
 	UPROPERTY() float MoveSpeed = 600.f;
 	UPROPERTY() float MaxAcceleration = 4096.f;
@@ -75,6 +78,7 @@ public:
 	UPROPERTY() float SwordShake = 1.f;
 
 	// 레이저총
+	UPROPERTY() int32 LaserPierce = 0;
 	UPROPERTY() float LaserDamage = 10.f;
 	UPROPERTY() float LaserInterval = 0.08f;
 	UPROPERTY() float LaserRange = 5000.f;
@@ -85,6 +89,7 @@ public:
 	UPROPERTY() float LaserShake = 0.15f;
 
 	// 투사체총
+	UPROPERTY() int32 ProjectilePierce = 0;
 	UPROPERTY() float ProjectileDamage = 20.f;
 	UPROPERTY() float ProjectileInterval = 0.25f;
 	UPROPERTY() float ProjectileSpeed = 3000.f;
@@ -113,10 +118,13 @@ public:
 	UPROPERTY() float CameraShakeDuration = 0.2f;
 	UPROPERTY() float CameraShakeFrequency = 25.f;
 	UPROPERTY() bool bHitParticles = true;
-	UPROPERTY() int32 HitParticleCount = 10;
+	UPROPERTY() int32 HitParticleCount = 14;
 	UPROPERTY() float HitParticleSpeed = 500.f;
-	UPROPERTY() float HitParticleLifetime = 0.35f;
-	UPROPERTY() float HitParticleSize = 0.06f;
+	UPROPERTY() float HitParticleLifetime = 0.45f;
+	UPROPERTY() float HitParticleSize = 0.15f;
+	UPROPERTY() bool bHitBurst = true;
+	UPROPERTY() float HitBurstSize = 0.7f;
+	UPROPERTY() float HitBurstDuration = 0.08f;
 
 	// 타격감 - 사격 반동
 	UPROPERTY() bool bWeaponRecoil = true;
@@ -131,4 +139,8 @@ public:
 	UPROPERTY() bool bMuzzleFlash = true;
 	UPROPERTY() float MuzzleFlashDuration = 0.04f;
 	UPROPERTY() float MuzzleLightIntensity = 8000.f;
+
+	// 다수 타격 테스트
+	UPROPERTY() float MonsterMoveSpeed = 0.f;
+	UPROPERTY() float SpawnRadius = 1500.f;
 };

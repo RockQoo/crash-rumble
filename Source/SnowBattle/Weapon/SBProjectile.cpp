@@ -30,7 +30,8 @@ ASBProjectile::ASBProjectile()
 	Collision->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Ignore); // 탄끼리 무시
 	Collision->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 	Collision->SetCollisionResponseToChannel(ECC_Visibility, ECR_Ignore);
-	Collision->SetGenerateOverlapEvents(false);
+	Collision->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap); // 캐릭터는 통과하며 판정 (관통)
+	Collision->SetGenerateOverlapEvents(true);
 	Collision->SetNotifyRigidBodyCollision(true);
 	Collision->SetCanEverAffectNavigation(false);
 	RootComponent = Collision;
@@ -60,6 +61,7 @@ void ASBProjectile::BeginPlay()
 	Super::BeginPlay();
 
 	Collision->OnComponentHit.AddDynamic(this, &ASBProjectile::HandleHit);
+	Collision->OnComponentBeginOverlap.AddDynamic(this, &ASBProjectile::HandleOverlap);
 	if (UMaterialInterface* Glow = USBGameSettings::LoadGlowMaterial())
 	{
 		Mesh->SetMaterial(0, Glow);
@@ -84,6 +86,8 @@ void ASBProjectile::Launch(AActor* InShooter, const FVector& Direction)
 	Mesh->SetRelativeScale3D(FVector(BaseRadius * 2.f * Size / 100.f));
 
 	LifeLeft = Tuning.ProjectileLifetime;
+	PierceLeft = FMath::Max(Tuning.ProjectilePierce, 0);
+	HitActors.Reset();
 	Movement->ProjectileGravityScale = Tuning.ProjectileGravity;
 	Movement->SetUpdatedComponent(Collision);
 	Movement->Velocity = Direction.GetSafeNormal() * Tuning.ProjectileSpeed;
@@ -112,15 +116,36 @@ void ASBProjectile::HandleHit(UPrimitiveComponent* HitComponent, AActor* OtherAc
 		return;
 	}
 
-	const bool bHitSnowman = SBCombat::ApplyWeaponHit(Shooter.Get(), OtherActor, ESBWeaponType::Projectile, Hit);
-	if (!bHitSnowman)
+	// 벽/바닥에 막힘 (캐릭터는 오버랩으로 처리)
+	if (USBFeedbackSubsystem* Feedback = USBFeedbackSubsystem::Get(this))
 	{
-		if (USBFeedbackSubsystem* Feedback = USBFeedbackSubsystem::Get(this))
-		{
-			Feedback->SpawnImpactParticles(Hit.ImpactPoint, Hit.ImpactNormal, ProjectileColor, 0.6f);
-		}
+		Feedback->SpawnImpactParticles(Hit.ImpactPoint, Hit.ImpactNormal, ProjectileColor, 0.6f);
 	}
 	ReturnToPool();
+}
+
+void ASBProjectile::HandleOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+	int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (!bActive || !OtherActor || OtherActor == Shooter.Get() || HitActors.Contains(OtherActor))
+	{
+		return;
+	}
+
+	FHitResult Hit = SweepResult;
+	if (!bFromSweep)
+	{
+		Hit = FHitResult(OtherActor, OtherComp, GetActorLocation(), -GetVelocity().GetSafeNormal());
+	}
+
+	if (SBCombat::ApplyWeaponHit(Shooter.Get(), OtherActor, ESBWeaponType::Projectile, Hit))
+	{
+		HitActors.Add(OtherActor);
+		if (PierceLeft-- <= 0)
+		{
+			ReturnToPool();
+		}
+	}
 }
 
 void ASBProjectile::ReturnToPool()

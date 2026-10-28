@@ -58,6 +58,7 @@ private:
 		float Age = 0.f;
 		float Lifetime = 0.f;
 		float Size = 0.f;
+		bool bStatic = false; // 섬광: 제자리에서 줄어들기만 함
 		bool bAlive = false;
 	};
 
@@ -77,6 +78,7 @@ private:
 	void AddDamageNumber(const FVector& Location, float Value, ESBWeaponType Weapon);
 	FParticleBatch* GetParticleBatch(const FLinearColor& Color);
 	void EmitParticles(const FLinearColor& Color, const FVector& Location, const FVector& Direction, int32 Count, float SpeedScale);
+	void EmitBurst(const FLinearColor& Color, const FVector& Location, float SizeScale);
 	void UpdateParticles(float DeltaTime);
 
 	TArray<FHitStopEntry> HitStops;

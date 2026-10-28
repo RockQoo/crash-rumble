@@ -16,6 +16,8 @@ void SSBTuningPanel::Construct(const FArguments& InArgs)
 {
 	Subsystem = InArgs._Subsystem;
 	OnCloseRequested = InArgs._OnCloseRequested;
+	OnSpawnTargets = InArgs._OnSpawnTargets;
+	OnClearTargets = InArgs._OnClearTargets;
 
 	const FSlateFontInfo TitleFont = FCoreStyle::GetDefaultFontStyle("Bold", 18);
 	const FSlateFontInfo HeaderFont = FCoreStyle::GetDefaultFontStyle("Bold", 13);
@@ -23,6 +25,46 @@ void SSBTuningPanel::Construct(const FArguments& InArgs)
 
 	TSharedRef<SVerticalBox> Rows = SNew(SVerticalBox);
 	FString LastCategory;
+
+	// 다수 타격 테스트: 몬스터 생성/제거 버튼
+	{
+		Rows->AddSlot().AutoHeight().Padding(0.f, 4.f, 0.f, 4.f)
+		[
+			SNew(STextBlock).Text(FText::FromString(TEXT("몬스터 생성 (풀링)"))).Font(HeaderFont).ColorAndOpacity(FLinearColor(1.f, 0.6f, 0.8f))
+		];
+		Rows->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 4.f)
+		[
+			SNew(STextBlock).Text(InArgs._StatusText).Font(RowFont).ColorAndOpacity(FLinearColor(0.75f, 0.75f, 0.8f))
+		];
+
+		TSharedRef<SHorizontalBox> Buttons = SNew(SHorizontalBox);
+		for (const int32 Count : { 10, 50, 100, 500 })
+		{
+			Buttons->AddSlot().FillWidth(1.f).Padding(0.f, 0.f, 4.f, 0.f)
+			[
+				SNew(SButton)
+				.HAlign(HAlign_Center)
+				.Text(FText::FromString(FString::Printf(TEXT("+%d"), Count)))
+				.OnClicked_Lambda([this, Count]()
+				{
+					OnSpawnTargets.ExecuteIfBound(Count);
+					return FReply::Handled();
+				})
+			];
+		}
+		Buttons->AddSlot().FillWidth(1.4f)
+		[
+			SNew(SButton)
+			.HAlign(HAlign_Center)
+			.Text(FText::FromString(TEXT("모두 제거")))
+			.OnClicked_Lambda([this]()
+			{
+				OnClearTargets.ExecuteIfBound();
+				return FReply::Handled();
+			})
+		];
+		Rows->AddSlot().AutoHeight()[ Buttons ];
+	}
 
 	for (const FSBTuningItem& Item : USBTuningSettings::GetItems())
 	{

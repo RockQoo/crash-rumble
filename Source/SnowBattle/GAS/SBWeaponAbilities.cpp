@@ -62,8 +62,9 @@ void USBGA_LaserFire::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 		return;
 	}
 
-	FHitResult Hit;
-	if (Weapon->FireLaser(Hit))
+	TArray<FHitResult> Hits;
+	Weapon->FireLaser(Hits);
+	for (const FHitResult& Hit : Hits)
 	{
 		SBCombat::ApplyWeaponHit(GetAvatarActorFromActorInfo(), Hit.GetActor(), ESBWeaponType::Laser, Hit);
 	}

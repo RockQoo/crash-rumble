@@ -7,13 +7,18 @@
 
 class USBTuningSettings;
 
-/** 튜닝 값 저장본. 항목 이름 → 값. 레지스트리에서 빠진 항목은 무시된다. */
+/** 튜닝 값 저장본. 기본값과 다른 항목만 이름 → 값으로 저장. 레지스트리에서 빠진 항목은 무시된다. */
 UCLASS()
 class SNOWBATTLE_API USBTuningSave : public USaveGame
 {
 	GENERATED_BODY()
 
 public:
+	static constexpr int32 CurrentVersion = 1;
+
+	UPROPERTY()
+	int32 Version = 0;
+
 	UPROPERTY()
 	TMap<FName, float> Values;
 };

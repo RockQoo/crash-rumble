@@ -34,6 +34,7 @@ AActor* USBActorPoolSubsystem::Acquire(UClass* Class, const FTransform& Transfor
 		return nullptr;
 	}
 
+	++ActiveCounts.FindOrAdd(Class);
 	Actor->SetActorTransform(Transform, false, nullptr, ETeleportType::TeleportPhysics);
 	if (ISBPoolable* Poolable = Cast<ISBPoolable>(Actor))
 	{
@@ -52,6 +53,8 @@ void USBActorPoolSubsystem::Release(AActor* Actor)
 	{
 		Poolable->OnPoolReleased();
 	}
+	int32& Active = ActiveCounts.FindOrAdd(Actor->GetClass());
+	Active = FMath::Max(0, Active - 1);
 	FreeActors.FindOrAdd(Actor->GetClass()).Actors.Add(Actor);
 }
 
@@ -83,4 +86,10 @@ AActor* USBActorPoolSubsystem::SpawnPooled(UClass* Class)
 		++TotalSpawned;
 	}
 	return Actor;
+}
+
+int32 USBActorPoolSubsystem::GetFreeCount(UClass* Class) const
+{
+	const FSBActorPoolList* List = FreeActors.Find(Class);
+	return List ? List->Actors.Num() : 0;
 }

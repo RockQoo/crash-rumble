@@ -26,8 +26,16 @@ public:
 	UPROPERTY(config, EditAnywhere, Category = "Materials")
 	TSoftObjectPtr<UMaterialInterface> GlowMaterial;
 
+	/**
+	 * 피격 파티클(인스턴스 메시)용 발광 머티리얼. 인스턴스 메시에는 Custom Primitive Data가 먹지 않아
+	 * 일반 파라미터 Color / Intensity를 MID로 설정한다.
+	 */
+	UPROPERTY(config, EditAnywhere, Category = "Materials")
+	TSoftObjectPtr<UMaterialInterface> ParticleMaterial;
+
 	static UMaterialInterface* LoadCharacterMaterial();
 	static UMaterialInterface* LoadGlowMaterial();
+	static UMaterialInterface* LoadParticleMaterial();
 };
 
 namespace SBMaterialData

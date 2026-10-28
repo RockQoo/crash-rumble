@@ -66,7 +66,9 @@ void ASBHUD::DrawHealthBars()
 	for (TActorIterator<ASBSnowmanCharacter> It(GetWorld()); It; ++It)
 	{
 		const ASBSnowmanCharacter* Snowman = *It;
-		if (Snowman == LocalPawn || Snowman->GetMaxHealth() <= 0.f)
+		// 수백 마리일 때를 위해 맞아서 체력이 줄어든 대상만 표시
+		if (Snowman == LocalPawn || Snowman->IsHidden() || Snowman->GetMaxHealth() <= 0.f
+			|| Snowman->GetHealth() >= Snowman->GetMaxHealth())
 		{
 			continue;
 		}

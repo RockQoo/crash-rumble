@@ -446,30 +446,48 @@ FVector USBWeaponComponent::GetFireDirection(const FVector& Start) const
 	return WeaponRoot->GetForwardVector();
 }
 
-bool USBWeaponComponent::FireLaser(FHitResult& OutHit)
+int32 USBWeaponComponent::FireLaser(TArray<FHitResult>& OutTargetHits)
 {
 	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
 	const FVector Start = GetMuzzleLocation();
 	const FVector End = Start + GetFireDirection(Start) * Tuning.LaserRange;
 
+	// 눈사람을 맞히면 그 대상을 빼고 다시 쏜다 (관통 수만큼)
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(SBLaser), false, GetOwner());
-	const bool bHit = GetWorld()->LineTraceSingleByObjectType(OutHit, Start, End, SBCombat::GetWeaponQueryParams(), Params);
-
-	LaserBeamStart = Start;
-	LaserBeamEnd = bHit ? FVector(OutHit.ImpactPoint) : End;
-	LaserBeamTimeLeft = Tuning.LaserBeamDuration;
-
-	// 벽/바닥에 맞으면 작은 불꽃
-	if (bHit && !Cast<ASBSnowmanCharacter>(OutHit.GetActor()))
+	FVector BeamEnd = End;
+	const int32 MaxTargets = FMath::Max(Tuning.LaserPierce, 0) + 1;
+	for (int32 Iteration = 0; Iteration < MaxTargets + 1; ++Iteration)
 	{
-		if (USBFeedbackSubsystem* Feedback = USBFeedbackSubsystem::Get(this))
+		FHitResult Hit;
+		if (!GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, SBCombat::GetWeaponQueryParams(), Params))
 		{
-			Feedback->SpawnImpactParticles(OutHit.ImpactPoint, OutHit.ImpactNormal, LaserColor, 0.5f);
+			break;
 		}
+		if (!Cast<ASBSnowmanCharacter>(Hit.GetActor()))
+		{
+			// 벽/바닥: 빔이 여기서 끝나고 작은 불꽃
+			BeamEnd = Hit.ImpactPoint;
+			if (USBFeedbackSubsystem* Feedback = USBFeedbackSubsystem::Get(this))
+			{
+				Feedback->SpawnImpactParticles(Hit.ImpactPoint, Hit.ImpactNormal, LaserColor, 0.5f);
+			}
+			break;
+		}
+		OutTargetHits.Add(Hit);
+		if (OutTargetHits.Num() >= MaxTargets)
+		{
+			BeamEnd = Hit.ImpactPoint;
+			break;
+		}
+		Params.AddIgnoredActor(Hit.GetActor());
 	}
 
+	LaserBeamStart = Start;
+	LaserBeamEnd = BeamEnd;
+	LaserBeamTimeLeft = Tuning.LaserBeamDuration;
+
 	PlayFireFeedback();
-	return bHit && Cast<ASBSnowmanCharacter>(OutHit.GetActor()) != nullptr;
+	return OutTargetHits.Num();
 }
 
 void USBWeaponComponent::FireProjectile()

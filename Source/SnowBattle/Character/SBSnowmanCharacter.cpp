@@ -8,6 +8,8 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Core/SBGameSettings.h"
+#include "Core/SBTargetSpawner.h"
+#include "Kismet/GameplayStatics.h"
 #include "Core/SBTuningSettings.h"
 #include "Core/SBTuningSubsystem.h"
 #include "Engine/StaticMesh.h"
@@ -35,6 +37,12 @@ namespace
 	constexpr float FallSpeed = 4.f;   // 1/초
 	constexpr float ReviveSpeed = 3.f;
 	constexpr float FallAngle = 85.f;
+
+	// 몬스터
+	const FName AccentTag(TEXT("Accent"));
+	constexpr float SkyDropHeight = 1200.f;
+	constexpr float FallOutDistance = 3000.f;
+	constexpr float MonsterStopDistance = 110.f;
 }
 
 ASBSnowmanCharacter::ASBSnowmanCharacter()
@@ -42,6 +50,8 @@ ASBSnowmanCharacter::ASBSnowmanCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 
 	GetCapsuleComponent()->InitCapsuleSize(50.f, CapsuleHalfHeight);
+	// 몬스터 무리에 카메라가 막혀 밀려 들어오지 않도록
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
 
 	// 스켈레탈 메시는 쓰지 않는다
 	GetMesh()->SetVisibility(false);
@@ -96,6 +106,7 @@ void ASBSnowmanCharacter::BeginPlay()
 		BuildParts();
 	}
 
+	HomeLocation = GetActorLocation();
 	ViewComponent->Setup(SpringArm, Camera);
 	WeaponComponent->Initialize(FindPart(HandRId));
 	InitAbilitySystem();
@@ -190,20 +201,163 @@ void ASBSnowmanCharacter::Die()
 
 void ASBSnowmanCharacter::Revive()
 {
+	if (bMonster)
+	{
+		// 몬스터는 쓰러진 자리에서 일어나지 않고 하늘에서 새로 떨어진다
+		Respawn();
+		ResetPose();
+	}
+	RestoreFullHealth();
+	AbilitySystem->RemoveLooseGameplayTag(SBTags::State_Dead);
+	bDead = false;
+}
+
+void ASBSnowmanCharacter::RestoreFullHealth()
+{
 	const float MaxHealth = USBTuningSubsystem::GetSettings(this).MaxHealth;
 	AbilitySystem->SetNumericAttributeBase(USBAttributeSet::GetMaxHealthAttribute(), MaxHealth);
 	AbilitySystem->SetNumericAttributeBase(USBAttributeSet::GetHealthAttribute(), MaxHealth);
-	AbilitySystem->RemoveLooseGameplayTag(SBTags::State_Dead);
-	bDead = false;
+}
+
+void ASBSnowmanCharacter::ResetPose()
+{
+	FallAlpha = 0.f;
+	VisualRoot->SetRelativeLocationAndRotation(FVector::ZeroVector, FQuat::Identity);
+}
+
+void ASBSnowmanCharacter::Respawn()
+{
+	FVector Location = HomeLocation;
+	if (bMonster)
+	{
+		if (const USBTargetSpawnerSubsystem* Spawner = USBTargetSpawnerSubsystem::Get(this))
+		{
+			Spawner->FindSpawnLocation(SkyDropHeight, Location);
+		}
+	}
+	SetActorLocation(Location, false, nullptr, ETeleportType::TeleportPhysics);
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+}
+
+void ASBSnowmanCharacter::FellOutOfWorld(const UDamageType& DamageType)
+{
+	// 엔진 기본 동작(액터 삭제) 대신 다시 등장
+	Respawn();
 }
 
 void ASBSnowmanCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (bInPool)
+	{
+		return;
+	}
+
+	// 바닥 밖으로 떨어지면 KillZ까지 기다리지 않고 바로 재등장
+	if (GetActorLocation().Z < HomeLocation.Z - FallOutDistance)
+	{
+		Respawn();
+	}
+
+	UpdateChase(DeltaSeconds);
 	UpdateHands(DeltaSeconds);
 	UpdateFacing(DeltaSeconds);
 	UpdateFlash(DeltaSeconds);
 	UpdateFall(DeltaSeconds);
+}
+
+void ASBSnowmanCharacter::UpdateChase(float DeltaSeconds)
+{
+	if (!bMonster || bDead)
+	{
+		return;
+	}
+	const float Speed = USBTuningSubsystem::GetSettings(this).MonsterMoveSpeed;
+	const APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
+	if (Speed <= 0.f || !Player)
+	{
+		return;
+	}
+
+	FVector ToPlayer = Player->GetActorLocation() - GetActorLocation();
+	ToPlayer.Z = 0.f;
+	const float Distance = ToPlayer.Size();
+	if (Distance < 1.f)
+	{
+		return;
+	}
+	const FVector Direction = ToPlayer / Distance;
+	SetActorRotation(FMath::RInterpTo(GetActorRotation(), FRotator(0.f, Direction.Rotation().Yaw, 0.f), DeltaSeconds, 8.f));
+	if (Distance > MonsterStopDistance)
+	{
+		AddMovementInput(Direction, FMath::Clamp(Speed / GetCharacterMovement()->MaxWalkSpeed, 0.f, 1.f));
+	}
+}
+
+void ASBSnowmanCharacter::SetupAsMonster(const FLinearColor& InAccentColor)
+{
+	bMonster = true;
+	SetAccentColor(InAccentColor);
+
+	// 몬스터에겐 카메라/무기가 필요 없다 (수백 마리일 때 틱 비용 절약)
+	SpringArm->SetComponentTickEnabled(false);
+	ViewComponent->SetComponentTickEnabled(false);
+	WeaponComponent->SetComponentTickEnabled(false);
+	ApplyTuning();
+}
+
+void ASBSnowmanCharacter::SetAccentColor(const FLinearColor& InAccentColor)
+{
+	AccentColor = InAccentColor;
+	for (UStaticMeshComponent* Part : PartComponents)
+	{
+		if (Part && Part->ComponentTags.Contains(AccentTag))
+		{
+			if (bUseCustomPrimitiveData)
+			{
+				Part->SetCustomPrimitiveDataVector4(SBMaterialData::ColorIndex, FVector4(AccentColor.R, AccentColor.G, AccentColor.B, 1.f));
+			}
+			else if (UMaterialInstanceDynamic* Material = Cast<UMaterialInstanceDynamic>(Part->GetMaterial(0)))
+			{
+				Material->SetVectorParameterValue(ColorParam, AccentColor);
+			}
+		}
+	}
+}
+
+void ASBSnowmanCharacter::OnPoolAcquired()
+{
+	bInPool = false;
+	HomeLocation = GetActorLocation();
+	SetActorHiddenInGame(false);
+	SetActorEnableCollision(true);
+	SetActorTickEnabled(true);
+	GetCharacterMovement()->SetComponentTickEnabled(true);
+	GetCharacterMovement()->SetMovementMode(MOVE_Falling);
+
+	GetWorldTimerManager().ClearTimer(ReviveTimer);
+	if (AbilitySystem->AbilityActorInfo.IsValid())
+	{
+		RestoreFullHealth();
+		AbilitySystem->RemoveLooseGameplayTag(SBTags::State_Dead, AbilitySystem->GetTagCount(SBTags::State_Dead));
+	}
+	bDead = false;
+	ResetPose();
+	FlashTimeLeft = 0.f;
+	SetPartsFlash(0.f);
+}
+
+void ASBSnowmanCharacter::OnPoolReleased()
+{
+	bInPool = true;
+	GetWorldTimerManager().ClearTimer(ReviveTimer);
+	SetActorHiddenInGame(true);
+	SetActorEnableCollision(false);
+	SetActorTickEnabled(false);
+	GetCharacterMovement()->StopMovementImmediately();
+	GetCharacterMovement()->DisableMovement();
+	GetCharacterMovement()->SetComponentTickEnabled(false);
 }
 
 void ASBSnowmanCharacter::MoveInput(const FVector2D& Axis)
@@ -290,6 +444,10 @@ void ASBSnowmanCharacter::BuildParts()
 		Part->SetGenerateOverlapEvents(false);
 		Part->SetCanEverAffectNavigation(false);
 		Part->ComponentTags.Add(Spec.Id);
+		if (Spec.bUseAccentColor)
+		{
+			Part->ComponentTags.Add(AccentTag);
+		}
 		Part->SetupAttachment(VisualRoot);
 		Part->SetRelativeTransform(Spec.Transform);
 		Part->RegisterComponent();
@@ -319,7 +477,8 @@ void ASBSnowmanCharacter::BuildParts()
 void ASBSnowmanCharacter::ApplyTuning()
 {
 	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
-	GetCharacterMovement()->MaxWalkSpeed = Tuning.MoveSpeed;
+	// 몬스터는 이동 입력 크기로 속도를 줄이므로 최대 속도는 둘 중 큰 값
+	GetCharacterMovement()->MaxWalkSpeed = bMonster ? FMath::Max(Tuning.MoveSpeed, Tuning.MonsterMoveSpeed) : Tuning.MoveSpeed;
 	GetCharacterMovement()->MaxAcceleration = Tuning.MaxAcceleration;
 
 	// 최대 체력이 바뀌면 비율 유지

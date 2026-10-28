@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "AbilitySystemInterface.h"
+#include "Core/SBActorPool.h"
 #include "GameFramework/Character.h"
 #include "SBSnowmanCharacter.generated.h"
 
@@ -20,7 +21,7 @@ struct FOnAttributeChangeData;
  * 플레이어와 허수아비가 같은 클래스를 쓴다 (허수아비는 컨트롤러 입력이 없을 뿐).
  */
 UCLASS()
-class SNOWBATTLE_API ASBSnowmanCharacter : public ACharacter, public IAbilitySystemInterface
+class SNOWBATTLE_API ASBSnowmanCharacter : public ACharacter, public IAbilitySystemInterface, public ISBPoolable
 {
 	GENERATED_BODY()
 
@@ -31,6 +32,16 @@ public:
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void PossessedBy(AController* NewController) override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+	virtual void FellOutOfWorld(const UDamageType& DamageType) override;
+
+	// 풀 (다수 타격 테스트 몬스터)
+	virtual void OnPoolAcquired() override;
+	virtual void OnPoolReleased() override;
+
+	/** 풀에서 꺼낸 몬스터로 설정: 색 변경, 플레이어 추적, 죽으면 하늘에서 재등장. */
+	void SetupAsMonster(const FLinearColor& InAccentColor);
+	bool IsMonster() const { return bMonster; }
+	void SetAccentColor(const FLinearColor& InAccentColor);
 
 	/** 이동 입력. X = 오른쪽, Y = 앞 (카메라 기준). */
 	void MoveInput(const FVector2D& Axis);
@@ -90,6 +101,10 @@ private:
 	void HandleHealthChanged(const FOnAttributeChangeData& Data);
 	void Die();
 	void Revive();
+	void RestoreFullHealth();
+	void ResetPose();
+	void Respawn(); // 몬스터: 하늘에서 / 그 외: 처음 위치로
+	void UpdateChase(float DeltaSeconds);
 
 	void UpdateHands(float DeltaSeconds);
 	void UpdateFacing(float DeltaSeconds);
@@ -105,6 +120,9 @@ private:
 	FDelegateHandle TuningChangedHandle;
 	bool bUseCustomPrimitiveData = false;
 	bool bAbilitiesGranted = false;
+	bool bMonster = false;
+	bool bInPool = false;
+	FVector HomeLocation = FVector::ZeroVector;
 
 	// 쓰러짐: 0 = 서 있음, 1 = 완전히 누움
 	bool bDead = false;
