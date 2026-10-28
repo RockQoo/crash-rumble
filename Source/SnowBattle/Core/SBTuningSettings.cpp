@@ -128,10 +128,31 @@ const TArray<FSBTuningItem>& USBTuningSettings::GetItems()
 		SB_TUNE("타격감", HitParticleCount, "파티클 개수", 0.f, 64.f, 1.f);
 		SB_TUNE("타격감", HitParticleSpeed, "파티클 속도", 0.f, 3000.f, 10.f);
 		SB_TUNE("타격감", HitParticleLifetime, "파티클 수명(초)", 0.05f, 2.f, 0.01f);
-		SB_TUNE("타격감", HitParticleSize, "파티클 크기", 0.01f, 1.f, 0.01f);
+		SB_TUNE("타격감", HitParticleSize, "파티클 크기", 0.01f, 2.f, 0.01f);
+		SB_TUNE_BOOL("타격감", bParticleStretch, "파티클 속도 방향 늘이기");
+		SB_TUNE("타격감", ParticleStretch, "늘이기 정도", 0.f, 0.02f, 0.0005f);
+		SB_TUNE_BOOL("타격감", bParticleBounce, "파티클 바닥 튕김");
+		SB_TUNE("타격감", ParticleBounce, "튕김 탄성", 0.f, 1.f, 0.05f);
 		SB_TUNE_BOOL("타격감", bHitBurst, "피격 섬광");
-		SB_TUNE("타격감", HitBurstSize, "섬광 크기", 0.05f, 3.f, 0.05f);
+		SB_TUNE("타격감", HitBurstSize, "섬광 크기", 0.05f, 5.f, 0.05f);
 		SB_TUNE("타격감", HitBurstDuration, "섬광 시간(초)", 0.01f, 0.5f, 0.01f);
+		SB_TUNE_BOOL("타격감", bShockwave, "충격파 링");
+		SB_TUNE("타격감", ShockwaveCount, "링 조각 수", 4.f, 64.f, 1.f);
+		SB_TUNE("타격감", ShockwaveSpeed, "링 퍼지는 속도", 100.f, 4000.f, 50.f);
+		SB_TUNE("타격감", ShockwaveSize, "링 조각 크기", 0.02f, 1.f, 0.01f);
+		SB_TUNE_BOOL("타격감", bKillExplosion, "처치 폭발");
+		SB_TUNE("타격감", KillExplosionCount, "폭발 파편 수", 0.f, 200.f, 1.f);
+		SB_TUNE("타격감", KillExplosionSpeed, "폭발 속도 배율", 0.2f, 5.f, 0.1f);
+		SB_TUNE("타격감", KillExplosionSize, "폭발 크기 배율", 0.2f, 5.f, 0.1f);
+
+		SB_TUNE_BOOL("사망 연출", bDeathDismember, "머리/몸통/손 분리 (끄면 뒤로 넘어짐)");
+		SB_TUNE("사망 연출", DeathKnockbackScale, "사망 넉백 배율", 0.f, 10.f, 0.1f);
+		SB_TUNE("사망 연출", DeathMinLaunchSpeed, "최소 날아가는 속도", 0.f, 3000.f, 50.f);
+		SB_TUNE("사망 연출", DeathHeadPop, "머리 튀어오르는 세기", 0.f, 3000.f, 50.f);
+		SB_TUNE("사망 연출", DeathHandScatter, "손 흩어지는 세기", 0.f, 3000.f, 50.f);
+		SB_TUNE("사망 연출", DeathSpin, "회전 속도(도/초)", 0.f, 3000.f, 30.f);
+		SB_TUNE("사망 연출", DeathGravity, "중력", 100.f, 6000.f, 100.f);
+		SB_TUNE("사망 연출", DeathBounce, "바닥 튕김 탄성", 0.f, 1.f, 0.05f);
 
 		SB_TUNE_BOOL("사격 반동", bWeaponRecoil, "총 반동 (킥백)");
 		SB_TUNE("사격 반동", RecoilKickback, "킥백 거리", 0.f, 60.f, 0.5f);
@@ -151,7 +172,11 @@ const TArray<FSBTuningItem>& USBTuningSettings::GetItems()
 		SB_TUNE("다수 타격 테스트", SpawnRadius, "생성 반경", 300.f, 3800.f, 50.f);
 
 		SB_TUNE("팀 전투", BattleMoveSpeed, "이동 속도", 50.f, 1000.f, 10.f);
-		SB_TUNE("팀 전투", BattleAttackRange, "공격 시작 거리", 80.f, 400.f, 5.f);
+		SB_TUNE("팀 전투", BattleAttackRange, "칼 공격 시작 거리", 80.f, 400.f, 5.f);
+		SB_TUNE("팀 전투", BattleGunRange, "총 사격 시작 거리", 200.f, 3000.f, 50.f);
+		SB_TUNE("팀 전투", BattleSwordRatio, "무기 비율: 칼", 0.f, 10.f, 1.f);
+		SB_TUNE("팀 전투", BattleLaserRatio, "무기 비율: 레이저", 0.f, 10.f, 1.f);
+		SB_TUNE("팀 전투", BattleProjectileRatio, "무기 비율: 투사체", 0.f, 10.f, 1.f);
 		SB_TUNE("팀 전투", BattleTeamDistance, "진영 간 거리(절반)", 200.f, 2000.f, 50.f);
 		SB_TUNE("팀 전투", BattleSpread, "진영 퍼짐 반경", 50.f, 1500.f, 25.f);
 		SB_TUNE_BOOL("팀 전투", bBattleSpectate, "관전 (플레이어 숨김)");

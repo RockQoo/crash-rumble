@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
@@ -118,13 +118,35 @@ public:
 	UPROPERTY() float CameraShakeDuration = 0.2f;
 	UPROPERTY() float CameraShakeFrequency = 25.f;
 	UPROPERTY() bool bHitParticles = true;
-	UPROPERTY() int32 HitParticleCount = 14;
-	UPROPERTY() float HitParticleSpeed = 500.f;
-	UPROPERTY() float HitParticleLifetime = 0.45f;
-	UPROPERTY() float HitParticleSize = 0.15f;
+	UPROPERTY() int32 HitParticleCount = 20;
+	UPROPERTY() float HitParticleSpeed = 750.f;
+	UPROPERTY() float HitParticleLifetime = 0.6f;
+	UPROPERTY() float HitParticleSize = 0.22f;
+	UPROPERTY() bool bParticleStretch = true;
+	UPROPERTY() float ParticleStretch = 0.0015f;
+	UPROPERTY() bool bParticleBounce = true;
+	UPROPERTY() float ParticleBounce = 0.45f;
 	UPROPERTY() bool bHitBurst = true;
-	UPROPERTY() float HitBurstSize = 0.7f;
-	UPROPERTY() float HitBurstDuration = 0.08f;
+	UPROPERTY() float HitBurstSize = 1.f;
+	UPROPERTY() float HitBurstDuration = 0.09f;
+	UPROPERTY() bool bShockwave = true;
+	UPROPERTY() int32 ShockwaveCount = 16;
+	UPROPERTY() float ShockwaveSpeed = 900.f;
+	UPROPERTY() float ShockwaveSize = 0.12f;
+	UPROPERTY() bool bKillExplosion = true;
+	UPROPERTY() int32 KillExplosionCount = 28;
+	UPROPERTY() float KillExplosionSpeed = 1.3f;
+	UPROPERTY() float KillExplosionSize = 0.9f;
+
+	// 사망 연출
+	UPROPERTY() bool bDeathDismember = true;
+	UPROPERTY() float DeathKnockbackScale = 0.8f;
+	UPROPERTY() float DeathMinLaunchSpeed = 450.f;
+	UPROPERTY() float DeathHeadPop = 900.f;
+	UPROPERTY() float DeathHandScatter = 400.f;
+	UPROPERTY() float DeathSpin = 720.f;
+	UPROPERTY() float DeathGravity = 2200.f;
+	UPROPERTY() float DeathBounce = 0.4f;
 
 	// 타격감 - 사격 반동
 	UPROPERTY() bool bWeaponRecoil = true;
@@ -142,12 +164,16 @@ public:
 
 	// 다수 타격 테스트
 	UPROPERTY() float MonsterMaxHealth = 100.f;
-	UPROPERTY() float MonsterMoveSpeed = 0.f;
+	UPROPERTY() float MonsterMoveSpeed = 100.f;
 	UPROPERTY() float SpawnRadius = 1500.f;
 
 	// 팀 전투 (레드 vs 블루)
 	UPROPERTY() float BattleMoveSpeed = 350.f;
 	UPROPERTY() float BattleAttackRange = 150.f;
+	UPROPERTY() float BattleGunRange = 800.f;
+	UPROPERTY() int32 BattleSwordRatio = 4;
+	UPROPERTY() int32 BattleLaserRatio = 3;
+	UPROPERTY() int32 BattleProjectileRatio = 3;
 	UPROPERTY() float BattleTeamDistance = 700.f;
 	UPROPERTY() float BattleSpread = 350.f;
 	UPROPERTY() bool bBattleSpectate = true;

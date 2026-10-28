@@ -58,7 +58,10 @@ private:
 		float Age = 0.f;
 		float Lifetime = 0.f;
 		float Size = 0.f;
+		float GroundZ = -UE_BIG_NUMBER; // 이 높이에서 튕긴다
+		float Drag = 0.f;
 		bool bStatic = false; // 섬광: 제자리에서 줄어들기만 함
+		bool bGravity = true;
 		bool bAlive = false;
 	};
 
@@ -77,8 +80,12 @@ private:
 	void UpdateHitStop();
 	void AddDamageNumber(const FVector& Location, float Value, ESBWeaponType Weapon);
 	FParticleBatch* GetParticleBatch(const FLinearColor& Color);
-	void EmitParticles(const FLinearColor& Color, const FVector& Location, const FVector& Direction, int32 Count, float SpeedScale);
+	FParticle& NextParticle(FParticleBatch& Batch);
+	void EmitParticles(const FLinearColor& Color, const FVector& Location, const FVector& Direction, int32 Count, float SpeedScale,
+		float SizeScale = 1.f, float GroundZ = -UE_BIG_NUMBER);
 	void EmitBurst(const FLinearColor& Color, const FVector& Location, float SizeScale);
+	/** 수평으로 퍼지는 충격파 링 (조각들이 원형으로 바깥으로 밀려남). */
+	void EmitRing(const FLinearColor& Color, const FVector& Location, float SizeScale);
 	void UpdateParticles(float DeltaTime);
 
 	TArray<FHitStopEntry> HitStops;

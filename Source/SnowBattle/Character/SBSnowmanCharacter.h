@@ -4,6 +4,7 @@
 #include "AbilitySystemInterface.h"
 #include "Core/SBActorPool.h"
 #include "GameFramework/Character.h"
+#include "Weapon/SBWeaponTypes.h"
 #include "SBSnowmanCharacter.generated.h"
 
 class UAbilitySystemComponent;
@@ -51,14 +52,18 @@ public:
 	 * 풀에서 꺼낸 몬스터로 설정: 색 변경, 죽으면 하늘에서 재등장.
 	 * 팀이 없으면 플레이어를 쫓고, 팀이 있으면 가장 가까운 적 팀을 찾아 칼로 공격한다.
 	 */
-	void SetupAsMonster(const FLinearColor& InAccentColor, ESBTeam InTeam = ESBTeam::None);
+	void SetupAsMonster(const FLinearColor& InAccentColor, ESBTeam InTeam = ESBTeam::None,
+		ESBWeaponType InWeapon = ESBWeaponType::Sword);
 	bool IsMonster() const { return bMonster; }
 	bool IsInPool() const { return bInPool; }
 	ESBTeam GetTeam() const { return Team; }
 	void SetAccentColor(const FLinearColor& InAccentColor);
 
 	/** 관전: 숨기고 다른 눈사람과 부딪히지 않게 한다. */
-	void SetSpectating(bool bSpectating);
+	void SetSpectating(bool bInSpectating);
+
+	/** 무기가 겨눌 지점. 플레이어는 조준점, 팀 전투 AI는 현재 적. 없으면 false. */
+	bool GetWeaponAimPoint(FVector& OutPoint) const;
 
 	/** 이동 입력. X = 오른쪽, Y = 앞 (카메라 기준). */
 	void MoveInput(const FVector2D& Axis);
@@ -124,6 +129,12 @@ private:
 	void UpdateChase(float DeltaSeconds);
 	void UpdateBattle(float DeltaSeconds);
 	float GetTunedMaxHealth() const;
+	void UpdatePawnBlocking();
+
+	// 사망 분리: 머리 묶음 / 몸통 / 양손이 따로 날아가 튕긴다 (물리 엔진 없이 직접 계산)
+	void StartDismember(const FVector& HitVelocity);
+	void UpdateDismember(float DeltaSeconds);
+	void Reassemble();
 
 	void UpdateHands(float DeltaSeconds);
 	void UpdateFacing(float DeltaSeconds);
@@ -133,6 +144,26 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UStaticMeshComponent>> PartComponents;
+	TArray<FTransform> PartRestTransforms; // PartComponents와 같은 순서
+
+	struct FDeathChunk
+	{
+		TArray<int32> PartIndices;       // PartComponents 인덱스
+		TArray<FTransform> PartOffsets;  // 조각 기준 상대 트랜스폼
+		FVector Location = FVector::ZeroVector;
+		FVector Velocity = FVector::ZeroVector;
+		FQuat Rotation = FQuat::Identity;
+		FVector SpinAxis = FVector::UpVector;
+		float SpinSpeed = 0.f; // 라디안/초
+		float Radius = 10.f;
+		bool bResting = false;
+	};
+	TArray<FDeathChunk> DeathChunks;
+	bool bDismembered = false;
+	bool bPendingDismember = false;
+	bool bSpectating = false;
+	float DeathGroundZ = 0.f;
+	ESBWeaponType BattleWeapon = ESBWeaponType::Sword;
 
 	TMap<FName, FVector> HandRestLocations;
 	float HandBobTime = 0.f;

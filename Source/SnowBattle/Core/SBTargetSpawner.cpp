@@ -122,8 +122,16 @@ void USBTargetSpawnerSubsystem::StartBattle(int32 PerTeam)
 		const float Side = Team == ESBTeam::Red ? -1.f : 1.f;
 		const FVector Base = BattleCenter + BattleAxis * Side * Tuning.BattleTeamDistance;
 		const FRotator Facing(0.f, (-BattleAxis * Side).Rotation().Yaw, 0.f);
+		const int32 SwordWeight = FMath::Max(Tuning.BattleSwordRatio, 0);
+		const int32 LaserWeight = FMath::Max(Tuning.BattleLaserRatio, 0);
+		const int32 TotalWeight = FMath::Max(SwordWeight + LaserWeight + FMath::Max(Tuning.BattleProjectileRatio, 0), 1);
 		for (int32 i = 0; i < PerTeam; ++i)
 		{
+			// 비율대로 고르게 섞는다 (예: 4:3:3 → 10명 중 칼 4, 레이저 3, 투사체 3)
+			const int32 Slot = FMath::FloorToInt((i + 0.5f) * TotalWeight / FMath::Max(PerTeam, 1)) % TotalWeight;
+			const ESBWeaponType Weapon = Slot < SwordWeight ? ESBWeaponType::Sword
+				: Slot < SwordWeight + LaserWeight ? ESBWeaponType::Laser
+				: ESBWeaponType::Projectile;
 			FVector Location;
 			if (!FindGroundAround(Base, 0.f, Tuning.BattleSpread, 0.f, Location))
 			{
@@ -131,7 +139,7 @@ void USBTargetSpawnerSubsystem::StartBattle(int32 PerTeam)
 			}
 			if (ASBSnowmanCharacter* Fighter = Pool->Acquire<ASBSnowmanCharacter>(FTransform(Facing, Location)))
 			{
-				Fighter->SetupAsMonster(Team == ESBTeam::Red ? RedAccent : BlueAccent, Team);
+				Fighter->SetupAsMonster(Team == ESBTeam::Red ? RedAccent : BlueAccent, Team, Weapon);
 				ActiveTargets.Add(Fighter);
 			}
 		}

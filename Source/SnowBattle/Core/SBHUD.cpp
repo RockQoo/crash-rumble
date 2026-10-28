@@ -67,7 +67,7 @@ void ASBHUD::DrawHealthBars()
 	{
 		const ASBSnowmanCharacter* Snowman = *It;
 		// 수백 마리일 때를 위해 맞아서 체력이 줄어든 대상만 표시
-		if (Snowman == LocalPawn || Snowman->IsHidden() || Snowman->GetMaxHealth() <= 0.f
+		if (Snowman == LocalPawn || Snowman->IsHidden() || Snowman->IsDead() || Snowman->GetMaxHealth() <= 0.f
 			|| Snowman->GetHealth() >= Snowman->GetMaxHealth())
 		{
 			continue;

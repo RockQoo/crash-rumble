@@ -354,10 +354,11 @@ void USBWeaponComponent::UpdateHandPose(float DeltaTime)
 		const ASBSnowmanCharacter* Snowman = Cast<ASBSnowmanCharacter>(Owner);
 		const FTransform ActorTransform = Owner->GetActorTransform();
 		FRotator Aim = FRotator::ZeroRotator;
-		if (Snowman && Snowman->GetViewComponent() && Snowman->IsPlayerControlled())
+		FVector AimPoint;
+		if (Snowman && Snowman->GetWeaponAimPoint(AimPoint))
 		{
 			const FVector HandWorld = ActorTransform.TransformPosition(GunHandLocation);
-			const FVector LocalDir = ActorTransform.InverseTransformVectorNoScale(Snowman->GetViewComponent()->GetAimPoint() - HandWorld);
+			const FVector LocalDir = ActorTransform.InverseTransformVectorNoScale(AimPoint - HandWorld);
 			Aim = LocalDir.Rotation();
 			Aim.Pitch = FMath::Clamp(Aim.Pitch, -60.f, 60.f);
 			Aim.Yaw = FMath::Clamp(FRotator::NormalizeAxis(Aim.Yaw), -50.f, 50.f);
@@ -434,9 +435,10 @@ FVector USBWeaponComponent::GetMuzzleLocation() const
 FVector USBWeaponComponent::GetFireDirection(const FVector& Start) const
 {
 	const ASBSnowmanCharacter* Snowman = Cast<ASBSnowmanCharacter>(GetOwner());
-	if (Snowman && Snowman->IsPlayerControlled() && Snowman->GetViewComponent())
+	FVector AimPoint;
+	if (Snowman && Snowman->GetWeaponAimPoint(AimPoint))
 	{
-		const FVector ToAim = Snowman->GetViewComponent()->GetAimPoint() - Start;
+		const FVector ToAim = AimPoint - Start;
 		// 조준점이 총구 뒤/너무 가까우면 몸 정면으로
 		if (ToAim.SizeSquared() > FMath::Square(50.f) && FVector::DotProduct(ToAim, GetOwner()->GetActorForwardVector()) > 0.f)
 		{
@@ -456,7 +458,10 @@ int32 USBWeaponComponent::FireLaser(TArray<FHitResult>& OutTargetHits)
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(SBLaser), false, GetOwner());
 	FVector BeamEnd = End;
 	const int32 MaxTargets = FMath::Max(Tuning.LaserPierce, 0) + 1;
-	for (int32 Iteration = 0; Iteration < MaxTargets + 1; ++Iteration)
+	const ASBSnowmanCharacter* Shooter = Cast<ASBSnowmanCharacter>(GetOwner());
+	const ESBTeam ShooterTeam = Shooter ? Shooter->GetTeam() : ESBTeam::None;
+	constexpr int32 MaxPassThrough = 16; // 아군/시체를 통과하는 최대 횟수
+	for (int32 Iteration = 0; Iteration < MaxTargets + MaxPassThrough; ++Iteration)
 	{
 		FHitResult Hit;
 		if (!GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, SBCombat::GetWeaponQueryParams(), Params))
@@ -472,6 +477,13 @@ int32 USBWeaponComponent::FireLaser(TArray<FHitResult>& OutTargetHits)
 				Feedback->SpawnImpactParticles(Hit.ImpactPoint, Hit.ImpactNormal, LaserColor, 0.5f);
 			}
 			break;
+		}
+		// 쓰러진 눈사람과 (팀 전투) 아군은 빔이 통과
+		const ASBSnowmanCharacter* HitSnowman = Cast<ASBSnowmanCharacter>(Hit.GetActor());
+		if (HitSnowman->IsDead() || (ShooterTeam != ESBTeam::None && HitSnowman->GetTeam() == ShooterTeam))
+		{
+			Params.AddIgnoredActor(Hit.GetActor());
+			continue;
 		}
 		OutTargetHits.Add(Hit);
 		if (OutTargetHits.Num() >= MaxTargets)

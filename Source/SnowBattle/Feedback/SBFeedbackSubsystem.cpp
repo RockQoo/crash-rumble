@@ -16,9 +16,12 @@
 namespace
 {
 	constexpr int32 MaxDamageNumbers = 64;
-	constexpr int32 ParticlesPerBatch = 128;
-	constexpr float ParticleGravity = 600.f;
-	constexpr float ParticleDrag = 3.f;
+	constexpr int32 ParticlesPerBatch = 512;
+	constexpr float ParticleGravity = 900.f;
+	constexpr float ParticleDrag = 2.5f;
+	constexpr float RingDrag = 7.f;
+	constexpr float RingLifetime = 0.3f;
+	constexpr float VictimHalfHeight = 100.f;
 	constexpr float ParticleGlowIntensity = 6.f;
 
 	const FLinearColor SnowColor(0.9f, 0.95f, 1.f);
@@ -103,15 +106,48 @@ void USBFeedbackSubsystem::OnHit(AActor* Attacker, ASBSnowmanCharacter* Victim, 
 		}
 	}
 
+	const FLinearColor WeaponColor = GetWeaponColor(Weapon);
+	const float GroundZ = Victim->GetActorLocation().Z - VictimHalfHeight;
+	const bool bKill = Victim->IsDead(); // 데미지가 먼저 적용되므로 이 타격으로 죽었으면 true
+
 	if (Tuning.bHitParticles)
 	{
-		EmitParticles(GetWeaponColor(Weapon), HitLocation, Direction, Tuning.HitParticleCount, 1.f);
-		EmitParticles(SnowColor, HitLocation, Direction, Tuning.HitParticleCount / 2, 0.6f);
+		EmitParticles(WeaponColor, HitLocation, Direction, Tuning.HitParticleCount, 1.f, 1.f, GroundZ);
+		EmitParticles(SnowColor, HitLocation, Direction, Tuning.HitParticleCount / 2, 0.6f, 1.f, GroundZ);
 	}
 	if (Tuning.bHitBurst)
 	{
-		EmitBurst(GetWeaponColor(Weapon), HitLocation, 1.f);
+		EmitBurst(WeaponColor, HitLocation, 1.f);
 	}
+	if (Tuning.bShockwave)
+	{
+		EmitRing(WeaponColor, HitLocation, 1.f);
+	}
+
+	if (bKill && Tuning.bKillExplosion)
+	{
+		// 처치 확정: 눈 폭발 (몸 중심에서 사방으로)
+		const FVector Center = Victim->GetActorLocation();
+		const float Size = Tuning.KillExplosionSize;
+		EmitParticles(SnowColor, Center, Direction, Tuning.KillExplosionCount, Tuning.KillExplosionSpeed, Size, GroundZ);
+		EmitParticles(WeaponColor, Center, Direction, Tuning.KillExplosionCount / 2, Tuning.KillExplosionSpeed * 1.2f, Size * 0.8f, GroundZ);
+		EmitBurst(FLinearColor::White, Center, Size * 1.5f);
+		if (Tuning.bShockwave)
+		{
+			EmitRing(SnowColor, FVector(Center.X, Center.Y, GroundZ + 10.f), Size * 1.5f);
+		}
+	}
+}
+
+USBFeedbackSubsystem::FParticle& USBFeedbackSubsystem::NextParticle(FParticleBatch& Batch)
+{
+	// 고정 버퍼를 돌려 쓴다: 꽉 차면 가장 오래된 것을 덮어씀
+	FParticle& P = Batch.Particles[Batch.Next];
+	Batch.Next = (Batch.Next + 1) % ParticlesPerBatch;
+	P = FParticle();
+	P.bAlive = true;
+	Batch.bAnyAlive = true;
+	return P;
 }
 
 void USBFeedbackSubsystem::EmitBurst(const FLinearColor& Color, const FVector& Location, float SizeScale)
@@ -122,16 +158,34 @@ void USBFeedbackSubsystem::EmitBurst(const FLinearColor& Color, const FVector& L
 		return;
 	}
 	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
-	FParticle& P = Batch->Particles[Batch->Next];
-	Batch->Next = (Batch->Next + 1) % ParticlesPerBatch;
+	FParticle& P = NextParticle(*Batch);
 	P.Location = Location;
-	P.Velocity = FVector::ZeroVector;
-	P.Age = 0.f;
 	P.Lifetime = Tuning.HitBurstDuration;
 	P.Size = Tuning.HitBurstSize * SizeScale;
 	P.bStatic = true;
-	P.bAlive = true;
-	Batch->bAnyAlive = true;
+}
+
+void USBFeedbackSubsystem::EmitRing(const FLinearColor& Color, const FVector& Location, float SizeScale)
+{
+	FParticleBatch* Batch = GetParticleBatch(Color);
+	if (!Batch)
+	{
+		return;
+	}
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
+	const int32 Count = FMath::Max(Tuning.ShockwaveCount, 1);
+	const float StartAngle = FMath::FRandRange(0.f, UE_TWO_PI);
+	for (int32 i = 0; i < Count; ++i)
+	{
+		const float Angle = StartAngle + UE_TWO_PI * i / Count;
+		FParticle& P = NextParticle(*Batch);
+		P.Location = Location;
+		P.Velocity = FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * Tuning.ShockwaveSpeed * SizeScale;
+		P.Lifetime = RingLifetime;
+		P.Size = Tuning.ShockwaveSize * SizeScale;
+		P.Drag = RingDrag;
+		P.bGravity = false;
+	}
 }
 
 void USBFeedbackSubsystem::SpawnImpactParticles(const FVector& Location, const FVector& Normal, const FLinearColor& Color, float CountScale)
@@ -278,7 +332,8 @@ USBFeedbackSubsystem::FParticleBatch* USBFeedbackSubsystem::GetParticleBatch(con
 	return &Batch;
 }
 
-void USBFeedbackSubsystem::EmitParticles(const FLinearColor& Color, const FVector& Location, const FVector& Direction, int32 Count, float SpeedScale)
+void USBFeedbackSubsystem::EmitParticles(const FLinearColor& Color, const FVector& Location, const FVector& Direction, int32 Count,
+	float SpeedScale, float SizeScale, float GroundZ)
 {
 	if (Count <= 0)
 	{
@@ -293,23 +348,20 @@ void USBFeedbackSubsystem::EmitParticles(const FLinearColor& Color, const FVecto
 	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
 	for (int32 i = 0; i < Count; ++i)
 	{
-		FParticle& P = Batch->Particles[Batch->Next];
-		Batch->Next = (Batch->Next + 1) % ParticlesPerBatch;
-
+		FParticle& P = NextParticle(*Batch);
 		const FVector Dir = (Direction + FMath::VRand() * 0.9f + FVector::UpVector * 0.5f).GetSafeNormal();
 		P.Location = Location;
 		P.Velocity = Dir * Tuning.HitParticleSpeed * SpeedScale * FMath::FRandRange(0.5f, 1.2f);
-		P.Age = 0.f;
-		P.Lifetime = Tuning.HitParticleLifetime * FMath::FRandRange(0.7f, 1.2f);
-		P.Size = Tuning.HitParticleSize * FMath::FRandRange(0.6f, 1.3f);
-		P.bStatic = false;
-		P.bAlive = true;
+		P.Lifetime = Tuning.HitParticleLifetime * FMath::FRandRange(0.7f, 1.3f);
+		P.Size = Tuning.HitParticleSize * SizeScale * FMath::FRandRange(0.6f, 1.3f);
+		P.Drag = ParticleDrag;
+		P.GroundZ = GroundZ;
 	}
-	Batch->bAnyAlive = true;
 }
 
 void USBFeedbackSubsystem::UpdateParticles(float DeltaTime)
 {
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
 	for (FParticleBatch& Batch : ParticleBatches)
 	{
 		if (!Batch.bAnyAlive)
@@ -341,12 +393,36 @@ void USBFeedbackSubsystem::UpdateParticles(float DeltaTime)
 			{
 				if (!P.bStatic)
 				{
-					P.Velocity.Z -= ParticleGravity * DeltaTime;
-					P.Velocity *= FMath::Max(0.f, 1.f - ParticleDrag * DeltaTime);
+					if (P.bGravity)
+					{
+						P.Velocity.Z -= ParticleGravity * DeltaTime;
+					}
+					P.Velocity *= FMath::Max(0.f, 1.f - P.Drag * DeltaTime);
 					P.Location += P.Velocity * DeltaTime;
+
+					const float Radius = P.Size * 50.f; // 구 메시 반지름 100 * 0.5
+					if (Tuning.bParticleBounce && P.Location.Z - Radius < P.GroundZ && P.Velocity.Z < 0.f)
+					{
+						P.Location.Z = P.GroundZ + Radius;
+						P.Velocity.Z = -P.Velocity.Z * Tuning.ParticleBounce;
+						P.Velocity.X *= 0.7f;
+						P.Velocity.Y *= 0.7f;
+					}
 				}
+
+				const float Shrink = P.Size * (1.f - P.Age / P.Lifetime);
 				Transform.SetLocation(P.Location);
-				Transform.SetScale3D(FVector(P.Size * (1.f - P.Age / P.Lifetime)));
+				if (Tuning.bParticleStretch && !P.bStatic)
+				{
+					// 속도 방향으로 길쭉한 불똥
+					const float Speed = P.Velocity.Size();
+					Transform.SetRotation(Speed > 1.f ? P.Velocity.ToOrientationQuat() : FQuat::Identity);
+					Transform.SetScale3D(FVector(Shrink * (1.f + Speed * Tuning.ParticleStretch), Shrink, Shrink));
+				}
+				else
+				{
+					Transform.SetScale3D(FVector(Shrink));
+				}
 				bAnyAlive = true;
 			}
 			Component->UpdateInstanceTransform(i, Transform, true, false, true);
