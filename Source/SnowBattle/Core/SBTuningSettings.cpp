@@ -72,7 +72,7 @@ const TArray<FSBTuningItem>& USBTuningSettings::GetItems()
 		SB_TUNE("손", HandBobAmplitude, "손 흔들림 크기", 0.f, 30.f, 0.5f);
 		SB_TUNE("손", HandBobSpeed, "손 흔들림 속도", 0.f, 10.f, 0.1f);
 
-		SB_TUNE("전투", MaxHealth, "최대 체력", 1.f, 1000.f, 5.f);
+		SB_TUNE("전투", MaxHealth, "최대 체력", 1.f, 5000.f, 10.f);
 		SB_TUNE("전투", RespawnDelay, "쓰러진 뒤 부활까지(초)", 0.f, 10.f, 0.1f);
 
 		SB_TUNE("칼", SwordDamage, "데미지", 0.f, 200.f, 1.f);

@@ -51,7 +51,7 @@ public:
 	UPROPERTY() float ShoulderFOV = 90.f;
 
 	// 카메라 - 탑다운
-	UPROPERTY() float TopDownArmLength = 1500.f;
+	UPROPERTY() float TopDownArmLength = 1200.f;
 	UPROPERTY() float TopDownPitch = 60.f;
 	UPROPERTY() float TopDownFOV = 70.f;
 
@@ -60,7 +60,7 @@ public:
 	UPROPERTY() float HandBobSpeed = 2.f;
 
 	// 전투 공통
-	UPROPERTY() float MaxHealth = 100.f;
+	UPROPERTY() float MaxHealth = 1000.f;
 	UPROPERTY() float RespawnDelay = 3.f;
 
 	// 칼
