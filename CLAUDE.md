@@ -42,6 +42,7 @@ UE 5.8.4 + C++ + Gameplay Ability System(GAS)으로 만드는 배틀 프로토�
 
 ```
 Source/SnowBattle/
+  Core/        게임모드, 컨트롤러, HUD, 튜닝 시스템/옵션창
   Character/   눈사람 캐릭터, 파츠 조립 컴포넌트
   Camera/      숄더뷰/탑다운 전환
   GAS/         AttributeSet, GameplayAbility(칼/레이저/투사체), GameplayEffect
@@ -49,4 +50,6 @@ Source/SnowBattle/
   Feedback/    타격감 (히트스톱, 넉백, 플래시, 데미지 숫자, 카메라 셰이크)
 ```
 
-클래스 접두사는 프로젝트 생성 시 확정하고 이 섹션을 갱신한다.
+클래스 접두사는 `SB` (`ASBSnowmanCharacter`, `USBTuningSettings`, `SSBTuningPanel` 등).
+
+- 튜닝이 필요한 수치는 하드코딩하지 말고 `USBTuningSettings`에 추가하고 레지스트리에 등록한다 (인게임 Tab 옵션창에 자동 노출)

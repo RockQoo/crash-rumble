@@ -18,6 +18,8 @@ public class SnowBattle : ModuleRules
 			"GameplayTasks"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
+
+		PublicIncludePaths.Add(ModuleDirectory);
 	}
 }
