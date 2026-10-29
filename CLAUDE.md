@@ -17,11 +17,12 @@ UE 5.8.4 + C++ + Gameplay Ability System(GAS)으로 만드는 배틀 프로토�
 
 - 엔진: UE 5.8.4 (Epic 런처 설치) — `C:\Program Files\Epic Games\UE_5.8`
 - 툴체인: Visual Studio 2026 Community, MSVC 14.44, Windows SDK 10.0.22621
-- 빌드: `& "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" SnowBattleEditor Win64 Development "-Project=C:\Work\Projects\snow-battle\SnowBattle.uproject" -WaitMutex`
+- 빌드: `& "C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" CrashRumbleEditor Win64 Development "-Project=C:\Work\Projects\crash-rumble\CrashRumble.uproject" -WaitMutex`
 - MCP: 에디터 실행 시 Unreal MCP 서버 자동 시작 (`http://127.0.0.1:8000/mcp`, 설정은 `Config/DefaultEditorPerProjectUserSettings.ini`), Claude Code 연결은 `.mcp.json`
 - 에디터 연동: Epic 공식 MCP 플러그인(Unreal MCP, Terminal, Editor Tool Set)으로 Claude Code가 에디터 작업 수행
 - OS: Windows, 셸은 PowerShell / Git Bash
-- 저장소: https://github.com/RockQoo/crash-rumble.git (2026-10-29 snow-battle에서 이름 변경, 프로젝트 이름 CrashRumble로 변경 예정. 지금 로컬 폴더 `snow-battle`, UE 프로젝트/모듈명 `SnowBattle`)
+- 녹화(자가 확인/GIF용): `.\Tools\record.ps1 -Name <이름> -Cmds "CRToggleView, CRSpawn 30, CRDemo 5" -Seconds 30` → `Recordings/` (git 제외). 콘솔 명령: `CRSpawn` `CRClear` `CRBattle` `CRDemo` `CRToggleView` `CRAutoFire` `cr.Tune`
+- 저장소: https://github.com/RockQoo/crash-rumble.git (로컬 폴더 `crash-rumble`, UE 프로젝트/모듈명 `CrashRumble`. 2026-10-29 snow-battle / SnowBattle에서 이름 변경, 옛 클래스는 DefaultEngine.ini [CoreRedirects]로 연결)
 
 ## 작업 원칙
 
@@ -41,7 +42,7 @@ UE 5.8.4 + C++ + Gameplay Ability System(GAS)으로 만드는 배틀 프로토�
 ## 코드 구조 (예정)
 
 ```
-Source/SnowBattle/
+Source/CrashRumble/
   Core/        게임모드, 컨트롤러, HUD, 튜닝 시스템/옵션창
   Character/   눈사람 캐릭터, 파츠 조립 컴포넌트
   Camera/      숄더뷰/탑다운 전환
@@ -50,6 +51,6 @@ Source/SnowBattle/
   Feedback/    타격감 (히트스톱, 넉백, 플래시, 데미지 숫자, 카메라 셰이크)
 ```
 
-클래스 접두사는 `SB` (`ASBSnowmanCharacter`, `USBTuningSettings`, `SSBTuningPanel` 등).
+클래스 접두사는 `CR` (`ACRCharacter`, `UCRTuningSettings`, `SCRTuningPanel` 등).
 
-- 튜닝이 필요한 수치는 하드코딩하지 말고 `USBTuningSettings`에 추가하고 레지스트리에 등록한다 (인게임 Tab 옵션창에 자동 노출)
+- 튜닝이 필요한 수치는 하드코딩하지 말고 `UCRTuningSettings`에 추가하고 레지스트리에 등록한다 (인게임 Tab 옵션창에 자동 노출)
