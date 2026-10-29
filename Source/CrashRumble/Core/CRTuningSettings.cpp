@@ -210,13 +210,61 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("큐브 잔해", DebrisCountScale, "개수 배율", 0.f, 5.f, 0.1f);
 		CR_TUNE("큐브 잔해", DebrisSize, "크기 배율", 0.2f, 4.f, 0.05f);
 		CR_TUNE("큐브 잔해", DebrisGravity, "중력", 0.f, 5000.f, 50.f);
+		CR_TUNE("큐브 잔해", DebrisMinSize, "최소 크기(cm)", 1.f, 100.f, 0.5f);
+		CR_TUNE("큐브 잔해", DebrisMaxSize, "최대 크기(cm, 작은 것 위주로 섞임)", 1.f, 200.f, 0.5f);
+		CR_TUNE("큐브 잔해", DebrisBury, "표면 안쪽에서 시작 (크기 비율)", 0.f, 2.f, 0.05f);
+		CR_TUNE("큐브 잔해", DebrisNormalSpeedMin, "튀는 속도 최소 (맞은 면 방향)", 0.f, 3000.f, 10.f);
+		CR_TUNE("큐브 잔해", DebrisNormalSpeedMax, "튀는 속도 최대 (맞은 면 방향)", 0.f, 3000.f, 10.f);
+		CR_TUNE("큐브 잔해", DebrisSideSpeedMin, "옆으로 최소", 0.f, 3000.f, 10.f);
+		CR_TUNE("큐브 잔해", DebrisSideSpeedMax, "옆으로 최대", 0.f, 3000.f, 10.f);
+		CR_TUNE("큐브 잔해", DebrisUpSpeedMin, "위로 최소", 0.f, 3000.f, 10.f);
+		CR_TUNE("큐브 잔해", DebrisUpSpeedMax, "위로 최대", 0.f, 3000.f, 10.f);
+		CR_TUNE("큐브 잔해", DebrisSpinMin, "회전 최소(도/초)", 0.f, 5000.f, 10.f);
+		CR_TUNE("큐브 잔해", DebrisSpinMax, "회전 최대(도/초)", 0.f, 5000.f, 10.f);
+		CR_TUNE("큐브 잔해", DebrisLifeMin, "수명 최소(초)", 0.05f, 5.f, 0.05f);
+		CR_TUNE("큐브 잔해", DebrisLifeMax, "수명 최대(초)", 0.05f, 5.f, 0.05f);
+		CR_TUNE("큐브 잔해", DebrisShrinkFrom, "작아지기 시작 (수명 비율)", 0.f, 1.f, 0.05f);
+		CR_TUNE("큐브 잔해", DebrisBounceUp, "튕김: 수직 속도 배율", 0.f, 1.f, 0.05f);
+		CR_TUNE("큐브 잔해", DebrisBounceSide, "튕김: 수평 속도 배율", 0.f, 1.f, 0.05f);
+		CR_TUNE("큐브 잔해", DebrisBounceSpin, "튕김: 회전 배율", 0.f, 1.f, 0.05f);
+		CR_TUNE("큐브 잔해", DebrisKillCount, "처치 시 개수", 0.f, 100.f, 1.f);
 
 		CR_TUNE_BOOL("구체 폭발", bSphereExplosion, "켜기 (처치, 미사일)");
 		CR_TUNE("구체 폭발", ExplosionRadius, "처치 폭발 반경", 10.f, 300.f, 5.f);
+		CR_TUNE("구체 폭발", FireballCount, "불덩이 개수", 0.f, 50.f, 1.f);
+		CR_TUNE("구체 폭발", FireballSpreadMin, "불덩이 퍼짐 최소 (반경 비율)", 0.f, 2.f, 0.05f);
+		CR_TUNE("구체 폭발", FireballSpreadMax, "불덩이 퍼짐 최대 (반경 비율)", 0.f, 2.f, 0.05f);
+		CR_TUNE("구체 폭발", FireballSizeMin, "불덩이 크기 최소 (반경 비율)", 0.05f, 2.f, 0.01f);
+		CR_TUNE("구체 폭발", FireballSizeMax, "불덩이 크기 최대 (반경 비율)", 0.05f, 2.f, 0.01f);
+		CR_TUNE("구체 폭발", FireballDelayMax, "불덩이 시작 지연 최대(초)", 0.f, 0.5f, 0.01f);
+		CR_TUNE("구체 폭발", FireballLifeMin, "불덩이 수명 최소(초)", 0.05f, 3.f, 0.05f);
+		CR_TUNE("구체 폭발", FireballLifeMax, "불덩이 수명 최대(초)", 0.05f, 3.f, 0.05f);
+		CR_TUNE("구체 폭발", FireballInflateTime, "부푸는 시간(초)", 0.01f, 1.f, 0.01f);
+		CR_TUNE("구체 폭발", FireGlowTime, "색 단계 1 흰노랑 발광 끝(초)", 0.f, 1.f, 0.01f);
+		CR_TUNE("구체 폭발", FireOrangeTime, "색 단계 2 주황 끝(초)", 0.f, 1.f, 0.01f);
+		CR_TUNE("구체 폭발", FireRedTime, "색 단계 3 빨강 끝(초, 그 뒤 연기)", 0.f, 2.f, 0.01f);
+		CR_TUNE("구체 폭발", FireballRiseFrom, "떠오르며 작아지기 시작 (수명 비율)", 0.f, 1.f, 0.05f);
+		CR_TUNE("구체 폭발", FireballRiseSpeed, "떠오르는 속도", 0.f, 500.f, 5.f);
+		CR_TUNE("구체 폭발", ExplosionFlashTime, "섬광 1장(흰 큰 구) 시간", 0.f, 0.5f, 0.01f);
+		CR_TUNE("구체 폭발", ExplosionFlashEnd, "섬광 2장(노란 작은 구) 끝", 0.f, 0.5f, 0.01f);
+		CR_TUNE("구체 폭발", ExplosionFlashSize, "섬광 크기 (반경 비율)", 0.f, 5.f, 0.05f);
+		CR_TUNE("구체 폭발", ShockCubeCount, "충격파 큐브 개수", 0.f, 64.f, 1.f);
+		CR_TUNE("구체 폭발", ShockSpreadStart, "충격파 시작 반경 (배)", 0.f, 5.f, 0.05f);
+		CR_TUNE("구체 폭발", ShockSpreadEnd, "충격파 끝 반경 (배)", 0.f, 10.f, 0.1f);
+		CR_TUNE("구체 폭발", ShockDuration, "충격파 시간(초)", 0.05f, 2.f, 0.01f);
 
 		CR_TUNE_BOOL("히트 스파크 별", bHitStar, "켜기");
 		CR_TUNE("히트 스파크 별", HitStarSize, "크기 배율", 0.2f, 4.f, 0.05f);
+		CR_TUNE("히트 스파크 별", HitStarDuration, "전체 시간(초, 3장)", 0.05f, 2.f, 0.01f);
+		CR_TUNE("히트 스파크 별", HitStarBrightness, "1장 흰색 밝기", 0.f, 20.f, 0.1f);
+		CR_TUNE("히트 스파크 별", HitStarStage2Scale, "2장 크기 배율", 0.f, 3.f, 0.05f);
+		CR_TUNE("히트 스파크 별", HitStarStage3Scale, "3장 크기 배율", 0.f, 3.f, 0.05f);
 		CR_TUNE_BOOL("십자 반짝임", bSparkle, "켜기 (무기 전환, 필살기)");
+		CR_TUNE("십자 반짝임", SparkleSize, "무기 전환 반짝임 크기(cm)", 1.f, 200.f, 1.f);
+		CR_TUNE("십자 반짝임", SparklePopTime, "튀어나오는 시간(초)", 0.01f, 1.f, 0.01f);
+		CR_TUNE("십자 반짝임", SparkleDuration, "전체 시간(초)", 0.05f, 3.f, 0.01f);
+		CR_TUNE("십자 반짝임", SparkleSpin, "도는 각도(도)", 0.f, 360.f, 5.f);
+		CR_TUNE("십자 반짝임", SparkleBrightness, "밝기 (높으면 블룸이 번짐)", 0.f, 20.f, 0.1f);
 
 		CR_TUNE_BOOL("임팩트 프레임", bImpactFrame, "켜기 · I");
 		CR_TUNE_BOOL("임팩트 프레임", bImpactOnPlayerKill, "플레이어 처치 때도");
@@ -225,10 +273,24 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 
 		CR_TUNE_BOOL("스미어", bSmear, "켜기 (빠른 손)");
 		CR_TUNE("스미어", SmearMinSpeed, "몸 기준 최소 속도", 50.f, 3000.f, 25.f);
+		CR_TUNE("스미어", SmearThickness, "굵기 (손 지름 비율)", 0.1f, 3.f, 0.05f);
 		CR_TUNE_BOOL("카나다 빛", bKanada, "켜기");
 		CR_TUNE("카나다 빛", KanadaSize, "크기 배율", 0.2f, 4.f, 0.05f);
+		CR_TUNE("카나다 빛", KanadaCount, "가시 개수", 1.f, 48.f, 1.f);
+		CR_TUNE("카나다 빛", KanadaDuration, "전체 시간(초)", 0.05f, 2.f, 0.01f);
+		CR_TUNE("카나다 빛", KanadaLengthMin, "가시 길이 최소 (크기 비율)", 0.f, 3.f, 0.05f);
+		CR_TUNE("카나다 빛", KanadaLengthMax, "가시 길이 최대 (크기 비율)", 0.f, 3.f, 0.05f);
+		CR_TUNE("카나다 빛", KanadaWidthMin, "가시 폭 최소 (크기 비율)", 0.f, 1.f, 0.01f);
+		CR_TUNE("카나다 빛", KanadaWidthMax, "가시 폭 최대 (크기 비율)", 0.f, 1.f, 0.01f);
+		CR_TUNE("카나다 빛", KanadaBlackRatio, "마지막 장 검은 가시 비율", 0.f, 1.f, 0.05f);
 		CR_TUNE_BOOL("먼지 링", bDustRing, "켜기 (착지)");
 		CR_TUNE("먼지 링", DustRingMinSpeed, "착지 최소 속도", 100.f, 3000.f, 25.f);
+		CR_TUNE("먼지 링", DustRingDuration, "시간(초)", 0.05f, 3.f, 0.05f);
+		CR_TUNE("먼지 링", DustRingStartScale, "링 시작 크기", 0.f, 5.f, 0.05f);
+		CR_TUNE("먼지 링", DustRingEndScale, "링 끝 크기", 0.f, 10.f, 0.1f);
+		CR_TUNE("먼지 링", DustPuffCount, "먼지 구체 개수", 0.f, 32.f, 1.f);
+		CR_TUNE("먼지 링", DustPuffSpeed, "먼지 밀려나는 속도", 0.f, 3000.f, 10.f);
+		CR_TUNE("먼지 링", DustPuffSize, "먼지 구체 크기", 0.f, 3.f, 0.01f);
 		CR_TUNE_BOOL("집중선", bFocusLines, "켜기");
 		CR_TUNE("집중선", SprintFocus, "달리기 집중선 세기", 0.f, 1.f, 0.05f);
 
@@ -238,6 +300,17 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("번개", LightningKnockback, "넉백", 0.f, 3000.f, 25.f);
 		CR_TUNE("번개", LightningHitStop, "히트스톱(초)", 0.f, 0.5f, 0.005f);
 		CR_TUNE("번개", LightningShake, "카메라 흔들림 배율", 0.f, 5.f, 0.05f);
+		CR_TUNE("번개", LightningBoltDuration, "줄기 보이는 시간(초)", 0.05f, 3.f, 0.01f);
+		CR_TUNE("번개", LightningSegmentLength, "꺾이는 간격(cm)", 10.f, 500.f, 5.f);
+		CR_TUNE("번개", LightningMinPoints, "꺾임 최소 개수", 2.f, 64.f, 1.f);
+		CR_TUNE("번개", LightningMaxPoints, "꺾임 최대 개수", 2.f, 64.f, 1.f);
+		CR_TUNE("번개", LightningJitterRatio, "흔들림 폭 (길이 비율)", 0.f, 1.f, 0.01f);
+		CR_TUNE("번개", LightningJitterMax, "흔들림 폭 최대(cm)", 0.f, 500.f, 5.f);
+		CR_TUNE("번개", LightningThickStart, "굵기 시작(cm)", 0.5f, 100.f, 0.5f);
+		CR_TUNE("번개", LightningThickEnd, "굵기 끝(cm)", 0.5f, 100.f, 0.5f);
+		CR_TUNE("번개", LightningBranchCount, "가지 개수", 0.f, 10.f, 1.f);
+		CR_TUNE("번개", LightningBranchMin, "가지 길이 최소 (비율)", 0.f, 1.f, 0.01f);
+		CR_TUNE("번개", LightningBranchMax, "가지 길이 최대 (비율)", 0.f, 1.f, 0.01f);
 
 		CR_TUNE("미사일", MissileDamage, "데미지(폭발)", 0.f, 500.f, 1.f);
 		CR_TUNE("미사일", MissileInterval, "일제 사격 간격(초)", 0.1f, 5.f, 0.05f);
@@ -259,6 +332,9 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("미사일 연기", MissileSmokeRise, "떠오르는 속도 (cm/s)", 0.f, 300.f, 5.f);
 		CR_TUNE("미사일 연기", MissileSmokeRingEvery, "도넛 링 간격 (연기 N개마다, 0 = 끔)", 0.f, 50.f, 1.f);
 		CR_TUNE("미사일 연기", MissileSmokeRingSize, "도넛 링 최대 지름 (cm)", 10.f, 300.f, 5.f);
+		CR_TUNE("미사일 연기", MissileSmokeInflateTime, "부푸는 시간(초, 55% → 100%)", 0.01f, 2.f, 0.01f);
+		CR_TUNE("미사일 연기", MissileSmokeGlowTime, "처음 흰색 발광 시간(초)", 0.f, 1.f, 0.01f);
+		CR_TUNE("미사일 연기", MissileSmokeRingDuration, "도넛 링 시간(초)", 0.05f, 3.f, 0.01f);
 
 		CR_TUNE("폴리곤 불꽃", FlameDamage, "데미지", 0.f, 500.f, 1.f);
 		CR_TUNE("폴리곤 불꽃", FlameInterval, "발사 간격(초)", 0.1f, 5.f, 0.05f);
@@ -267,6 +343,12 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("폴리곤 불꽃", FlameDuration, "지속(초)", 0.2f, 5.f, 0.05f);
 		CR_TUNE("폴리곤 불꽃", FlameRange, "사거리", 200.f, 5000.f, 50.f);
 		CR_TUNE("폴리곤 불꽃", FlameKnockback, "넉백", 0.f, 3000.f, 25.f);
+		CR_TUNE("폴리곤 불꽃", FlameCount, "삼각뿔 개수", 1.f, 128.f, 1.f);
+		CR_TUNE("폴리곤 불꽃", FlameGrowTime, "자라는 시간(초)", 0.01f, 2.f, 0.01f);
+		CR_TUNE("폴리곤 불꽃", FlameSinkFrom, "가라앉기 시작 (수명 비율)", 0.f, 1.f, 0.05f);
+		CR_TUNE("폴리곤 불꽃", FlameTilt, "기울기 최대(도)", 0.f, 90.f, 1.f);
+		CR_TUNE("폴리곤 불꽃", FlameSizeMin, "삼각뿔 굵기 최소 (반경 비율)", 0.01f, 1.f, 0.01f);
+		CR_TUNE("폴리곤 불꽃", FlameSizeMax, "삼각뿔 굵기 최대 (반경 비율)", 0.01f, 1.f, 0.01f);
 
 		CR_TUNE("펀치", PunchDamage, "데미지", 0.f, 500.f, 1.f);
 		CR_TUNE("펀치", PunchInterval, "간격(초)", 0.05f, 3.f, 0.01f);
@@ -280,6 +362,7 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("필살기", SuperMissileCount, "미사일 수", 1.f, 60.f, 1.f);
 		CR_TUNE("필살기", SuperCooldown, "쿨다운(초)", 0.f, 30.f, 0.5f);
 		CR_TUNE("필살기", SuperZoom, "줌 FOV 배율", 0.3f, 1.f, 0.05f);
+		CR_TUNE("필살기", SuperWorldDilation, "시간 정지 중 월드 속도", 0.001f, 1.f, 0.005f);
 
 		CR_TUNE("달리기", SprintMultiplier, "달리기 배율 (Shift)", 1.f, 4.f, 0.05f);
 
@@ -292,6 +375,9 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("블럭 지형", BlockCollapseImpact, "임팩트 프레임 붕괴 블럭 수", 1.f, 200.f, 1.f);
 		CR_TUNE("블럭 지형", MissileCraterRadius, "미사일 크레이터 반경", 0.f, 500.f, 5.f);
 		CR_TUNE("블럭 지형", LightningBlockDamage, "번개 블럭 피해", 0.f, 10.f, 1.f);
+		CR_TUNE("블럭 지형", BlockRegrowDuration, "다시 자라는 연출 시간(초)", 0.01f, 3.f, 0.01f);
+		CR_TUNE("블럭 지형", BlockRegrowStartScale, "다시 자랄 때 시작 크기", 0.f, 1.f, 0.01f);
+		CR_TUNE("블럭 지형", BlockRegrowBrightness, "다시 자랄 때 시작 밝기", 1.f, 10.f, 0.1f);
 
 		CR_TUNE("훈련장", BarrelHealth, "드럼통 HP (맞는 횟수)", 1.f, 20.f, 1.f);
 		CR_TUNE("훈련장", BarrelBlastRadius, "드럼통 폭발 반경", 50.f, 800.f, 10.f);
@@ -317,6 +403,67 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 
 #undef CR_TUNE_BOOL
 #undef CR_TUNE
+
+FText UCRTuningSettings::GetCategoryDescription(const FString& Category)
+{
+	static TMap<FString, FText> Descriptions;
+	if (Descriptions.Num() == 0)
+	{
+		Descriptions.Add(TEXT("옵션창"), FText::FromString(TEXT("이 옵션창 자체의 동작.")));
+		Descriptions.Add(TEXT("툰 / 화면"), FText::FromString(TEXT("애니풍 렌더링 바탕. 툰 셰이딩(2단 명암, 보라 그림자, 실루엣 어둡게), 노출 고정, 바닥 체크무늬, 캐릭터 밑 반투명 원판 그림자.")));
+		Descriptions.Add(TEXT("2코마"), FText::FromString(TEXT("이펙트/캐릭터를 초당 12장처럼 끊어서 그린다 (애니 2코마). 계산은 매 프레임. T: 이펙트, Y: 캐릭터 토글.")));
+		Descriptions.Add(TEXT("숨쉬기"), FText::FromString(TEXT("가만히 있을 때 몸통이 위아래로 늘었다 줄고, 머리와 모자가 조금씩 늦게 따라온다. 걸을 때는 통통 튄다.")));
+		Descriptions.Add(TEXT("이동"), FText::FromString(TEXT("플레이어 이동 속도, 가속, 회전, Shift 달리기 배율.")));
+		Descriptions.Add(TEXT("카메라"), FText::FromString(TEXT("숄더뷰 / 탑다운 / 맵 제작 자유 카메라 수치와 마우스 감도.")));
+		Descriptions.Add(TEXT("손"), FText::FromString(TEXT("떠 있는 손이 위아래로 둥둥 흔들리는 정도.")));
+		Descriptions.Add(TEXT("전투"), FText::FromString(TEXT("체력과 부활 시간.")));
+		Descriptions.Add(TEXT("칼"), FText::FromString(TEXT("1번 칼: 손이 호를 그리며 휘두르고 칼날 궤적에 닿은 적을 때린다.")));
+		Descriptions.Add(TEXT("레이저총"), FText::FromString(TEXT("2번 레이저: 히트스캔 연사, 하늘색 빔.")));
+		Descriptions.Add(TEXT("투사체총"), FText::FromString(TEXT("3번 투사체: 날아가는 주황 탄.")));
+		Descriptions.Add(TEXT("피격 번쩍임"), FText::FromString(TEXT("맞은 눈사람이 하얗게 번쩍인다.")));
+		Descriptions.Add(TEXT("데미지 숫자"), FText::FromString(TEXT("맞은 자리에 떠오르는 데미지 숫자.")));
+		Descriptions.Add(TEXT("히트스톱"), FText::FromString(TEXT("맞는 순간 때린 쪽과 맞은 쪽을 아주 잠깐 멈춘다.")));
+		Descriptions.Add(TEXT("넉백"), FText::FromString(TEXT("맞으면 뒤로 밀려난다.")));
+		Descriptions.Add(TEXT("카메라 흔들림"), FText::FromString(TEXT("때렸을 때 플레이어 카메라가 흔들린다.")));
+		Descriptions.Add(TEXT("피격 파티클"), FText::FromString(TEXT("[예전 연출, 기본 끔] 맞은 자리에서 튀는 길쭉한 구 불똥. 지금은 큐브 잔해가 대신한다.")));
+		Descriptions.Add(TEXT("피격 섬광"), FText::FromString(TEXT("[예전 연출, 기본 끔] 맞은 자리의 둥근 섬광. 지금은 히트 스파크 별이 대신한다.")));
+		Descriptions.Add(TEXT("충격파 링"), FText::FromString(TEXT("[예전 연출, 기본 끔] 수평으로 퍼지는 구 조각 링.")));
+		Descriptions.Add(TEXT("처치 폭발"), FText::FromString(TEXT("[예전 연출, 기본 끔] 처치 시 눈 폭발. 지금은 구체 폭발이 대신한다.")));
+		Descriptions.Add(TEXT("사망 연출"), FText::FromString(TEXT("죽으면 몸이 맞은 방향으로 넘어지고, 모자와 무기가 벗겨져 튀어 나가 바닥에서 튕긴다.")));
+		Descriptions.Add(TEXT("색종이"), FText::FromString(TEXT("처치 시 터지는 색종이.")));
+		Descriptions.Add(TEXT("총 반동"), FText::FromString(TEXT("쏠 때 손과 총이 뒤로 튀었다가 스프링처럼 돌아온다. 연사하면 덜덜 떨림.")));
+		Descriptions.Add(TEXT("카메라 반동"), FText::FromString(TEXT("쏠 때 카메라가 위로 살짝 튀었다가 돌아온다.")));
+		Descriptions.Add(TEXT("총구 화염"), FText::FromString(TEXT("쏠 때 총구에 번쩍이는 발광 구와 순간 조명.")));
+		Descriptions.Add(TEXT("큐브 잔해"), FText::FromString(TEXT("유타폰 큐브: 맞은 표면 안쪽에서 작은 큐브들이 튀어나와 날아가고, 돌고, 바닥에서 튕기고, 작아져 사라진다. 블럭이 부서질 때도 같은 잔해.")));
+		Descriptions.Add(TEXT("구체 폭발"), FText::FromString(TEXT("처치·미사일·드럼통 폭발: 섬광 2장 → 불덩이 구체들이 부풀며 흰노랑 → 주황 → 빨강 → 연기로 단계 색이 바뀌고, 바닥에 큐브 충격파 링이 퍼진다.")));
+		Descriptions.Add(TEXT("히트 스파크 별"), FText::FromString(TEXT("맞은 자리에 8각 별 3장: 흰색 → 무기 색 → 어둡고 작게. 장마다 회전이 바뀐다.")));
+		Descriptions.Add(TEXT("십자 반짝임"), FText::FromString(TEXT("4각 별 두 개가 튀어나와 돌며 작아진다. 무기 전환(총구), 필살기(눈), 크리스탈 블럭, 드럼통 재생.")));
+		Descriptions.Add(TEXT("임팩트 프레임"), FText::FromString(TEXT("타격 순간 화면 전체가 2장: 주인공·밝은 이펙트는 검은 실루엣 + 나머지 흰색 → 반전. 펀치, 미사일 폭발, 큰 붕괴, 필살기. I 토글.")));
+		Descriptions.Add(TEXT("스미어"), FText::FromString(TEXT("손이 아주 빨리 움직이면 지난 그림과 이번 그림 사이를 늘린 구로 채운다 (펀치할 때 잘 보임).")));
+		Descriptions.Add(TEXT("카나다 빛"), FText::FromString(TEXT("각진 가시 12개가 화면 쪽으로 방사: 흰색 → 노랑 → 검은 가시 몇 개. 미사일 폭발, 펀치, 필살기 발사.")));
+		Descriptions.Add(TEXT("먼지 링"), FText::FromString(TEXT("높은 곳에서 착지하면 바닥에 납작한 도넛이 퍼지고 먼지 구체가 밀려난다. 블럭이 떨어져 부서질 때도.")));
+		Descriptions.Add(TEXT("집중선"), FText::FromString(TEXT("화면 가장자리에서 가운데로 모이는 선. 필살기(최대), 큰 붕괴, Shift 달리기.")));
+		Descriptions.Add(TEXT("번개"), FText::FromString(TEXT("4번 번개: 지그재그 줄기 + 가지 2개 + 양 끝 섬광. 그릴 때마다 모양이 새로 바뀐다.")));
+		Descriptions.Add(TEXT("미사일"), FText::FromString(TEXT("5번 미사일 일제 사격(이타노 서커스): 느리게 출발해 크게 돌다가 급하게 모인다.")));
+		Descriptions.Add(TEXT("미사일 연기"), FText::FromString(TEXT("미사일 뒤에 남는 연기 덩이와 가끔 생기는 도넛 링. 흰 발광 → 흰 연기 → 회색, 위로 떠오르며 사라진다.")));
+		Descriptions.Add(TEXT("폴리곤 불꽃"), FText::FromString(TEXT("6번 불꽃: 조준 지점 바닥에 삼각뿔들이 솟는다. 자홍 → 분홍 → 하늘색 끝, 장마다 모양이 바뀐다.")));
+		Descriptions.Add(TEXT("펀치"), FText::FromString(TEXT("우클릭 왼손 펀치: 손이 한 프레임에 뻗고(스미어), 맞으면 때린 쪽 히트스톱 + 별 + 카나다 빛 + 임팩트 프레임.")));
+		Descriptions.Add(TEXT("필살기"), FText::FromString(TEXT("F: 오른손을 들고 시간 정지(배경 2톤, 집중선, 줌인) → 해제 순간 미사일 일제 사격.")));
+		Descriptions.Add(TEXT("달리기"), FText::FromString(TEXT("Shift: 빨라지고 화면 가장자리에 집중선.")));
+		Descriptions.Add(TEXT("블럭 지형"), FText::FromString(TEXT("부서진 블럭이 다시 자라는 시간과 연출, 무너지는 블럭, 미사일 크레이터.")));
+		Descriptions.Add(TEXT("훈련장"), FText::FromString(TEXT("폭발 드럼통과 DPS 허수아비.")));
+		Descriptions.Add(TEXT("다수 타격 테스트"), FText::FromString(TEXT("몬스터 체력, 이동 속도, 생성 반경.")));
+		Descriptions.Add(TEXT("팀 전투"), FText::FromString(TEXT("레드 vs 블루 팀 전투 수치.")));
+	}
+	const FText* Found = Descriptions.Find(Category);
+	return Found ? *Found : FText::GetEmpty();
+}
+
+bool UCRTuningSettings::HasPreview(const FString& Category)
+{
+	static const TSet<FString> Previews = { TEXT("큐브 잔해"), TEXT("구체 폭발"), TEXT("히트 스파크 별"), TEXT("십자 반짝임"), TEXT("임팩트 프레임"), TEXT("스미어"), TEXT("카나다 빛"), TEXT("먼지 링"), TEXT("집중선"), TEXT("번개"), TEXT("미사일"), TEXT("미사일 연기"), TEXT("폴리곤 불꽃"), TEXT("펀치"), TEXT("필살기"), TEXT("피격 번쩍임"), TEXT("데미지 숫자"), TEXT("히트스톱"), TEXT("넉백"), TEXT("카메라 흔들림"), TEXT("사망 연출"), TEXT("색종이"), TEXT("훈련장") };
+	return Previews.Contains(Category);
+}
 
 const FCRTuningItem* UCRTuningSettings::FindItem(FName Name)
 {

@@ -17,6 +17,14 @@
 #include "Weapon/CRWeaponComponent.h"
 #include "Core/CRActorPool.h"
 #include "Map/CRBlockArena.h"
+#include "Feedback/CRFxSubsystem.h"
+#include "Feedback/CRFeedbackSubsystem.h"
+#include "Feedback/CRScreenFxSubsystem.h"
+#include "GAS/CRCombat.h"
+#include "Map/CRExplosiveBarrel.h"
+#include "EngineUtils.h"
+#include "AbilitySystemComponent.h"
+#include "GAS/CRAttributeSet.h"
 #include "Core/CRInGameGameMode.h"
 #include "Core/CRModes.h"
 #include "Core/CRTargetSpawner.h"
@@ -35,6 +43,8 @@ namespace
 	constexpr int32 HelpZOrder = 10;
 	constexpr float FreeCameraLookScale = 0.15f;
 	constexpr float ToastSeconds = 1.5f;
+	constexpr float PreviewDistance = 300.f;
+	constexpr float PreviewTargetRange = 2000.f;
 	constexpr float EditTraceDistance = 20000.f;
 	constexpr int32 SteppedFps = 12;
 }
@@ -198,6 +208,151 @@ void ACRPlayerController::CRPunch()
 void ACRPlayerController::CRSuper()
 {
 	OnSuper();
+}
+
+void ACRPlayerController::CROptions(int32 Tab)
+{
+	if (Tab >= 0)
+	{
+		SCRTuningPanel::SetCurrentTab(Tab);
+	}
+	ToggleOptions();
+}
+
+void ACRPlayerController::CRPreview(const FString& Category)
+{
+	ACRCharacter* Snowman = GetPawn<ACRCharacter>();
+	UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this);
+	UCRScreenFxSubsystem* Screen = UCRScreenFxSubsystem::Get(this);
+	if (!Snowman || !Fx)
+	{
+		ShowToast(TEXT("미리보기는 캐릭터로 플레이할 때만 (타격 체크 / 인게임)"));
+		return;
+	}
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+
+	// 플레이어 앞 3m, 그 아래 바닥
+	const FVector Forward = Snowman->GetActorForwardVector();
+	const FVector Front = Snowman->GetActorLocation() + Forward * PreviewDistance;
+	FVector Ground = Front - FVector(0.f, 0.f, 100.f);
+	FHitResult GroundHit;
+	FCollisionObjectQueryParams Statics;
+	Statics.AddObjectTypesToQuery(ECC_WorldStatic);
+	Statics.AddObjectTypesToQuery(ECC_WorldDynamic);
+	if (GetWorld()->LineTraceSingleByObjectType(GroundHit, Front + FVector(0.f, 0.f, 200.f), Front - FVector(0.f, 0.f, 2000.f), Statics,
+		FCollisionQueryParams(SCENE_QUERY_STAT(CRPreview), false, Snowman)))
+	{
+		Ground = GroundHit.ImpactPoint;
+	}
+	const FVector Chest = Ground + FVector(0.f, 0.f, 100.f);
+
+	// 맞을 대상이 필요한 탭: 앞쪽에서 가장 가까운 눈사람 (없으면 알림)
+	auto HitNearest = [this, Snowman](ECRWeaponType Weapon, bool bKill)
+	{
+		ACRCharacter* Best = nullptr;
+		float BestDistance = PreviewTargetRange * PreviewTargetRange;
+		for (TActorIterator<ACRCharacter> It(GetWorld()); It; ++It)
+		{
+			ACRCharacter* Candidate = *It;
+			const float Distance = FVector::DistSquared(Candidate->GetActorLocation(), Snowman->GetActorLocation());
+			if (Candidate != Snowman && !Candidate->IsDead() && !Candidate->IsHidden() && Distance < BestDistance
+				&& Candidate->GetTrainingRole() != ECRTrainingRole::DpsDummy)
+			{
+				Best = Candidate;
+				BestDistance = Distance;
+			}
+		}
+		if (!Best)
+		{
+			ShowToast(TEXT("가까운 허수아비가 없음 (20m 안)"));
+			return;
+		}
+		const FVector Point = Best->GetActorLocation();
+		FHitResult Hit(Best, nullptr, Point, (Snowman->GetActorLocation() - Point).GetSafeNormal());
+		Hit.bBlockingHit = true;
+		// 처치 연출 확인: 체력을 1로 만들고 때린다
+		if (bKill && Best->GetAbilitySystemComponent())
+		{
+			Best->GetAbilitySystemComponent()->SetNumericAttributeBase(UCRAttributeSet::GetHealthAttribute(), 1.f);
+		}
+		CRCombat::ApplyWeaponHit(Snowman, Best, Weapon, Hit);
+	};
+
+	if (Category == TEXT("큐브 잔해"))
+	{
+		Fx->SpawnDebris(Chest, -Forward, 12, FLinearColor(0.92f, 0.95f, 1.f), FLinearColor(1.f, 0.35f, 0.1f), 1.f, Ground.Z);
+	}
+	else if (Category == TEXT("구체 폭발"))
+	{
+		Fx->SpawnSphereExplosion(Ground + FVector(0.f, 0.f, 60.f), Tuning.ExplosionRadius, Ground.Z);
+	}
+	else if (Category == TEXT("히트 스파크 별"))
+	{
+		Fx->SpawnHitStar(Chest, 40.f, FLinearColor(1.f, 0.85f, 0.5f));
+	}
+	else if (Category == TEXT("십자 반짝임"))
+	{
+		Fx->SpawnSparkle(Chest, Tuning.SparkleSize * 2.f);
+	}
+	else if (Category == TEXT("카나다 빛"))
+	{
+		Fx->SpawnKanada(Chest, 120.f);
+	}
+	else if (Category == TEXT("먼지 링"))
+	{
+		Fx->SpawnDustRing(Ground, 1.2f);
+	}
+	else if (Category == TEXT("번개"))
+	{
+		Fx->SpawnLightning(Snowman->GetWeaponComponent()->GetMuzzleLocation(), Chest + Forward * 400.f, Tuning.LightningBoltDuration);
+	}
+	else if (Category == TEXT("폴리곤 불꽃"))
+	{
+		Fx->SpawnFlame(Ground, Tuning.FlameRadius, Tuning.FlameHeight, Tuning.FlameDuration);
+	}
+	else if (Category == TEXT("미사일") || Category == TEXT("미사일 연기"))
+	{
+		Snowman->GetWeaponComponent()->FireMissiles(Tuning.MissileCount);
+	}
+	else if (Category == TEXT("임팩트 프레임"))
+	{
+		if (Screen)
+		{
+			Screen->RequestImpactFrame(true);
+		}
+	}
+	else if (Category == TEXT("집중선"))
+	{
+		if (Screen)
+		{
+			Screen->AddFocusLines(1.f, 1.f);
+		}
+	}
+	else if (Category == TEXT("스미어") || Category == TEXT("펀치"))
+	{
+		Snowman->PerformPunch();
+	}
+	else if (Category == TEXT("필살기"))
+	{
+		Snowman->TrySuper();
+	}
+	else if (Category == TEXT("사망 연출") || Category == TEXT("색종이"))
+	{
+		HitNearest(ECRWeaponType::Sword, true);
+	}
+	else if (Category == TEXT("훈련장"))
+	{
+		// 앞에 드럼통을 하나 놓아 둔다 (쏘면 터짐)
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+		GetWorld()->SpawnActor<ACRExplosiveBarrel>(Ground + FVector(0.f, 0.f, 46.f), FRotator::ZeroRotator, Params);
+		ShowToast(TEXT("앞에 드럼통을 놓았음 (쏘면 터짐)"));
+	}
+	else
+	{
+		// 피격 번쩍임, 데미지 숫자, 히트스톱, 넉백, 카메라 흔들림: 가까운 허수아비를 칼로 한 대
+		HitNearest(ECRWeaponType::Sword, false);
+	}
 }
 
 void ACRPlayerController::BeginPlay()
@@ -701,6 +856,7 @@ void ACRPlayerController::ToggleOptions()
 			.ShowSpawnPage(CRModes::GetCurrent(this) == ECRMode::HitCheck)
 			.OnCloseRequested(FSimpleDelegate::CreateUObject(this, &ACRPlayerController::ToggleOptions))
 			.OnBackToTitle(FSimpleDelegate::CreateUObject(this, &ACRPlayerController::GoToTitle))
+			.OnPreview(FCROnPreviewCategory::CreateUObject(this, &ACRPlayerController::CRPreview))
 			.OnSpawnTargets(FCROnSpawnTargets::CreateUObject(this, &ACRPlayerController::CRSpawn))
 			.OnClearTargets(FSimpleDelegate::CreateUObject(this, &ACRPlayerController::CRClear))
 			.OnStartBattle(FCROnSpawnTargets::CreateUObject(this, &ACRPlayerController::CRBattle))

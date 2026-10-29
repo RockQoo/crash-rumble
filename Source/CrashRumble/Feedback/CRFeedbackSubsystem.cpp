@@ -39,8 +39,6 @@ namespace
 	};
 	constexpr float ConfettiFlutterFrequency = 9.f;
 
-	// 슈퍼 프리즈: 월드 0.05배, 주인공만 20배 (= 정상 속도)
-	constexpr float FreezeWorldDilation = 0.05f;
 
 	// 히트 스파크 별 크기 (반지름 cm)
 	float GetHitStarSize(ECRWeaponType Weapon)
@@ -179,7 +177,7 @@ void UCRFeedbackSubsystem::OnHit(AActor* Attacker, ACRCharacter* Victim, ECRWeap
 			}
 			if (Tuning.bCubeDebris)
 			{
-				Fx->SpawnDebris(Center, FVector::UpVector, 14, SnowColor, Victim->GetAccentColor(), 1.2f, GroundZ);
+				Fx->SpawnDebris(Center, FVector::UpVector, Tuning.DebrisKillCount, SnowColor, Victim->GetAccentColor(), 1.2f, GroundZ);
 			}
 		}
 	}
@@ -359,6 +357,7 @@ void UCRFeedbackSubsystem::StartTimeFreeze(AActor* Hero, float Duration, FSimple
 	HitStops.Reset();
 	GlobalHitStopEnd = 0.0;
 
+	const float FreezeWorldDilation = FMath::Clamp(UCRTuningSubsystem::GetSettings(this).SuperWorldDilation, 0.001f, 1.f);
 	FreezeStart = FPlatformTime::Seconds();
 	FreezeEnd = FreezeStart + FMath::Max(Duration, 0.01f);
 	FreezeHero = Hero;

@@ -34,6 +34,11 @@ public:
 	static const TArray<FCRTuningItem>& GetItems();
 	static const FCRTuningItem* FindItem(FName Name);
 
+	/** 탭(카테고리) 설명: 이 탭이 화면에서 어떤 효과인지. */
+	static FText GetCategoryDescription(const FString& Category);
+	/** 옵션창에서 "미리보기"로 바로 터뜨려 볼 수 있는 탭인가. */
+	static bool HasPreview(const FString& Category);
+
 	// 옵션창
 	UPROPERTY() bool bPauseOnOptions = false;
 
@@ -188,21 +193,83 @@ public:
 	UPROPERTY() float DebrisCountScale = 1.f;
 	UPROPERTY() float DebrisSize = 1.f;
 	UPROPERTY() float DebrisGravity = 1400.f;
+	UPROPERTY() float DebrisMinSize = 5.f;
+	UPROPERTY() float DebrisMaxSize = 20.f;
+	UPROPERTY() float DebrisBury = 0.7f;
+	UPROPERTY() float DebrisNormalSpeedMin = 300.f;
+	UPROPERTY() float DebrisNormalSpeedMax = 700.f;
+	UPROPERTY() float DebrisSideSpeedMin = 80.f;
+	UPROPERTY() float DebrisSideSpeedMax = 380.f;
+	UPROPERTY() float DebrisUpSpeedMin = 100.f;
+	UPROPERTY() float DebrisUpSpeedMax = 250.f;
+	UPROPERTY() float DebrisSpinMin = 300.f;
+	UPROPERTY() float DebrisSpinMax = 1250.f;
+	UPROPERTY() float DebrisLifeMin = 0.55f;
+	UPROPERTY() float DebrisLifeMax = 1.f;
+	UPROPERTY() float DebrisShrinkFrom = 0.65f;
+	UPROPERTY() float DebrisBounceUp = 0.3f;
+	UPROPERTY() float DebrisBounceSide = 0.5f;
+	UPROPERTY() float DebrisBounceSpin = 0.4f;
+	UPROPERTY() int32 DebrisKillCount = 14;
 	UPROPERTY() bool bSphereExplosion = true;
 	UPROPERTY() float ExplosionRadius = 70.f;
+	UPROPERTY() int32 FireballCount = 10;
+	UPROPERTY() float FireballSpreadMin = 0.15f;
+	UPROPERTY() float FireballSpreadMax = 0.6f;
+	UPROPERTY() float FireballSizeMin = 0.32f;
+	UPROPERTY() float FireballSizeMax = 0.55f;
+	UPROPERTY() float FireballDelayMax = 0.07f;
+	UPROPERTY() float FireballLifeMin = 0.45f;
+	UPROPERTY() float FireballLifeMax = 0.7f;
+	UPROPERTY() float FireballInflateTime = 0.14f;
+	UPROPERTY() float FireGlowTime = 0.07f;
+	UPROPERTY() float FireOrangeTime = 0.18f;
+	UPROPERTY() float FireRedTime = 0.32f;
+	UPROPERTY() float FireballRiseFrom = 0.45f;
+	UPROPERTY() float FireballRiseSpeed = 60.f;
+	UPROPERTY() float ExplosionFlashTime = 0.05f;
+	UPROPERTY() float ExplosionFlashEnd = 0.1f;
+	UPROPERTY() float ExplosionFlashSize = 1.1f;
+	UPROPERTY() int32 ShockCubeCount = 18;
+	UPROPERTY() float ShockSpreadStart = 0.3f;
+	UPROPERTY() float ShockSpreadEnd = 2.2f;
+	UPROPERTY() float ShockDuration = 0.28f;
 	UPROPERTY() bool bHitStar = true;
 	UPROPERTY() float HitStarSize = 1.f;
+	UPROPERTY() float HitStarDuration = 0.25f;
+	UPROPERTY() float HitStarBrightness = 4.f;
+	UPROPERTY() float HitStarStage2Scale = 1.15f;
+	UPROPERTY() float HitStarStage3Scale = 0.6f;
 	UPROPERTY() bool bSparkle = true;
+	UPROPERTY() float SparkleSize = 28.f;
+	UPROPERTY() float SparklePopTime = 0.1f;
+	UPROPERTY() float SparkleDuration = 0.38f;
+	UPROPERTY() float SparkleSpin = 45.f;
+	UPROPERTY() float SparkleBrightness = 2.2f;
 	UPROPERTY() bool bImpactFrame = true;
 	UPROPERTY() float ImpactFrameDuration = 0.045f;
 	UPROPERTY() float ImpactFrameCooldown = 0.4f;
 	UPROPERTY() bool bImpactOnPlayerKill = false;
 	UPROPERTY() bool bSmear = true;
 	UPROPERTY() float SmearMinSpeed = 400.f;
+	UPROPERTY() float SmearThickness = 0.75f;
 	UPROPERTY() bool bKanada = true;
 	UPROPERTY() float KanadaSize = 1.f;
+	UPROPERTY() int32 KanadaCount = 12;
+	UPROPERTY() float KanadaDuration = 0.26f;
+	UPROPERTY() float KanadaLengthMin = 0.5f;
+	UPROPERTY() float KanadaLengthMax = 1.2f;
+	UPROPERTY() float KanadaWidthMin = 0.12f;
+	UPROPERTY() float KanadaWidthMax = 0.3f;
+	UPROPERTY() float KanadaBlackRatio = 0.35f;
 	UPROPERTY() bool bDustRing = true;
 	UPROPERTY() float DustRingMinSpeed = 450.f;
+	UPROPERTY() float DustRingDuration = 0.4f;
+	UPROPERTY() float DustRingStartScale = 0.4f;
+	UPROPERTY() float DustRingEndScale = 1.6f;
+	UPROPERTY() int32 DustPuffCount = 8;
+	UPROPERTY() float DustPuffSpeed = 320.f;
+	UPROPERTY() float DustPuffSize = 0.28f;
 	UPROPERTY() bool bFocusLines = true;
 	UPROPERTY() float SprintFocus = 0.35f;
 
@@ -227,6 +294,17 @@ public:
 	UPROPERTY() float LightningKnockback = 250.f;
 	UPROPERTY() float LightningHitStop = 0.05f;
 	UPROPERTY() float LightningShake = 0.6f;
+	UPROPERTY() float LightningBoltDuration = 0.32f;
+	UPROPERTY() float LightningSegmentLength = 60.f;
+	UPROPERTY() int32 LightningMinPoints = 6;
+	UPROPERTY() int32 LightningMaxPoints = 16;
+	UPROPERTY() float LightningJitterRatio = 0.09f;
+	UPROPERTY() float LightningJitterMax = 55.f;
+	UPROPERTY() float LightningThickStart = 9.f;
+	UPROPERTY() float LightningThickEnd = 6.f;
+	UPROPERTY() int32 LightningBranchCount = 2;
+	UPROPERTY() float LightningBranchMin = 0.15f;
+	UPROPERTY() float LightningBranchMax = 0.3f;
 
 	// 미사일 (이타노 서커스)
 	UPROPERTY() float MissileDamage = 40.f;
@@ -250,6 +328,9 @@ public:
 	UPROPERTY() float MissileSmokeRise = 25.f;
 	UPROPERTY() int32 MissileSmokeRingEvery = 10;
 	UPROPERTY() float MissileSmokeRingSize = 60.f;
+	UPROPERTY() float MissileSmokeInflateTime = 0.12f;
+	UPROPERTY() float MissileSmokeGlowTime = 0.05f;
+	UPROPERTY() float MissileSmokeRingDuration = 0.25f;
 
 	// 폴리곤 불꽃
 	UPROPERTY() float FlameDamage = 15.f;
@@ -259,6 +340,12 @@ public:
 	UPROPERTY() float FlameDuration = 1.1f;
 	UPROPERTY() float FlameRange = 1500.f;
 	UPROPERTY() float FlameKnockback = 200.f;
+	UPROPERTY() int32 FlameCount = 22;
+	UPROPERTY() float FlameGrowTime = 0.15f;
+	UPROPERTY() float FlameSinkFrom = 0.6f;
+	UPROPERTY() float FlameTilt = 15.f;
+	UPROPERTY() float FlameSizeMin = 0.12f;
+	UPROPERTY() float FlameSizeMax = 0.25f;
 
 	// 펀치 (우클릭)
 	UPROPERTY() float PunchDamage = 35.f;
@@ -274,6 +361,7 @@ public:
 	UPROPERTY() int32 SuperMissileCount = 24;
 	UPROPERTY() float SuperCooldown = 3.f;
 	UPROPERTY() float SuperZoom = 0.8f;
+	UPROPERTY() float SuperWorldDilation = 0.05f;
 
 	// 달리기 (Shift)
 	UPROPERTY() float SprintMultiplier = 1.6f;
@@ -288,6 +376,9 @@ public:
 	UPROPERTY() int32 BlockCollapseImpact = 8;
 	UPROPERTY() float MissileCraterRadius = 110.f;
 	UPROPERTY() int32 LightningBlockDamage = 3;
+	UPROPERTY() float BlockRegrowDuration = 0.3f;
+	UPROPERTY() float BlockRegrowStartScale = 0.05f;
+	UPROPERTY() float BlockRegrowBrightness = 3.f;
 
 	// 훈련장 (타격 체크 기본 맵)
 	UPROPERTY() int32 BarrelHealth = 3;

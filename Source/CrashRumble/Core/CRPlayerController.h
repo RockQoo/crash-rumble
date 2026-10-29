@@ -63,6 +63,14 @@ public:
 	UFUNCTION(Exec)
 	void CRSuper();
 
+	/** 옵션창을 Tab번째 탭으로 열고 닫는다 (녹화/자동 확인용, -1 = 지금 탭). */
+	UFUNCTION(Exec)
+	void CROptions(int32 Tab);
+
+	/** 옵션창 탭 이름의 효과를 플레이어 앞에 터뜨린다 (예: CRPreview 구체 폭발). */
+	UFUNCTION(Exec)
+	void CRPreview(const FString& Category);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

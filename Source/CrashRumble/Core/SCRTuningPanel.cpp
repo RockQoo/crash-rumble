@@ -22,6 +22,11 @@ namespace
 	const FLinearColor TabNormalColor(0.35f, 0.35f, 0.4f);
 }
 
+void SCRTuningPanel::SetCurrentTab(int32 Index)
+{
+	GLastTuningTab = FMath::Max(Index, 0);
+}
+
 TSharedRef<SWidget> SCRTuningPanel::MakeItemRow(const FCRTuningItem& Item, const FSlateFontInfo& Font)
 {
 	const FName Name = Item.GetName();
@@ -160,6 +165,7 @@ void SCRTuningPanel::Construct(const FArguments& InArgs)
 	Subsystem = InArgs._Subsystem;
 	OnCloseRequested = InArgs._OnCloseRequested;
 	OnBackToTitle = InArgs._OnBackToTitle;
+	OnPreview = InArgs._OnPreview;
 	OnSpawnTargets = InArgs._OnSpawnTargets;
 	OnClearTargets = InArgs._OnClearTargets;
 	OnStartBattle = InArgs._OnStartBattle;
@@ -191,6 +197,19 @@ void SCRTuningPanel::Construct(const FArguments& InArgs)
 				[
 					SNew(STextBlock).Text(Item.Category).Font(HeaderFont).ColorAndOpacity(FLinearColor(0.55f, 0.8f, 1.f))
 				]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 6.f, 0.f)
+				[
+					SNew(SButton)
+					.Visibility(UCRTuningSettings::HasPreview(Category) ? EVisibility::Visible : EVisibility::Collapsed)
+					.ButtonColorAndOpacity(FLinearColor(1.f, 0.55f, 0.15f))
+					.ToolTipText(FText::FromString(TEXT("지금 수치로 플레이어 앞에 이 효과를 터뜨린다 (옵션창을 연 채로 수치를 바꾸며 비교)")))
+					.Text(FText::FromString(TEXT("▶ 미리보기")))
+					.OnClicked_Lambda([this, Category]()
+					{
+						OnPreview.ExecuteIfBound(Category);
+						return FReply::Handled();
+					})
+				]
 				+ SHorizontalBox::Slot().AutoWidth()
 				[
 					SNew(SButton)
@@ -202,6 +221,20 @@ void SCRTuningPanel::Construct(const FArguments& InArgs)
 					})
 				]
 			];
+			const FText Description = UCRTuningSettings::GetCategoryDescription(Category);
+			if (!Description.IsEmpty())
+			{
+				CurrentRows->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f)
+				[
+					SNew(SBorder)
+					.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
+					.BorderBackgroundColor(FLinearColor(0.08f, 0.1f, 0.16f, 1.f))
+					.Padding(8.f)
+					[
+						SNew(STextBlock).Text(Description).Font(RowFont).AutoWrapText(true).ColorAndOpacity(FLinearColor(0.85f, 0.88f, 0.95f))
+					]
+				];
+			}
 			TabNames.Add(Category);
 			Pages.Add(CurrentRows.ToSharedRef());
 		}

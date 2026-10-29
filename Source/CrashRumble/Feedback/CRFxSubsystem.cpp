@@ -17,18 +17,11 @@ namespace
 	constexpr int32 MaxProcs = 256;
 	const FTransform HiddenTransform(FQuat::Identity, FVector::ZeroVector, FVector::ZeroVector);
 
-	// 큐브 잔해
-	constexpr float DebrisBounceUp = 0.3f;
-	constexpr float DebrisBounceSide = 0.5f;
-	constexpr float DebrisBounceSpin = 0.4f;
-	constexpr float DebrisShrinkFrom = 0.65f; // 수명 마지막 35%에 작아짐
-
 	// 구체 폭발 단계 색 (그라데이션 없이 끊는다)
 	const FLinearColor FireGlow(3.f, 2.6f, 1.2f);
 	const FLinearColor FireOrange(1.f, 0.45f, 0.08f);
 	const FLinearColor FireRed(0.75f, 0.1f, 0.05f);
 	const FLinearColor FireSmoke(0.2f, 0.16f, 0.18f);
-	constexpr float FireInflateTime = 0.14f;
 
 	// 연기
 	const FLinearColor SmokeGlow(2.5f, 2.5f, 2.5f);
@@ -248,17 +241,18 @@ void UCRFxSubsystem::SpawnDebris(const FVector& Location, const FVector& Normal,
 		P.Kind = EPieceKind::Debris;
 		P.Shape = ECRFxShape::Cube;
 		// 작은 것 위주, 가끔 큰 것 (랜덤값 제곱)
-		const float Size = FMath::Lerp(5.f, 20.f, FMath::Square(FMath::FRand())) * SizeScale * Tuning.DebrisSize;
+		const float Size = FMath::Lerp(Tuning.DebrisMinSize, Tuning.DebrisMaxSize, FMath::Square(FMath::FRand())) * SizeScale * Tuning.DebrisSize;
 		P.Size = Size / 100.f;
-		// 공중에서 갑자기 생기지 않고 표면 안쪽(크기의 70%)에서 튀어나온다
-		P.Location = Location - N * Size * 0.7f;
+		// 공중에서 갑자기 생기지 않고 표면 안쪽(크기의 일정 비율)에서 튀어나온다
+		P.Location = Location - N * Size * Tuning.DebrisBury;
 		const FVector Sideways = Side.RotateAngleAxis(FMath::FRandRange(0.f, 360.f), N);
-		P.Velocity = N * FMath::FRandRange(300.f, 700.f) + Sideways * FMath::FRandRange(80.f, 380.f)
-			+ FVector::UpVector * FMath::FRandRange(100.f, 250.f);
+		P.Velocity = N * FMath::FRandRange(Tuning.DebrisNormalSpeedMin, Tuning.DebrisNormalSpeedMax)
+			+ Sideways * FMath::FRandRange(Tuning.DebrisSideSpeedMin, Tuning.DebrisSideSpeedMax)
+			+ FVector::UpVector * FMath::FRandRange(Tuning.DebrisUpSpeedMin, Tuning.DebrisUpSpeedMax);
 		P.Rotation = FMath::VRand().ToOrientationQuat();
 		P.SpinAxis = FMath::VRand();
-		P.SpinSpeed = FMath::DegreesToRadians(FMath::FRandRange(300.f, 1250.f));
-		P.Lifetime = FMath::FRandRange(0.55f, 1.f);
+		P.SpinSpeed = FMath::DegreesToRadians(FMath::FRandRange(Tuning.DebrisSpinMin, Tuning.DebrisSpinMax));
+		P.Lifetime = FMath::FRandRange(Tuning.DebrisLifeMin, Tuning.DebrisLifeMax);
 		P.GroundZ = GroundZ;
 		P.Color = (i % 2 == 0) ? ColorA : ColorB;
 	}
@@ -266,6 +260,7 @@ void UCRFxSubsystem::SpawnDebris(const FVector& Location, const FVector& Normal,
 
 void UCRFxSubsystem::SpawnSphereExplosion(const FVector& Center, float Radius, float GroundZ)
 {
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	// 섬광: 딱 두 장 (흰 큰 구 → 노란 작은 구)
 	{
 		FPiece& P = NextPiece();
@@ -273,42 +268,43 @@ void UCRFxSubsystem::SpawnSphereExplosion(const FVector& Center, float Radius, f
 		P.Shape = ECRFxShape::Sphere;
 		P.Location = Center;
 		P.Size = Radius / 50.f;
-		P.Lifetime = 0.1f;
+		P.Lifetime = FMath::Max(Tuning.ExplosionFlashEnd, 0.001f);
 		P.Flat = 1.f;
 	}
 
 	// 불덩이: 위쪽 반구에 퍼뜨린다 (바닥으로 파고들지 않게)
-	for (int32 i = 0; i < 10; ++i)
+	for (int32 i = 0; i < Tuning.FireballCount; ++i)
 	{
 		FPiece& P = NextPiece();
 		P.Kind = EPieceKind::Fireball;
 		P.Shape = ECRFxShape::Sphere;
 		FVector Dir = FMath::VRand();
 		Dir.Z = FMath::Abs(Dir.Z);
-		P.Location = Center + Dir * Radius * FMath::FRandRange(0.15f, 0.6f);
+		P.Location = Center + Dir * Radius * FMath::FRandRange(Tuning.FireballSpreadMin, Tuning.FireballSpreadMax);
 		if (GroundZ > -UE_BIG_NUMBER * 0.5f)
 		{
 			P.Location.Z = FMath::Max(P.Location.Z, GroundZ + Radius * 0.2f);
 		}
-		P.Size = Radius * FMath::FRandRange(0.32f, 0.55f) / 50.f;
-		P.Delay = FMath::FRandRange(0.f, 0.07f);
-		P.Lifetime = FMath::FRandRange(0.45f, 0.7f);
+		P.Size = Radius * FMath::FRandRange(Tuning.FireballSizeMin, Tuning.FireballSizeMax) / 50.f;
+		P.Delay = FMath::FRandRange(0.f, Tuning.FireballDelayMax);
+		P.Lifetime = FMath::FRandRange(Tuning.FireballLifeMin, Tuning.FireballLifeMax);
 	}
 
 	// 바닥 충격파: 작은 큐브가 원형으로 바닥을 따라 0.3배 → 2.2배까지 퍼지며 작아짐
 	const float RingZ = GroundZ > -UE_BIG_NUMBER * 0.5f ? GroundZ + 6.f : Center.Z;
 	const float Start = FMath::FRandRange(0.f, UE_TWO_PI);
-	for (int32 i = 0; i < 18; ++i)
+	const int32 RingCount = FMath::Max(Tuning.ShockCubeCount, 0);
+	for (int32 i = 0; i < RingCount; ++i)
 	{
 		FPiece& P = NextPiece();
 		P.Kind = EPieceKind::RingCube;
 		P.Shape = ECRFxShape::Cube;
-		const float Angle = Start + UE_TWO_PI * i / 18.f;
+		const float Angle = Start + UE_TWO_PI * i / RingCount;
 		P.Origin = FVector(Center.X, Center.Y, RingZ);
 		P.Velocity = FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0.f) * Radius;
 		P.Rotation = FRotator(0.f, FMath::RadiansToDegrees(Angle), 0.f).Quaternion();
 		P.Size = FMath::Clamp(Radius * 0.12f, 4.f, 20.f) / 100.f;
-		P.Lifetime = 0.28f;
+		P.Lifetime = Tuning.ShockDuration;
 		P.Color = DustColor;
 	}
 }
@@ -320,7 +316,7 @@ void UCRFxSubsystem::SpawnHitStar(const FVector& Location, float Size, const FLi
 	Proc.A = Location;
 	Proc.Size = Size * UCRTuningSubsystem::GetSettings(this).HitStarSize;
 	Proc.Color = Color;
-	Proc.Lifetime = 0.25f;
+	Proc.Lifetime = UCRTuningSubsystem::GetSettings(this).HitStarDuration;
 }
 
 void UCRFxSubsystem::SpawnSparkle(const FVector& Location, float Size, USceneComponent* Follow, bool bRealTime)
@@ -329,7 +325,7 @@ void UCRFxSubsystem::SpawnSparkle(const FVector& Location, float Size, USceneCom
 	Proc.Kind = EProcKind::Sparkle;
 	Proc.A = Location;
 	Proc.Size = Size;
-	Proc.Lifetime = 0.38f;
+	Proc.Lifetime = FMath::Max(UCRTuningSubsystem::GetSettings(this).SparkleDuration, 0.02f);
 	Proc.bRealTime = bRealTime;
 	if (Follow)
 	{
@@ -344,32 +340,34 @@ void UCRFxSubsystem::SpawnKanada(const FVector& Location, float Size)
 	Proc.Kind = EProcKind::Kanada;
 	Proc.A = Location;
 	Proc.Size = Size * UCRTuningSubsystem::GetSettings(this).KanadaSize;
-	Proc.Lifetime = 0.26f;
+	Proc.Lifetime = UCRTuningSubsystem::GetSettings(this).KanadaDuration;
 }
 
 void UCRFxSubsystem::SpawnDustRing(const FVector& GroundLocation, float Size)
 {
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	{
 		FPiece& P = NextPiece();
 		P.Kind = EPieceKind::DustRing;
 		P.Shape = ECRFxShape::Donut;
 		P.Location = GroundLocation + FVector(0.f, 0.f, 4.f);
 		P.Size = Size;
-		P.Lifetime = 0.4f;
+		P.Lifetime = Tuning.DustRingDuration;
 		P.Color = DustColor;
 	}
 	const float Start = FMath::FRandRange(0.f, UE_TWO_PI);
-	for (int32 i = 0; i < 8; ++i)
+	const int32 PuffCount = FMath::Max(Tuning.DustPuffCount, 0);
+	for (int32 i = 0; i < PuffCount; ++i)
 	{
 		FPiece& P = NextPiece();
 		P.Kind = EPieceKind::DustPuff;
 		P.Shape = ECRFxShape::Sphere;
-		const float Angle = Start + UE_TWO_PI * i / 8.f;
+		const float Angle = Start + UE_TWO_PI * i / PuffCount;
 		const FVector Dir(FMath::Cos(Angle), FMath::Sin(Angle), 0.f);
 		P.Location = GroundLocation + Dir * 30.f * Size + FVector(0.f, 0.f, 10.f * Size);
-		P.Velocity = Dir * 320.f * Size + FVector(0.f, 0.f, 40.f);
-		P.Size = 0.28f * Size * FMath::FRandRange(0.7f, 1.2f);
-		P.Lifetime = 0.4f;
+		P.Velocity = Dir * Tuning.DustPuffSpeed * Size + FVector(0.f, 0.f, 40.f);
+		P.Size = Tuning.DustPuffSize * Size * FMath::FRandRange(0.7f, 1.2f);
+		P.Lifetime = Tuning.DustRingDuration;
 		P.Color = DustColor;
 	}
 }
@@ -412,7 +410,7 @@ void UCRFxSubsystem::SpawnSmokePuff(const FVector& Location, float Size, const F
 		P.Location = Location;
 		// 도넛(XY 평면)의 축을 진행 방향으로
 		P.Rotation = FRotationMatrix::MakeFromZ(Direction.GetSafeNormal()).ToQuat();
-		P.Lifetime = 0.25f;
+		P.Lifetime = UCRTuningSubsystem::GetSettings(this).MissileSmokeRingDuration;
 		P.Color = SmokeWhite;
 	}
 }
@@ -474,19 +472,19 @@ void UCRFxSubsystem::UpdatePieces(float DeltaTime, float RealDeltaTime)
 			if (P.Location.Z - HalfSize < P.GroundZ && P.Velocity.Z < 0.f)
 			{
 				P.Location.Z = P.GroundZ + HalfSize;
-				P.Velocity.Z *= -DebrisBounceUp;
-				P.Velocity.X *= DebrisBounceSide;
-				P.Velocity.Y *= DebrisBounceSide;
-				P.SpinSpeed *= DebrisBounceSpin;
+				P.Velocity.Z *= -Tuning.DebrisBounceUp;
+				P.Velocity.X *= Tuning.DebrisBounceSide;
+				P.Velocity.Y *= Tuning.DebrisBounceSide;
+				P.SpinSpeed *= Tuning.DebrisBounceSpin;
 			}
 			break;
 		}
 		case EPieceKind::Fireball:
 		{
 			const float T = P.Age - P.Delay;
-			if (T > P.Lifetime * 0.45f)
+			if (T > P.Lifetime * Tuning.FireballRiseFrom)
 			{
-				P.Location.Z += 60.f * DeltaTime; // 공기에 먹히듯 떠오르며 작아짐
+				P.Location.Z += Tuning.FireballRiseSpeed * DeltaTime; // 공기에 먹히듯 떠오르며 작아짐
 			}
 			break;
 		}
@@ -539,6 +537,7 @@ void UCRFxSubsystem::Emit(ECRFxShape Shape, const FTransform& Transform, const F
 
 void UCRFxSubsystem::DrawPieces()
 {
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	for (const FPiece& P : Pieces)
 	{
 		if (!P.bAlive || P.Age < P.Delay)
@@ -553,40 +552,42 @@ void UCRFxSubsystem::DrawPieces()
 		{
 		case EPieceKind::Debris:
 		{
-			// 처음부터 원래 크기 (페이드인 없음), 마지막 35%에 작아짐
-			const float Shrink = Alpha < DebrisShrinkFrom ? 1.f : 1.f - (Alpha - DebrisShrinkFrom) / (1.f - DebrisShrinkFrom);
+			// 처음부터 원래 크기 (페이드인 없음), 수명 마지막 구간에 작아짐
+			const float ShrinkFrom = FMath::Clamp(Tuning.DebrisShrinkFrom, 0.f, 0.99f);
+			const float Shrink = Alpha < ShrinkFrom ? 1.f : 1.f - (Alpha - ShrinkFrom) / (1.f - ShrinkFrom);
 			Emit(P.Shape, FTransform(P.Rotation, P.Location, FVector(P.Size * Shrink)), P.Color, 0.f);
 			break;
 		}
 		case EPieceKind::Flash:
 		{
-			const bool bFirst = T < 0.05f;
-			const float Scale = P.Size * (bFirst ? 1.1f : 0.6f);
+			const bool bFirst = T < Tuning.ExplosionFlashTime;
+			const float Scale = P.Size * Tuning.ExplosionFlashSize * (bFirst ? 1.f : 0.55f);
 			Emit(P.Shape, FTransform(FQuat::Identity, P.Location, FVector(Scale)),
 				bFirst ? FLinearColor(4.f, 4.f, 4.f) : FLinearColor(3.f, 2.4f, 0.6f), 1.f);
 			break;
 		}
 		case EPieceKind::Fireball:
 		{
-			const float Grow = EaseOut(T / FireInflateTime);
-			const float Fade = Alpha < 0.45f ? 1.f : 1.f - (Alpha - 0.45f) / 0.55f;
-			const bool bGlow = T < 0.07f;
-			const FLinearColor Color = bGlow ? FireGlow : T < 0.18f ? FireOrange : T < 0.32f ? FireRed : FireSmoke;
+			const float Grow = EaseOut(T / FMath::Max(Tuning.FireballInflateTime, 0.001f));
+			const float RiseFrom = FMath::Clamp(Tuning.FireballRiseFrom, 0.f, 0.99f);
+			const float Fade = Alpha < RiseFrom ? 1.f : 1.f - (Alpha - RiseFrom) / (1.f - RiseFrom);
+			const bool bGlow = T < Tuning.FireGlowTime;
+			const FLinearColor Color = bGlow ? FireGlow : T < Tuning.FireOrangeTime ? FireOrange : T < Tuning.FireRedTime ? FireRed : FireSmoke;
 			Emit(P.Shape, FTransform(FQuat::Identity, P.Location, FVector(P.Size * Grow * Fade)), Color, bGlow ? 1.f : 0.f);
 			break;
 		}
 		case EPieceKind::RingCube:
 		{
-			const float Spread = FMath::Lerp(0.3f, 2.2f, EaseOut(Alpha));
+			const float Spread = FMath::Lerp(Tuning.ShockSpreadStart, Tuning.ShockSpreadEnd, EaseOut(Alpha));
 			const FVector Location = P.Origin + P.Velocity * Spread;
 			Emit(P.Shape, FTransform(P.Rotation, Location, FVector(P.Size * (1.f - Alpha))), P.Color, 0.f);
 			break;
 		}
 		case EPieceKind::Smoke:
 		{
-			const float Grow = FMath::Lerp(0.55f, 1.f, EaseOut(T / 0.12f));
+			const float Grow = FMath::Lerp(0.55f, 1.f, EaseOut(T / FMath::Max(Tuning.MissileSmokeInflateTime, 0.001f)));
 			const float Fade = Alpha < 0.6f ? 1.f : 1.f - (Alpha - 0.6f) / 0.4f;
-			const bool bGlow = T < 0.05f;
+			const bool bGlow = T < Tuning.MissileSmokeGlowTime;
 			const FLinearColor Color = bGlow ? SmokeGlow : Alpha < 0.45f ? SmokeWhite : SmokeGray;
 			Emit(P.Shape, FTransform(FQuat::Identity, P.Location, FVector(P.Size * Grow * Fade)), Color, bGlow ? 1.f : 0.f);
 			break;
@@ -594,14 +595,14 @@ void UCRFxSubsystem::DrawPieces()
 		case EPieceKind::SmokeRing:
 		{
 			// 작게(16cm) 시작해 넓어지며 얇아짐
-			const float Diameter = FMath::Lerp(16.f, UCRTuningSubsystem::GetSettings(this).MissileSmokeRingSize, EaseOut(Alpha));
+			const float Diameter = FMath::Lerp(16.f, Tuning.MissileSmokeRingSize, EaseOut(Alpha));
 			const float Thin = FMath::Lerp(1.f, 0.3f, Alpha);
 			Emit(P.Shape, FTransform(P.Rotation, P.Location, FVector(Diameter / 100.f, Diameter / 100.f, 0.25f * Thin)), P.Color, 0.f);
 			break;
 		}
 		case EPieceKind::DustRing:
 		{
-			const float Scale = FMath::Lerp(0.4f, 1.6f, EaseOut(Alpha)) * P.Size;
+			const float Scale = FMath::Lerp(Tuning.DustRingStartScale, Tuning.DustRingEndScale, EaseOut(Alpha)) * P.Size;
 			Emit(P.Shape, FTransform(FQuat::Identity, P.Location, FVector(Scale, Scale, 0.15f * (1.f - Alpha))), P.Color, 0.f);
 			break;
 		}
@@ -613,7 +614,7 @@ void UCRFxSubsystem::DrawPieces()
 			const FVector Delta = P.Location - P.Origin;
 			const float Length = Delta.Size() + P.Size;
 			const FQuat Rotation = Delta.IsNearlyZero() ? FQuat::Identity : FRotationMatrix::MakeFromX(Delta).ToQuat();
-			const float Thick = P.Size * 0.75f / 100.f;
+			const float Thick = P.Size * Tuning.SmearThickness / 100.f;
 			Emit(P.Shape, FTransform(Rotation, (P.Location + P.Origin) * 0.5f, FVector(Length / 100.f, Thick, Thick)), P.Color, 0.f);
 			break;
 		}
@@ -636,6 +637,7 @@ void UCRFxSubsystem::DrawProcs()
 
 void UCRFxSubsystem::DrawProc(const FProc& Proc, FRandomStream& Random)
 {
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	const float Alpha = Proc.Age / FMath::Max(Proc.Lifetime, 0.001f);
 	switch (Proc.Kind)
 	{
@@ -643,18 +645,22 @@ void UCRFxSubsystem::DrawProc(const FProc& Proc, FRandomStream& Random)
 	{
 		// 흰색 → 색(1.25배) → 어둡고 작게, 장마다 회전 재추첨
 		const int32 Stage = FMath::Min(FMath::FloorToInt(Alpha * 3.f), 2);
-		const FLinearColor Color = Stage == 0 ? FLinearColor(4.f, 4.f, 4.f) : Stage == 1 ? Proc.Color * 1.25f : Proc.Color * 0.2f;
-		const float Scale = Proc.Size / 50.f * (Stage == 0 ? 1.f : Stage == 1 ? 1.15f : 0.6f);
+		const float White = Tuning.HitStarBrightness;
+		const FLinearColor Color = Stage == 0 ? FLinearColor(White, White, White) : Stage == 1 ? Proc.Color * 1.25f : Proc.Color * 0.2f;
+		const float Scale = Proc.Size / 50.f * (Stage == 0 ? 1.f : Stage == 1 ? Tuning.HitStarStage2Scale : Tuning.HitStarStage3Scale);
 		Emit(ECRFxShape::Star8, FTransform(FaceCamera(Proc.A, Random.FRandRange(0.f, UE_TWO_PI)), Proc.A, FVector(Scale)), Color, 1.f);
 		break;
 	}
 	case EProcKind::Sparkle:
 	{
-		// 0.1초에 튀어나와 45° 돌며 작아짐
-		const float Pop = Proc.Age < 0.1f ? EaseOut(Proc.Age / 0.1f) : 1.f - (Proc.Age - 0.1f) / (Proc.Lifetime - 0.1f);
-		const float Spin = FMath::DegreesToRadians(45.f) * FMath::Clamp((Proc.Age - 0.1f) / (Proc.Lifetime - 0.1f), 0.f, 1.f);
+		// 짧게 튀어나와 돌며 작아짐
+		const float PopTime = FMath::Clamp(Tuning.SparklePopTime, 0.001f, Proc.Lifetime * 0.9f);
+		const float Rest = FMath::Max(Proc.Lifetime - PopTime, 0.001f);
+		const float Pop = Proc.Age < PopTime ? EaseOut(Proc.Age / PopTime) : 1.f - (Proc.Age - PopTime) / Rest;
+		const float Spin = FMath::DegreesToRadians(Tuning.SparkleSpin) * FMath::Clamp((Proc.Age - PopTime) / Rest, 0.f, 1.f);
 		const float Scale = Proc.Size / 50.f * FMath::Max(Pop, 0.f);
-		const FLinearColor Color(2.2f, 2.2f, 2.f);
+		const float Bright = Tuning.SparkleBrightness;
+		const FLinearColor Color(Bright, Bright, Bright * 0.9f);
 		Emit(ECRFxShape::Star4, FTransform(FaceCamera(Proc.A, Spin), Proc.A, FVector(Scale)), Color, 1.f);
 		Emit(ECRFxShape::Star4, FTransform(FaceCamera(Proc.A, Spin + UE_PI * 0.25f), Proc.A, FVector(Scale * 0.6f)), Color, 1.f);
 		break;
@@ -663,12 +669,13 @@ void UCRFxSubsystem::DrawProc(const FProc& Proc, FRandomStream& Random)
 	{
 		// 흰색 → 노랑 → 검은 가시 몇 개 → 끝
 		const int32 Stage = FMath::Min(FMath::FloorToInt(Alpha * 3.f), 2);
-		for (int32 i = 0; i < 12; ++i)
+		const int32 SpikeCount = FMath::Max(Tuning.KanadaCount, 1);
+		for (int32 i = 0; i < SpikeCount; ++i)
 		{
-			const bool bShow = Stage < 2 || Random.FRand() < 0.35f;
-			const float Angle = UE_TWO_PI * i / 12.f + Random.FRandRange(-0.2f, 0.2f);
-			const float Length = Proc.Size * Random.FRandRange(0.5f, 1.2f);
-			const float Width = Random.FRandRange(0.12f, 0.3f) * Proc.Size / 100.f;
+			const bool bShow = Stage < 2 || Random.FRand() < Tuning.KanadaBlackRatio;
+			const float Angle = UE_TWO_PI * i / SpikeCount + Random.FRandRange(-0.2f, 0.2f);
+			const float Length = Proc.Size * Random.FRandRange(Tuning.KanadaLengthMin, Tuning.KanadaLengthMax);
+			const float Width = Random.FRandRange(Tuning.KanadaWidthMin, Tuning.KanadaWidthMax) * Proc.Size / 100.f;
 			if (!bShow)
 			{
 				continue;
@@ -689,12 +696,13 @@ void UCRFxSubsystem::DrawProc(const FProc& Proc, FRandomStream& Random)
 			break;
 		}
 		const FVector Dir = Delta / Length;
-		const int32 Count = FMath::Clamp(FMath::RoundToInt(Length / 60.f), 6, 16);
-		const float Jitter = FMath::Min(Length * 0.09f, 55.f);
-		const float Thickness = FMath::Lerp(9.f, 6.f, Alpha);
+		const int32 MinPoints = FMath::Max(Tuning.LightningMinPoints, 2);
+		const int32 Count = FMath::Clamp(FMath::RoundToInt(Length / FMath::Max(Tuning.LightningSegmentLength, 1.f)), MinPoints, FMath::Max(Tuning.LightningMaxPoints, MinPoints));
+		const float Jitter = FMath::Min(Length * Tuning.LightningJitterRatio, Tuning.LightningJitterMax);
+		const float Thickness = FMath::Lerp(Tuning.LightningThickStart, Tuning.LightningThickEnd, Alpha);
 		const FVector Perp = AnyPerpendicular(Dir);
 
-		TArray<FVector, TInlineAllocator<17>> Points;
+		TArray<FVector, TInlineAllocator<65>> Points;
 		for (int32 i = 0; i <= Count; ++i)
 		{
 			const float T = static_cast<float>(i) / Count;
@@ -715,12 +723,12 @@ void UCRFxSubsystem::DrawProc(const FProc& Proc, FRandomStream& Random)
 		{
 			Segment(Points[i], Points[i + 1], Thickness, Proc.Color);
 		}
-		// 가지 2개: 본 줄기의 임의 점에서, 길이 15~30%, 굵기 절반
-		for (int32 b = 0; b < 2; ++b)
+		// 가지: 본 줄기의 임의 점에서, 길이 비율 min~max, 굵기 절반
+		for (int32 b = 0; b < Tuning.LightningBranchCount && Points.Num() > 2; ++b)
 		{
 			const int32 From = Random.RandRange(1, Points.Num() - 2);
 			const FVector BranchDir = (Dir + Perp.RotateAngleAxis(Random.FRandRange(0.f, 360.f), Dir) * 0.9f).GetSafeNormal();
-			const float BranchLength = Length * Random.FRandRange(0.15f, 0.3f);
+			const float BranchLength = Length * Random.FRandRange(Tuning.LightningBranchMin, Tuning.LightningBranchMax);
 			const FVector Mid = Points[From] + BranchDir * BranchLength * 0.5f + Perp * Random.FRandRange(-0.15f, 0.15f) * BranchLength;
 			const FVector End = Points[From] + BranchDir * BranchLength;
 			Segment(Points[From], Mid, Thickness * 0.5f, Proc.Color);
@@ -734,13 +742,14 @@ void UCRFxSubsystem::DrawProc(const FProc& Proc, FRandomStream& Random)
 	}
 	case EProcKind::Flame:
 	{
-		// 0.15초에 자라고 마지막 40%에 가라앉음
-		float Grow = EaseOut(Proc.Age / 0.15f);
-		if (Alpha > 0.6f)
+		// 짧게 자라고 마지막 구간에 가라앉음
+		float Grow = EaseOut(Proc.Age / FMath::Max(Tuning.FlameGrowTime, 0.001f));
+		const float SinkFrom = FMath::Clamp(Tuning.FlameSinkFrom, 0.f, 0.99f);
+		if (Alpha > SinkFrom)
 		{
-			Grow *= 1.f - (Alpha - 0.6f) / 0.4f;
+			Grow *= 1.f - (Alpha - SinkFrom) / (1.f - SinkFrom);
 		}
-		for (int32 i = 0; i < 22; ++i)
+		for (int32 i = 0; i < Tuning.FlameCount; ++i)
 		{
 			const float Dist = FMath::Sqrt(Random.FRand()) * Proc.Size;
 			const float Angle = Random.FRandRange(0.f, UE_TWO_PI);
@@ -748,8 +757,8 @@ void UCRFxSubsystem::DrawProc(const FProc& Proc, FRandomStream& Random)
 			// 가운데가 높다
 			const float Ratio = FMath::Pow(1.f - Dist / FMath::Max(Proc.Size, 1.f), 0.7f) * Random.FRandRange(0.55f, 1.f);
 			const float Height = Proc.Height * Ratio * Grow;
-			const float Radius = Proc.Size * Random.FRandRange(0.12f, 0.25f);
-			const FRotator Tilt(Random.FRandRange(-15.f, 15.f), Random.FRandRange(0.f, 360.f), Random.FRandRange(-15.f, 15.f));
+			const float Radius = Proc.Size * Random.FRandRange(Tuning.FlameSizeMin, Tuning.FlameSizeMax);
+			const FRotator Tilt(Random.FRandRange(-Tuning.FlameTilt, Tuning.FlameTilt), Random.FRandRange(0.f, 360.f), Random.FRandRange(-Tuning.FlameTilt, Tuning.FlameTilt));
 			// 높이 비율로 3색: 자홍 → 분홍 → 하늘색 끝
 			const FLinearColor Color = Ratio > 0.7f ? FLinearColor(0.4f, 2.2f, 3.f) : Ratio > 0.4f ? FLinearColor(2.5f, 0.6f, 1.5f) : FLinearColor(2.2f, 0.15f, 1.6f);
 			if (Height > 1.f)

@@ -244,7 +244,7 @@ void UCRWeaponComponent::Equip(ECRWeaponType Type)
 			const FVector Tip = Type == ECRWeaponType::Sword
 				? WeaponRoot->GetComponentTransform().TransformPosition(FVector(BladeStart + UCRTuningSubsystem::GetSettings(this).SwordLength, 0.f, 0.f))
 				: GetMuzzleLocation();
-			Fx->SpawnSparkle(Tip, 28.f, WeaponRoot);
+			Fx->SpawnSparkle(Tip, UCRTuningSubsystem::GetSettings(this).SparkleSize, WeaponRoot);
 		}
 	}
 }
@@ -670,7 +670,7 @@ void UCRWeaponComponent::FireLightning(TArray<FHitResult>& OutTargetHits)
 	}
 	if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
 	{
-		Fx->SpawnLightning(Start, BoltEnd);
+		Fx->SpawnLightning(Start, BoltEnd, Tuning.LightningBoltDuration);
 	}
 	PlayFireFeedback();
 }

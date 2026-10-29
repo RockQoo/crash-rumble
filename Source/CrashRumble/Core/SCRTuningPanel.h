@@ -6,6 +6,7 @@
 class UCRTuningSubsystem;
 
 DECLARE_DELEGATE_OneParam(FCROnSpawnTargets, int32);
+DECLARE_DELEGATE_OneParam(FCROnPreviewCategory, const FString&);
 
 /**
  * Tab 옵션창. 위쪽은 다수 타격 테스트 버튼(몬스터 생성/제거),
@@ -22,6 +23,8 @@ public:
 		SLATE_ARGUMENT(bool, ShowSpawnPage)
 		SLATE_EVENT(FSimpleDelegate, OnCloseRequested)
 		SLATE_EVENT(FSimpleDelegate, OnBackToTitle)
+		/** 탭의 "미리보기" 버튼: 그 효과를 플레이어 앞에 바로 터뜨린다. */
+		SLATE_EVENT(FCROnPreviewCategory, OnPreview)
 		SLATE_EVENT(FCROnSpawnTargets, OnSpawnTargets)
 		SLATE_EVENT(FSimpleDelegate, OnClearTargets)
 		SLATE_EVENT(FCROnSpawnTargets, OnStartBattle)
@@ -29,6 +32,9 @@ public:
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
+
+	/** 다음에 열 때 보여줄 탭 (녹화/자동 확인용). */
+	static void SetCurrentTab(int32 Index);
 
 	virtual bool SupportsKeyboardFocus() const override { return true; }
 	virtual FReply OnPreviewKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
@@ -41,6 +47,7 @@ private:
 	TWeakObjectPtr<UCRTuningSubsystem> Subsystem;
 	FSimpleDelegate OnCloseRequested;
 	FSimpleDelegate OnBackToTitle;
+	FCROnPreviewCategory OnPreview;
 	FCROnSpawnTargets OnSpawnTargets;
 	FSimpleDelegate OnClearTargets;
 	FCROnSpawnTargets OnStartBattle;

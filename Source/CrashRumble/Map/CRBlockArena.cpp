@@ -23,9 +23,6 @@ namespace
 	constexpr float BlockSize = 50.f;
 	constexpr float HiddenDepth = 100000.f;       // 부서진 블럭 인스턴스를 숨기는 깊이 (콜리전도 같이 치운다)
 	constexpr float RegenRetryDelay = 0.25f;     // 이웃이 없거나 캐릭터가 있으면 미룸
-	constexpr float RegrowDuration = 0.3f;
-	constexpr float RegrowStartScale = 0.05f;
-	constexpr float RegrowStartBrightness = 3.f;
 	constexpr float FileCheckInterval = 1.f;
 	constexpr float FallVoidDepth = 2000.f;
 	constexpr int32 MaxFallDebrisPerFrame = 10;  // 한 프레임에 잔해는 최대 10개, 먼지 링은 2개
@@ -812,7 +809,7 @@ void ACRBlockArena::UpdateRegen(float DeltaSeconds)
 		RegenAt[Cell] = 0.f;
 		++SolidCount;
 		RegenQueue.RemoveAtSwap(i);
-		ShowCell(Cell, RegrowStartScale, RegrowStartBrightness);
+		ShowCell(Cell, Tuning.BlockRegrowStartScale, Tuning.BlockRegrowBrightness);
 		Regrowing.Add({ Cell, 0.f });
 		--Budget;
 	}
@@ -823,7 +820,7 @@ void ACRBlockArena::UpdateRegen(float DeltaSeconds)
 	{
 		FRegrow& Grow = Regrowing[i];
 		Grow.Age += DeltaSeconds;
-		const float T = Grow.Age / RegrowDuration;
+		const float T = Grow.Age / FMath::Max(Tuning.BlockRegrowDuration, 0.001f);
 		if (!IsSolid(Grow.Cell))
 		{
 			Regrowing.RemoveAtSwap(i);
@@ -836,8 +833,8 @@ void ACRBlockArena::UpdateRegen(float DeltaSeconds)
 		}
 		else if (bDraw)
 		{
-			const float Scale = FMath::Lerp(RegrowStartScale, 1.f, EaseOutBack(T));
-			ShowCell(Grow.Cell, Scale, FMath::Lerp(RegrowStartBrightness, 1.f, T));
+			const float Scale = FMath::Lerp(Tuning.BlockRegrowStartScale, 1.f, EaseOutBack(T));
+			ShowCell(Grow.Cell, Scale, FMath::Lerp(Tuning.BlockRegrowBrightness, 1.f, T));
 		}
 	}
 }
