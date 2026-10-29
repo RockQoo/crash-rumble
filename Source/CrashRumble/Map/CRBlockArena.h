@@ -139,6 +139,8 @@ private:
 	TArray<int32> Instance; // 원래 블럭 종류 인스턴스 메시 안의 고정 번호
 	TArray<float> RegenAt;  // 월드 시간, 0 = 재생 대기 아님
 	TArray<int32> RegenQueue;
+	/** 재생 큐를 프레임마다 조금씩 이어서 도는 위치 (뒤에서 앞으로). */
+	int32 RegenCursor = 0;
 	TArray<FRegrow> Regrowing;
 	TArray<FFallingBlock> Falling;
 	int32 FallingDrawn = 0;

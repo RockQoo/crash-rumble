@@ -404,6 +404,7 @@ public:
 	UPROPERTY() float BlockRegenRandom = 1.5f;
 	UPROPERTY() float BlockRegenPerLayer = 0.15f;
 	UPROPERTY() int32 BlockRegenPerFrame = 48;
+	UPROPERTY() int32 BlockRegenVisitPerFrame = 256;
 	UPROPERTY() float BlockFallGravity = 1400.f;
 	UPROPERTY() int32 BlockCollapseImpact = 8;
 	UPROPERTY() float MissileCraterRadius = 110.f;

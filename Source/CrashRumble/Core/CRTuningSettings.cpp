@@ -400,6 +400,7 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("블럭 지형", BlockRegenRandom, "재생 랜덤 추가(초)", 0.f, 10.f, 0.1f);
 		CR_TUNE("블럭 지형", BlockRegenPerLayer, "층마다 추가 대기(초)", 0.f, 2.f, 0.01f);
 		CR_TUNE("블럭 지형", BlockRegenPerFrame, "한 프레임 최대 재생 수", 1.f, 500.f, 1.f);
+		CR_TUNE("블럭 지형", BlockRegenVisitPerFrame, "한 프레임 최대 재생 대기 칸 검사 수", 16.f, 4096.f, 16.f);
 		CR_TUNE("블럭 지형", BlockFallGravity, "무너지는 블럭 중력", 100.f, 5000.f, 50.f);
 		CR_TUNE("블럭 지형", BlockCollapseImpact, "임팩트 프레임 붕괴 블럭 수", 1.f, 200.f, 1.f);
 		CR_TUNE("블럭 지형", MissileCraterRadius, "미사일 크레이터 반경", 0.f, 500.f, 5.f);

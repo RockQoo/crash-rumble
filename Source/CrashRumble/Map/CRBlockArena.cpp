@@ -204,6 +204,7 @@ void ACRBlockArena::Rebuild(FCRMapSpec&& Spec)
 	FallingDrawn = 0;
 	Regrowing.Reset();
 	RegenQueue.Reset();
+	RegenCursor = 0;
 
 	SizeX = Spec.SizeX;
 	SizeY = Spec.SizeY;
@@ -810,8 +811,16 @@ void ACRBlockArena::UpdateRegen(float DeltaSeconds)
 	FCollisionObjectQueryParams Pawns;
 	Pawns.AddObjectTypesToQuery(ECC_Pawn);
 
-	for (int32 i = RegenQueue.Num() - 1; i >= 0 && Budget > 0; --i)
+	// 대기 칸이 수천 개여도 프레임당 검사(시간 비교, 겹침 검사)는 예산만큼만: 커서로 큐를 이어서 돈다.
+	// 지운 자리는 맨 뒤 칸이 채우는데, 그 칸은 이번 바퀴에 이미 봤거나 다음 바퀴에 본다
+	int32 Visits = FMath::Min(FMath::Max(Tuning.BlockRegenVisitPerFrame, 1), RegenQueue.Num());
+	while (Visits-- > 0 && Budget > 0 && RegenQueue.Num() > 0)
 	{
+		if (RegenCursor <= 0 || RegenCursor > RegenQueue.Num())
+		{
+			RegenCursor = RegenQueue.Num();
+		}
+		const int32 i = --RegenCursor;
 		const int32 Cell = RegenQueue[i];
 		if (RegenAt[Cell] <= 0.f || IsSolid(Cell))
 		{
