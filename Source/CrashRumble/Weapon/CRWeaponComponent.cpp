@@ -129,72 +129,8 @@ UStaticMeshComponent* UCRWeaponComponent::MakePart(USceneComponent* Parent, cons
 
 void UCRWeaponComponent::BuildVisuals()
 {
-	const FRotator AlongX(-90.f, 0.f, 0.f); // 원기둥(Z축)을 X축 방향으로 눕힘
-
-	// 칼
-	{
-		FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Sword);
-		Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(0, 0, 0), FVector(0.05f, 0.05f, 0.2f), AlongX, FLinearColor(0.25f, 0.12f, 0.05f), false));
-		Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(10, 0, 0), FVector(0.05f, 0.3f, 0.05f), FRotator::ZeroRotator, FLinearColor(1.f, 0.75f, 0.2f), false));
-		SwordBlade = MakePart(WeaponRoot, CubeMesh, FVector::ZeroVector, FVector(1.f), FRotator::ZeroRotator, FLinearColor(0.85f, 0.9f, 1.f), false);
-		Visual.Parts.Add(SwordBlade);
-		UpdateSwordBlade();
-	}
-
-	// 레이저총
-	{
-		FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Laser);
-		Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(12, 0, 4), FVector(0.32f, 0.12f, 0.16f), FRotator::ZeroRotator, FLinearColor(0.15f, 0.15f, 0.18f), false));
-		Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(36, 0, 6), FVector(0.07f, 0.07f, 0.28f), AlongX, FLinearColor(0.3f, 0.3f, 0.35f), false));
-		Visual.Parts.Add(MakePart(WeaponRoot, SphereMesh, FVector(50, 0, 6), FVector(0.08f), FRotator::ZeroRotator, LaserColor, true, 4.f));
-		Visual.MuzzleOffset = FVector(54, 0, 6);
-		Visual.FlashColor = LaserColor;
-	}
-
-	// 투사체총
-	{
-		FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Projectile);
-		Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(12, 0, 4), FVector(0.36f, 0.16f, 0.2f), FRotator::ZeroRotator, FLinearColor(0.15f, 0.35f, 0.15f), false));
-		Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(36, 0, 8), FVector(0.13f, 0.13f, 0.24f), AlongX, FLinearColor(0.2f, 0.2f, 0.2f), false));
-		Visual.MuzzleOffset = FVector(50, 0, 8);
-		Visual.FlashColor = ProjectileFlashColor;
-	}
-
-	// 번개총: 몸통 + 코일 링 + 발광 끝
-	{
-		FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Lightning);
-		Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(12, 0, 4), FVector(0.3f, 0.13f, 0.16f), FRotator::ZeroRotator, FLinearColor(0.2f, 0.22f, 0.3f), false));
-		for (int32 i = 0; i < 3; ++i)
-		{
-			Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(30 + i * 7, 0, 6), FVector(0.12f, 0.12f, 0.03f), AlongX, FLinearColor(0.9f, 0.75f, 0.2f), false));
-		}
-		Visual.Parts.Add(MakePart(WeaponRoot, SphereMesh, FVector(52, 0, 6), FVector(0.1f), FRotator::ZeroRotator, LightningGunColor, true, 4.f));
-		Visual.MuzzleOffset = FVector(56, 0, 6);
-		Visual.FlashColor = LightningGunColor;
-	}
-
-	// 미사일 발사대: 몸통 + 발사관 3개
-	{
-		FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Missile);
-		Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(10, 0, 6), FVector(0.3f, 0.2f, 0.2f), FRotator::ZeroRotator, FLinearColor(0.3f, 0.35f, 0.2f), false));
-		for (int32 i = -1; i <= 1; ++i)
-		{
-			Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(30, i * 7.f, 12), FVector(0.06f, 0.06f, 0.3f), AlongX, FLinearColor(0.75f, 0.75f, 0.8f), false));
-		}
-		Visual.MuzzleOffset = FVector(46, 0, 12);
-		Visual.FlashColor = MissileFlashColor;
-	}
-
-	// 불꽃 발사기: 통 + 분홍 노즐
-	{
-		FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Flame);
-		Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(8, 0, 6), FVector(0.14f, 0.14f, 0.3f), AlongX, FLinearColor(0.6f, 0.15f, 0.4f), false));
-		Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(32, 0, 6), FVector(0.06f, 0.06f, 0.22f), AlongX, FLinearColor(0.25f, 0.25f, 0.3f), false));
-		Visual.Parts.Add(MakePart(WeaponRoot, SphereMesh, FVector(44, 0, 6), FVector(0.08f), FRotator::ZeroRotator, FlameGunColor, true, 4.f));
-		Visual.MuzzleOffset = FVector(48, 0, 6);
-		Visual.FlashColor = FlameGunColor;
-	}
-
+	// 무기별 외형은 처음 장착할 때 만든다 (BuildVisual). 고정 무기 AI가 안 쓰는 무기 파츠까지
+	// 손에 붙이고 있으면 손이 움직일 때마다 숨은 파츠까지 위치 갱신 비용을 낸다
 	MuzzleFlash = MakePart(WeaponRoot, SphereMesh, FVector::ZeroVector, FVector(0.3f, 0.18f, 0.18f), FRotator::ZeroRotator, FLinearColor::White, true, GlowIntensity);
 	MuzzleFlash->SetVisibility(false);
 
@@ -213,10 +149,95 @@ void UCRWeaponComponent::BuildVisuals()
 	LaserBeam->SetVisibility(false);
 }
 
+void UCRWeaponComponent::BuildVisual(ECRWeaponType Type)
+{
+	if (Type == ECRWeaponType::None || Visuals.Contains(Type) || !WeaponRoot)
+	{
+		return;
+	}
+	const FRotator AlongX(-90.f, 0.f, 0.f); // 원기둥(Z축)을 X축 방향으로 눕힘
+	switch (Type)
+	{
+	case ECRWeaponType::Sword:
+		// 칼
+		{
+			FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Sword);
+			Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(0, 0, 0), FVector(0.05f, 0.05f, 0.2f), AlongX, FLinearColor(0.25f, 0.12f, 0.05f), false));
+			Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(10, 0, 0), FVector(0.05f, 0.3f, 0.05f), FRotator::ZeroRotator, FLinearColor(1.f, 0.75f, 0.2f), false));
+			SwordBlade = MakePart(WeaponRoot, CubeMesh, FVector::ZeroVector, FVector(1.f), FRotator::ZeroRotator, FLinearColor(0.85f, 0.9f, 1.f), false);
+			Visual.Parts.Add(SwordBlade);
+			UpdateSwordBlade();
+		}
+		break;
+	case ECRWeaponType::Laser:
+		// 레이저총
+		{
+			FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Laser);
+			Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(12, 0, 4), FVector(0.32f, 0.12f, 0.16f), FRotator::ZeroRotator, FLinearColor(0.15f, 0.15f, 0.18f), false));
+			Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(36, 0, 6), FVector(0.07f, 0.07f, 0.28f), AlongX, FLinearColor(0.3f, 0.3f, 0.35f), false));
+			Visual.Parts.Add(MakePart(WeaponRoot, SphereMesh, FVector(50, 0, 6), FVector(0.08f), FRotator::ZeroRotator, LaserColor, true, 4.f));
+			Visual.MuzzleOffset = FVector(54, 0, 6);
+			Visual.FlashColor = LaserColor;
+		}
+		break;
+	case ECRWeaponType::Projectile:
+		// 투사체총
+		{
+			FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Projectile);
+			Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(12, 0, 4), FVector(0.36f, 0.16f, 0.2f), FRotator::ZeroRotator, FLinearColor(0.15f, 0.35f, 0.15f), false));
+			Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(36, 0, 8), FVector(0.13f, 0.13f, 0.24f), AlongX, FLinearColor(0.2f, 0.2f, 0.2f), false));
+			Visual.MuzzleOffset = FVector(50, 0, 8);
+			Visual.FlashColor = ProjectileFlashColor;
+		}
+		break;
+	case ECRWeaponType::Lightning:
+		// 번개총: 몸통 + 코일 링 + 발광 끝
+		{
+			FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Lightning);
+			Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(12, 0, 4), FVector(0.3f, 0.13f, 0.16f), FRotator::ZeroRotator, FLinearColor(0.2f, 0.22f, 0.3f), false));
+			for (int32 i = 0; i < 3; ++i)
+			{
+				Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(30 + i * 7, 0, 6), FVector(0.12f, 0.12f, 0.03f), AlongX, FLinearColor(0.9f, 0.75f, 0.2f), false));
+			}
+			Visual.Parts.Add(MakePart(WeaponRoot, SphereMesh, FVector(52, 0, 6), FVector(0.1f), FRotator::ZeroRotator, LightningGunColor, true, 4.f));
+			Visual.MuzzleOffset = FVector(56, 0, 6);
+			Visual.FlashColor = LightningGunColor;
+		}
+		break;
+	case ECRWeaponType::Missile:
+		// 미사일 발사대: 몸통 + 발사관 3개
+		{
+			FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Missile);
+			Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(10, 0, 6), FVector(0.3f, 0.2f, 0.2f), FRotator::ZeroRotator, FLinearColor(0.3f, 0.35f, 0.2f), false));
+			for (int32 i = -1; i <= 1; ++i)
+			{
+				Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(30, i * 7.f, 12), FVector(0.06f, 0.06f, 0.3f), AlongX, FLinearColor(0.75f, 0.75f, 0.8f), false));
+			}
+			Visual.MuzzleOffset = FVector(46, 0, 12);
+			Visual.FlashColor = MissileFlashColor;
+		}
+		break;
+	case ECRWeaponType::Flame:
+		// 불꽃 발사기: 통 + 분홍 노즐
+		{
+			FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Flame);
+			Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(8, 0, 6), FVector(0.14f, 0.14f, 0.3f), AlongX, FLinearColor(0.6f, 0.15f, 0.4f), false));
+			Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(32, 0, 6), FVector(0.06f, 0.06f, 0.22f), AlongX, FLinearColor(0.25f, 0.25f, 0.3f), false));
+			Visual.Parts.Add(MakePart(WeaponRoot, SphereMesh, FVector(44, 0, 6), FVector(0.08f), FRotator::ZeroRotator, FlameGunColor, true, 4.f));
+			Visual.MuzzleOffset = FVector(48, 0, 6);
+			Visual.FlashColor = FlameGunColor;
+		}
+		break;
+	default:
+		break;
+	}
+}
+
 void UCRWeaponComponent::Equip(ECRWeaponType Type)
 {
 	const bool bChanged = Equipped != Type;
 	Equipped = Type;
+	BuildVisual(Type);
 	for (TPair<ECRWeaponType, FCRWeaponVisual>& Pair : Visuals)
 	{
 		for (UStaticMeshComponent* Part : Pair.Value.Parts)

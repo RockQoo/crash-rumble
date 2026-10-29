@@ -78,6 +78,8 @@ protected:
 
 private:
 	void BuildVisuals();
+	/** 이 무기 외형을 아직 안 만들었으면 만든다 (장착할 때). */
+	void BuildVisual(ECRWeaponType Type);
 	UStaticMeshComponent* MakePart(USceneComponent* Parent, const TCHAR* MeshPath, const FVector& Location,
 		const FVector& Scale, const FRotator& Rotation, const FLinearColor& Color, bool bGlow, float GlowIntensity = 1.f);
 
