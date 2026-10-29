@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Feedback/CRShapeMeshes.h"
@@ -52,7 +52,7 @@ public:
 	/** 폴리곤 불꽃: 삼각뿔 22개, 장마다 재추첨. */
 	void SpawnFlame(const FVector& GroundCenter, float Radius, float Height, float Duration);
 	/** 미사일 연기 한 덩이. bRing이면 진행 방향에 수직인 도넛 링도. */
-	void SpawnSmokePuff(const FVector& Location, float Size, const FVector& Direction, bool bRing);
+	void SpawnSmokePuff(const FVector& Location, float Size, const FVector& Direction, bool bRing, float Lifetime = -1.f);
 	/** 스미어: 지난 그림과 이번 그림 사이를 늘린 구체로 채운다 (다음 그림에서 사라짐). */
 	void SpawnSmear(const FVector& From, const FVector& To, float Diameter, const FLinearColor& Color);
 

@@ -24,6 +24,10 @@ namespace
 	const FLinearColor BarrelBandColor(1.f, 0.85f, 0.15f);
 	constexpr float BarrelFlashTime = 0.1f;
 	constexpr float BarrelFlashIntensity = 4.f;
+	// 폭발 크기 배율 1일 때의 기준 크기
+	constexpr float BarrelFireballRadius = 100.f;
+	constexpr float BarrelDebrisCount = 14.f;
+	constexpr float BarrelKanadaSize = 120.f;
 }
 
 ACRExplosiveBarrel::ACRExplosiveBarrel()
@@ -99,17 +103,26 @@ void ACRExplosiveBarrel::Explode()
 	const float GroundZ = Center.Z - BarrelHalfHeight;
 	if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
 	{
+		const float Scale = Tuning.BarrelExplosionScale;
 		if (Tuning.bSphereExplosion)
 		{
-			Fx->SpawnSphereExplosion(Center, Tuning.BarrelBlastRadius * 0.45f, GroundZ);
+			Fx->SpawnSphereExplosion(Center, BarrelFireballRadius * Scale, GroundZ);
 		}
 		if (Tuning.bCubeDebris)
 		{
-			Fx->SpawnDebris(Center, FVector::UpVector, 14, BarrelBodyColor, FLinearColor(0.3f, 0.3f, 0.32f), 1.3f, GroundZ);
+			Fx->SpawnDebris(Center, FVector::UpVector, FMath::RoundToInt(BarrelDebrisCount * Scale), BarrelBodyColor, FLinearColor(0.3f, 0.3f, 0.32f),
+				1.3f * FMath::Sqrt(Scale), GroundZ);
 		}
 		if (Tuning.bKanada)
 		{
-			Fx->SpawnKanada(Center, 120.f);
+			Fx->SpawnKanada(Center, BarrelKanadaSize * Scale);
+		}
+		// 피어오르는 큰 연기: 폭발 반경 안 낮은 곳에 흩어 놓으면 위로 떠오르며 부푼다 (가운데 하나는 도넛 링)
+		for (int32 i = 0; i < Tuning.BarrelSmokeCount; ++i)
+		{
+			const FVector2D Disk = FMath::RandPointInCircle(Tuning.BarrelSmokeSpread);
+			const FVector Puff(Center.X + Disk.X, Center.Y + Disk.Y, GroundZ + FMath::FRandRange(30.f, Tuning.BarrelSmokeSpread * 0.8f));
+			Fx->SpawnSmokePuff(Puff, Tuning.BarrelSmokeSize * FMath::FRandRange(0.7f, 1.3f), FVector::UpVector, i == 0, Tuning.BarrelSmokeLifetime);
 		}
 	}
 
@@ -117,7 +130,7 @@ void ACRExplosiveBarrel::Explode()
 	AActor* Shooter = LastInstigator.Get();
 	if (Shooter)
 	{
-		CRCombat::ApplyRadialHit(Shooter, ECRWeaponType::Missile, Center, Tuning.BarrelBlastRadius);
+		CRCombat::ApplyRadialHit(Shooter, ECRWeaponType::Missile, Center, Tuning.BarrelBlastRadius, Tuning.BarrelDamage);
 		const APawn* ShooterPawn = Cast<APawn>(Shooter);
 		if (ShooterPawn && ShooterPawn->IsPlayerControlled())
 		{
@@ -133,7 +146,7 @@ void ACRExplosiveBarrel::Explode()
 	}
 	if (ACRBlockArena* Arena = ACRBlockArena::Find(this))
 	{
-		Arena->DestroySphere(Center, CRCombat::GetCraterRadius(this));
+		Arena->DestroySphere(Center, Tuning.BarrelCraterRadius);
 	}
 
 	// 연쇄: 근처 드럼통이 조금 늦게 따라 터진다

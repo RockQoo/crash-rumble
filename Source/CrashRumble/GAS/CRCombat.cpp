@@ -20,7 +20,7 @@ bool CRCombat::ApplyWeaponHit(AActor* Attacker, AActor* Victim, ECRWeaponType We
 	return ApplyWeaponHitFrom(Attacker, Victim, Weapon, Hit, Attacker ? Attacker->GetActorLocation() : FVector::ZeroVector);
 }
 
-int32 CRCombat::ApplyRadialHit(AActor* Attacker, ECRWeaponType Weapon, const FVector& Center, float Radius)
+int32 CRCombat::ApplyRadialHit(AActor* Attacker, ECRWeaponType Weapon, const FVector& Center, float Radius, float DamageOverride)
 {
 	UWorld* World = Attacker ? Attacker->GetWorld() : nullptr;
 	if (!World)
@@ -45,7 +45,7 @@ int32 CRCombat::ApplyRadialHit(AActor* Attacker, ECRWeaponType Weapon, const FVe
 		const FVector Point = Victim->GetActorLocation();
 		FHitResult Hit(Victim, Overlap.GetComponent(), Point, (Point - Center).GetSafeNormal());
 		Hit.bBlockingHit = true;
-		if (ApplyWeaponHitFrom(Attacker, Victim, Weapon, Hit, Center))
+		if (ApplyWeaponHitFrom(Attacker, Victim, Weapon, Hit, Center, DamageOverride))
 		{
 			++Count;
 		}
@@ -96,7 +96,8 @@ bool CRCombat::DamageWorldByGun(const FHitResult& Hit, AActor* Attacker)
 	return DamageWorld(Hit, 1, Attacker);
 }
 
-bool CRCombat::ApplyWeaponHitFrom(AActor* Attacker, AActor* Victim, ECRWeaponType Weapon, const FHitResult& Hit, const FVector& Origin)
+bool CRCombat::ApplyWeaponHitFrom(AActor* Attacker, AActor* Victim, ECRWeaponType Weapon, const FHitResult& Hit, const FVector& Origin,
+	float DamageOverride)
 {
 	// 드럼통: 무기에 맞으면 HP 감소 (폭발은 한 방)
 	if (ACRExplosiveBarrel* Barrel = Cast<ACRExplosiveBarrel>(Victim))
@@ -135,7 +136,8 @@ bool CRCombat::ApplyWeaponHitFrom(AActor* Attacker, AActor* Victim, ECRWeaponTyp
 		return false;
 	}
 	// 팀 전투원끼리는 전투 설정의 피해 배율 (벤치마크: 싸우는 걸 보기 전에 다 죽지 않게)
-	float Damage = Feel.Damage;
+	// DamageOverride: 무기 수치 대신 쓰는 피해 (예: 드럼통 폭발은 미사일 넉백/연출에 자기 피해)
+	float Damage = DamageOverride >= 0.f ? DamageOverride : Feel.Damage;
 	if (Source && Source->GetTeam() != ECRTeam::None)
 	{
 		if (const UCRTargetSpawnerSubsystem* Spawner = UCRTargetSpawnerSubsystem::Get(Attacker); Spawner && Spawner->IsBattleActive())

@@ -410,7 +410,14 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("블럭 지형", BlockRegrowBrightness, "다시 자랄 때 시작 밝기", 1.f, 10.f, 0.1f);
 
 		CR_TUNE("훈련장", BarrelHealth, "드럼통 HP (맞는 횟수)", 1.f, 20.f, 1.f);
-		CR_TUNE("훈련장", BarrelBlastRadius, "드럼통 폭발 반경", 50.f, 800.f, 10.f);
+		CR_TUNE("훈련장", BarrelBlastRadius, "드럼통 폭발 피해 반경", 50.f, 800.f, 10.f);
+		CR_TUNE("훈련장", BarrelDamage, "드럼통 폭발 피해", 0.f, 1000.f, 5.f);
+		CR_TUNE("훈련장", BarrelExplosionScale, "드럼통 폭발 크기 배율 (불덩이·카나다 빛·잔해)", 0.3f, 4.f, 0.1f);
+		CR_TUNE("훈련장", BarrelCraterRadius, "드럼통 크레이터 반경", 0.f, 600.f, 10.f);
+		CR_TUNE("훈련장", BarrelSmokeCount, "드럼통 연기 덩이 수", 0.f, 60.f, 1.f);
+		CR_TUNE("훈련장", BarrelSmokeSize, "드럼통 연기 크기", 0.1f, 5.f, 0.05f);
+		CR_TUNE("훈련장", BarrelSmokeSpread, "드럼통 연기 퍼짐 반경", 0.f, 800.f, 10.f);
+		CR_TUNE("훈련장", BarrelSmokeLifetime, "드럼통 연기 수명(초)", 0.2f, 8.f, 0.1f);
 		CR_TUNE("훈련장", BarrelRespawnDelay, "드럼통 다시 생김(초)", 0.5f, 60.f, 0.5f);
 		CR_TUNE("훈련장", DpsWindow, "DPS 측정 구간(초)", 0.5f, 10.f, 0.5f);
 
@@ -485,7 +492,7 @@ FText UCRTuningSettings::GetCategoryDescription(const FString& Category)
 		Descriptions.Add(TEXT("필살기"), FText::FromString(TEXT("F: 오른손을 들고 시간 정지(배경 2톤, 집중선, 줌인) → 해제 순간 미사일 일제 사격.")));
 		Descriptions.Add(TEXT("달리기"), FText::FromString(TEXT("Shift: 빨라지고 화면 가장자리에 집중선.")));
 		Descriptions.Add(TEXT("블럭 지형"), FText::FromString(TEXT("부서진 블럭이 다시 자라는 시간과 연출, 무너지는 블럭, 미사일 크레이터.")));
-		Descriptions.Add(TEXT("훈련장"), FText::FromString(TEXT("폭발 드럼통과 DPS 허수아비.")));
+		Descriptions.Add(TEXT("훈련장"), FText::FromString(TEXT("폭발 드럼통(TNT)과 DPS 허수아비. 드럼통은 구체 폭발 + 큐브 잔해 + 카나다 빛 + 피어오르는 큰 연기, 주변 드럼통 연쇄 폭발. 미리보기: 앞에 드럼통을 놓는다 (쏘면 터짐).")));
 		Descriptions.Add(TEXT("다수 타격 테스트"), FText::FromString(TEXT("몬스터 체력, 이동 속도, 생성 반경.")));
 		Descriptions.Add(TEXT("팀 전투"), FText::FromString(TEXT("레드 vs 블루 팀 전투 수치.")));
 	}

@@ -393,7 +393,7 @@ void UCRFxSubsystem::SpawnFlame(const FVector& GroundCenter, float Radius, float
 	Proc.Lifetime = Duration;
 }
 
-void UCRFxSubsystem::SpawnSmokePuff(const FVector& Location, float Size, const FVector& Direction, bool bRing)
+void UCRFxSubsystem::SpawnSmokePuff(const FVector& Location, float Size, const FVector& Direction, bool bRing, float Lifetime)
 {
 	{
 		FPiece& P = NextPiece();
@@ -401,7 +401,7 @@ void UCRFxSubsystem::SpawnSmokePuff(const FVector& Location, float Size, const F
 		P.Shape = ECRFxShape::Sphere;
 		P.Location = Location;
 		P.Size = Size;
-		P.Lifetime = UCRTuningSubsystem::GetSettings(this).MissileSmokeLifetime * FMath::FRandRange(0.85f, 1.15f);
+		P.Lifetime = (Lifetime > 0.f ? Lifetime : UCRTuningSubsystem::GetSettings(this).MissileSmokeLifetime) * FMath::FRandRange(0.85f, 1.15f);
 	}
 	if (bRing)
 	{

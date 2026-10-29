@@ -415,7 +415,14 @@ public:
 
 	// 훈련장 (타격 체크 기본 맵)
 	UPROPERTY() int32 BarrelHealth = 3;
-	UPROPERTY() float BarrelBlastRadius = 220.f;
+	UPROPERTY() float BarrelBlastRadius = 300.f;
+	UPROPERTY() float BarrelDamage = 80.f;
+	UPROPERTY() float BarrelExplosionScale = 1.8f;
+	UPROPERTY() float BarrelCraterRadius = 170.f;
+	UPROPERTY() int32 BarrelSmokeCount = 14;
+	UPROPERTY() float BarrelSmokeSize = 1.4f;
+	UPROPERTY() float BarrelSmokeSpread = 200.f;
+	UPROPERTY() float BarrelSmokeLifetime = 2.5f;
 	UPROPERTY() float BarrelRespawnDelay = 5.f;
 	UPROPERTY() float DpsWindow = 3.f;
 
