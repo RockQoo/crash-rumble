@@ -20,10 +20,10 @@ namespace
 {
 	constexpr float BarrelRadius = 30.f;
 	constexpr float BarrelHalfHeight = 45.f;
-	const FLinearColor BodyColor(0.85f, 0.12f, 0.08f);
-	const FLinearColor BandColor(1.f, 0.85f, 0.15f);
-	constexpr float FlashTime = 0.1f;
-	constexpr float FlashIntensity = 4.f;
+	const FLinearColor BarrelBodyColor(0.85f, 0.12f, 0.08f);
+	const FLinearColor BarrelBandColor(1.f, 0.85f, 0.15f);
+	constexpr float BarrelFlashTime = 0.1f;
+	constexpr float BarrelFlashIntensity = 4.f;
 }
 
 ACRExplosiveBarrel::ACRExplosiveBarrel()
@@ -62,9 +62,9 @@ void ACRExplosiveBarrel::BeginPlay()
 	if (UMaterialInterface* Toon = UCRGameSettings::LoadToonMaterial())
 	{
 		Body->SetMaterial(0, Toon);
-		Body->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(BodyColor.R, BodyColor.G, BodyColor.B, 0.f));
+		Body->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(BarrelBodyColor.R, BarrelBodyColor.G, BarrelBodyColor.B, 0.f));
 		Band->SetMaterial(0, Toon);
-		Band->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(BandColor.R, BandColor.G, BandColor.B, 0.f));
+		Band->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(BarrelBandColor.R, BarrelBandColor.G, BarrelBandColor.B, 0.f));
 	}
 	Health = UCRTuningSubsystem::GetSettings(this).BarrelHealth;
 }
@@ -80,8 +80,8 @@ void ACRExplosiveBarrel::ApplyHit(int32 Damage, AActor* InInstigator)
 		LastInstigator = InInstigator;
 	}
 	Health -= Damage;
-	FlashTimeLeft = FlashTime;
-	Body->SetCustomPrimitiveDataFloat(CRMaterialData::FlashIndex, FlashIntensity);
+	FlashTimeLeft = BarrelFlashTime;
+	Body->SetCustomPrimitiveDataFloat(CRMaterialData::FlashIndex, BarrelFlashIntensity);
 	if (Health <= 0)
 	{
 		Explode();
@@ -105,7 +105,7 @@ void ACRExplosiveBarrel::Explode()
 		}
 		if (Tuning.bCubeDebris)
 		{
-			Fx->SpawnDebris(Center, FVector::UpVector, 14, BodyColor, FLinearColor(0.3f, 0.3f, 0.32f), 1.3f, GroundZ);
+			Fx->SpawnDebris(Center, FVector::UpVector, 14, BarrelBodyColor, FLinearColor(0.3f, 0.3f, 0.32f), 1.3f, GroundZ);
 		}
 		if (Tuning.bKanada)
 		{
@@ -191,7 +191,7 @@ void ACRExplosiveBarrel::Tick(float DeltaSeconds)
 	if (FlashTimeLeft > 0.f)
 	{
 		FlashTimeLeft -= DeltaSeconds;
-		const float Alpha = FMath::Clamp(FlashTimeLeft / FlashTime, 0.f, 1.f);
-		Body->SetCustomPrimitiveDataFloat(CRMaterialData::FlashIndex, FlashIntensity * Alpha * Alpha);
+		const float Alpha = FMath::Clamp(FlashTimeLeft / BarrelFlashTime, 0.f, 1.f);
+		Body->SetCustomPrimitiveDataFloat(CRMaterialData::FlashIndex, BarrelFlashIntensity * Alpha * Alpha);
 	}
 }

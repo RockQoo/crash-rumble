@@ -507,7 +507,7 @@ void ACRPlayerController::OnLook(const FInputActionValue& Value)
 		const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 		const float Scale = FreeCameraLookScale * Tuning.MouseSensitivity;
 		AddYawInput(Axis.X * Scale);
-		AddPitchInput(Axis.Y * Scale * (Tuning.bInvertMouseY ? -1.f : 1.f));
+		AddPitchInput(-Axis.Y * Scale * (Tuning.bInvertMouseY ? -1.f : 1.f));
 	}
 }
 

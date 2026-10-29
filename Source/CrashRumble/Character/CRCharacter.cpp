@@ -970,7 +970,8 @@ void ACRCharacter::LookInput(const FVector2D& Axis)
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	const float Scale = LookScale * Tuning.MouseSensitivity;
 	AddControllerYawInput(Axis.X * Scale);
-	AddControllerPitchInput(Axis.Y * Scale * (Tuning.bInvertMouseY ? -1.f : 1.f));
+	// 엔진 피치 입력은 위가 음수라 마우스 위(+Y)를 뒤집어 넘긴다
+	AddControllerPitchInput(-Axis.Y * Scale * (Tuning.bInvertMouseY ? -1.f : 1.f));
 }
 
 void ACRCharacter::ToggleViewMode()

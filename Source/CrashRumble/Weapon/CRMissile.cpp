@@ -25,8 +25,8 @@ namespace
 	constexpr float WobbleDegrees = 18.f;
 	constexpr float GroundNearDistance = 120.f;
 
-	const FLinearColor BodyColor(0.85f, 0.87f, 0.92f);
-	const FLinearColor ExhaustColor(3.f, 1.5f, 0.3f);
+	const FLinearColor MissileBodyColor(0.85f, 0.87f, 0.92f);
+	const FLinearColor MissileExhaustColor(3.f, 1.5f, 0.3f);
 }
 
 ACRMissile::ACRMissile()
@@ -68,9 +68,9 @@ void ACRMissile::BeginPlay()
 	if (UMaterialInterface* Toon = UCRGameSettings::LoadToonMaterial())
 	{
 		Body->SetMaterial(0, Toon);
-		Body->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(BodyColor.R, BodyColor.G, BodyColor.B, 0.f));
+		Body->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(MissileBodyColor.R, MissileBodyColor.G, MissileBodyColor.B, 0.f));
 		Exhaust->SetMaterial(0, Toon);
-		Exhaust->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(ExhaustColor.R, ExhaustColor.G, ExhaustColor.B, 1.f));
+		Exhaust->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(MissileExhaustColor.R, MissileExhaustColor.G, MissileExhaustColor.B, 1.f));
 	}
 }
 
