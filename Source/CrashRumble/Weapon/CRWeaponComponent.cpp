@@ -50,8 +50,12 @@ namespace
 	const FLinearColor MissileFlashColor(1.f, 0.7f, 0.3f);
 	const FLinearColor FlameGunColor(1.f, 0.3f, 0.8f);
 
-	// 미사일 표적: 커서 근처(300cm)에 적이 있으면 그 적
+	// 미사일 표적: 커서 근처(300cm)에 적이 있으면 그 적.
+	// 없으면 앞쪽 일정 거리 안의 적들에게 나눠 보내고, 적도 없으면 사거리 안 바닥
 	constexpr float MissileLockRadius = 300.f;
+	constexpr float MissileSeekRange = 2500.f;
+	constexpr float MissileSeekCone = 0.3f;
+	constexpr float MissileMaxGroundRange = 3000.f;
 	constexpr float SuperMissileSpacingScale = 0.5f;
 	constexpr float GlowIntensity = 12.f;
 
@@ -685,35 +689,70 @@ void UCRWeaponComponent::FireMissiles(int32 Count, bool bSuper)
 	{
 		Snowman->GetWeaponAimPoint(AimPoint);
 	}
-	// 커서 근처(300cm)에 적이 있으면 그 적, 없으면 커서 아래 바닥
-	MissileTarget.Reset();
-	MissileTargetPoint = AimPoint;
-	if (const UCRTargetSpawnerSubsystem* Spawner = UCRTargetSpawnerSubsystem::Get(this))
+	const AActor* Owner = GetOwner();
+	const FVector From = Owner->GetActorLocation();
+	const ECRTeam OwnerTeam = Snowman ? Snowman->GetTeam() : ECRTeam::None;
+	auto IsEnemy = [Snowman, OwnerTeam](const ACRCharacter* Candidate)
 	{
-		ACRCharacter* Nearest = Spawner->FindNearestTarget(AimPoint);
-		if (Nearest && Nearest != Snowman && FVector::Dist(Nearest->GetActorLocation(), AimPoint) < MissileLockRadius)
+		return Candidate && Candidate != Snowman && !Candidate->IsDead() && !Candidate->IsInPool() && !Candidate->IsHidden()
+			&& (OwnerTeam == ECRTeam::None || (Candidate->GetTeam() != ECRTeam::None && Candidate->GetTeam() != OwnerTeam));
+	};
+
+	MissileTargets.Reset();
+	MissileTargetPoint = AimPoint;
+
+	// 1) 커서 근처(300cm)의 적 하나 (맵에 놓인 허수아비 포함)
+	TArray<FOverlapResult> Overlaps;
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_Pawn);
+	GetWorld()->OverlapMultiByObjectType(Overlaps, AimPoint, FQuat::Identity, Objects, FCollisionShape::MakeSphere(MissileLockRadius),
+		FCollisionQueryParams(SCENE_QUERY_STAT(CRMissileLock), false, Owner));
+	float Best = UE_BIG_NUMBER;
+	ACRCharacter* Locked = nullptr;
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		ACRCharacter* Candidate = Cast<ACRCharacter>(Overlap.GetActor());
+		const float Distance = Candidate ? FVector::DistSquared(Candidate->GetActorLocation(), AimPoint) : UE_BIG_NUMBER;
+		if (IsEnemy(Candidate) && Distance < Best)
 		{
-			MissileTarget = Nearest;
+			Best = Distance;
+			Locked = Candidate;
 		}
 	}
-	if (!MissileTarget.IsValid())
+	if (Locked)
 	{
-		// 맵에 놓인 허수아비도 표적이 될 수 있게
-		TArray<FOverlapResult> Overlaps;
-		FCollisionObjectQueryParams Objects;
-		Objects.AddObjectTypesToQuery(ECC_Pawn);
-		GetWorld()->OverlapMultiByObjectType(Overlaps, AimPoint, FQuat::Identity, Objects, FCollisionShape::MakeSphere(MissileLockRadius),
-			FCollisionQueryParams(SCENE_QUERY_STAT(CRMissileLock), false, GetOwner()));
-		float Best = UE_BIG_NUMBER;
-		for (const FOverlapResult& Overlap : Overlaps)
+		MissileTargets.Add(Locked);
+	}
+	else
+	{
+		// 2) 숄더뷰로 지평선을 조준하면 커서 아래가 너무 멀다: 앞쪽의 가까운 적들에게 나눠 보낸다
+		TArray<FOverlapResult> Nearby;
+		GetWorld()->OverlapMultiByObjectType(Nearby, From, FQuat::Identity, Objects, FCollisionShape::MakeSphere(MissileSeekRange),
+			FCollisionQueryParams(SCENE_QUERY_STAT(CRMissileSeek), false, Owner));
+		TArray<TPair<float, ACRCharacter*>> Candidates;
+		const FVector Forward = (AimPoint - From).GetSafeNormal2D();
+		for (const FOverlapResult& Overlap : Nearby)
 		{
 			ACRCharacter* Candidate = Cast<ACRCharacter>(Overlap.GetActor());
-			const float Distance = Candidate ? FVector::DistSquared(Candidate->GetActorLocation(), AimPoint) : UE_BIG_NUMBER;
-			if (Candidate && !Candidate->IsDead() && Distance < Best)
+			if (IsEnemy(Candidate))
 			{
-				Best = Distance;
-				MissileTarget = Candidate;
+				const FVector To = Candidate->GetActorLocation() - From;
+				if (FVector::DotProduct(To.GetSafeNormal2D(), Forward) > MissileSeekCone)
+				{
+					Candidates.AddUnique(TPair<float, ACRCharacter*>(To.SizeSquared(), Candidate));
+				}
 			}
+		}
+		Candidates.Sort([](const TPair<float, ACRCharacter*>& A, const TPair<float, ACRCharacter*>& B) { return A.Key < B.Key; });
+		for (int32 i = 0; i < Candidates.Num() && i < Count; ++i)
+		{
+			MissileTargets.Add(Candidates[i].Value);
+		}
+		// 3) 적도 없으면 사거리 안 바닥
+		const FVector Flat = AimPoint - From;
+		if (Flat.Size2D() > MissileMaxGroundRange)
+		{
+			MissileTargetPoint = From + Flat.GetSafeNormal2D() * MissileMaxGroundRange - FVector(0.f, 0.f, 100.f);
 		}
 	}
 	PendingMissiles = FMath::Max(Count, 1);
@@ -750,7 +789,8 @@ void UCRWeaponComponent::LaunchOneMissile()
 	const FVector Start = GetMuzzleLocation();
 	if (ACRMissile* Missile = Pool->Acquire<ACRMissile>(FTransform(Direction.Rotation(), Start)))
 	{
-		Missile->Launch(GetOwner(), Direction, MissileTarget.Get(), MissileTargetPoint);
+		AActor* Target = MissileTargets.Num() > 0 ? MissileTargets[(MissileSalvoIndex - 1) % MissileTargets.Num()].Get() : nullptr;
+		Missile->Launch(GetOwner(), Direction, Target, MissileTargetPoint);
 	}
 	PlayFireFeedback();
 }

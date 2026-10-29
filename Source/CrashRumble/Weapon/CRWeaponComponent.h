@@ -152,7 +152,8 @@ private:
 	int32 MissileSalvoSize = 0;
 	float NextMissileTime = 0.f;
 	float MissileSpacing = 0.05f;
-	TWeakObjectPtr<AActor> MissileTarget;
+	/** 미사일마다 돌아가며 쓰는 표적 (비면 MissileTargetPoint). */
+	TArray<TWeakObjectPtr<AActor>> MissileTargets;
 	FVector MissileTargetPoint = FVector::ZeroVector;
 
 	// 손 포즈 덮어쓰기 (필살기)
