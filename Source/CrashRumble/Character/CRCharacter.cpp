@@ -33,6 +33,9 @@
 
 namespace
 {
+	constexpr float RetargetMinInterval = 0.2f;
+	constexpr float RetargetMaxInterval = 0.4f;
+	constexpr double DpsKeepSeconds = 10.0; // 옵션창 DPS 측정 구간 최대값
 	const TCHAR* FallbackMaterialPath = TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial");
 	const FName ColorParam(TEXT("Color"));
 	const FName HandLId(TEXT("HandL"));
@@ -243,6 +246,16 @@ void ACRCharacter::HandleHealthChanged(const FOnAttributeChangeData& Data)
 			LastDamageTime = Now;
 			TotalDamage += Damage;
 			DamageLog.Add(TPair<double, float>(Now, Damage));
+			// 측정 구간 최대치보다 오래된 기록은 버린다 (계속 맞아도 기록이 끝없이 늘지 않게. 누적 피해는 TotalDamage)
+			int32 Expired = 0;
+			while (Expired < DamageLog.Num() && Now - DamageLog[Expired].Key > DpsKeepSeconds)
+			{
+				++Expired;
+			}
+			if (Expired > 0)
+			{
+				DamageLog.RemoveAt(0, Expired, EAllowShrinking::No);
+			}
 			AbilitySystem->SetNumericAttributeBase(UCRAttributeSet::GetHealthAttribute(), GetMaxHealth());
 		}
 		return;
@@ -877,11 +890,12 @@ void ACRCharacter::UpdateBattle(float DeltaSeconds)
 	// 가장 가까운 적은 가끔만 다시 찾는다 (다 같이 같은 프레임에 찾지 않도록 간격을 흩뜨림)
 	RetargetTimeLeft -= DeltaSeconds;
 	ACRCharacter* Enemy = TargetEnemy.Get();
-	if (RetargetTimeLeft <= 0.f || !Enemy || Enemy->IsDead() || Enemy->IsInPool())
+	// 표적이 죽거나 풀로 돌아가면 바로, 그 외(표적 없음 포함)엔 타이머마다만 찾는다 (생성 직후 한꺼번에 몰리지 않게)
+	if (RetargetTimeLeft <= 0.f || (Enemy && (Enemy->IsDead() || Enemy->IsInPool())))
 	{
 		Enemy = Spawner ? Spawner->FindNearestEnemy(this) : nullptr;
 		TargetEnemy = Enemy;
-		RetargetTimeLeft = FMath::FRandRange(0.2f, 0.4f);
+		RetargetTimeLeft = FMath::FRandRange(RetargetMinInterval, RetargetMaxInterval);
 	}
 	// 줄 서기 전투: 교전 거리 안에 적이 없으면 자기 줄을 지키며 앞으로 전진 (상대 출발선을 넘으면 그냥 가장 가까운 적에게)
 	const FCRBattleSetup* Setup = Spawner ? &Spawner->GetBattleSetup() : nullptr;
@@ -938,7 +952,7 @@ void ACRCharacter::SetupAsMonster(const FLinearColor& InAccentColor, ECRTeam InT
 	TrainingRole = ECRTrainingRole::None;
 	BattleWeapon = InWeapon == ECRWeaponType::None ? ECRWeaponType::Sword : InWeapon;
 	TargetEnemy.Reset();
-	RetargetTimeLeft = 0.f;
+	RetargetTimeLeft = FMath::FRandRange(0.f, RetargetMaxInterval);
 	SetAccentColor(InAccentColor);
 
 	// 몬스터에겐 카메라가 필요 없다 (수백 마리일 때 틱 비용 절약). 무기는 팀 전투일 때만.
