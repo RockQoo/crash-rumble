@@ -21,6 +21,7 @@
 #include "Core/CRTargetSpawner.h"
 #include "Core/CRTuningSettings.h"
 #include "Misc/App.h"
+#include "HAL/PlatformTime.h"
 #include "TimerManager.h"
 #include "Weapon/CRProjectile.h"
 #include "Widgets/Layout/SBox.h"
@@ -32,6 +33,8 @@ namespace
 	constexpr int32 OptionsZOrder = 100;
 	constexpr int32 HelpZOrder = 10;
 	constexpr float FreeCameraLookScale = 0.15f;
+	constexpr float ToastSeconds = 1.5f;
+	constexpr int32 SteppedFps = 12;
 }
 
 FText ACRPlayerController::GetStatsText()
@@ -108,11 +111,12 @@ void ACRPlayerController::PlayerTick(float DeltaTime)
 
 	// 무기 순환: 칼 → 레이저 → 투사체
 	DemoTime += DeltaTime;
-	const int32 Index = FMath::FloorToInt(DemoTime / DemoWeaponSeconds) % 3;
+	static const ECRWeaponType Order[] = { ECRWeaponType::Sword, ECRWeaponType::Laser, ECRWeaponType::Projectile,
+		ECRWeaponType::Lightning, ECRWeaponType::Missile, ECRWeaponType::Flame };
+	const int32 Index = FMath::FloorToInt(DemoTime / DemoWeaponSeconds) % UE_ARRAY_COUNT(Order);
 	if (Index != DemoWeaponIndex)
 	{
 		DemoWeaponIndex = Index;
-		static const ECRWeaponType Order[] = { ECRWeaponType::Sword, ECRWeaponType::Laser, ECRWeaponType::Projectile };
 		Snowman->GetWeaponComponent()->Equip(Order[Index]);
 	}
 
@@ -171,11 +175,23 @@ void ACRPlayerController::CRAutoFire(int32 Weapon, float Seconds)
 	{
 		return;
 	}
-	const ECRWeaponType Type = Weapon == 2 ? ECRWeaponType::Laser : Weapon == 3 ? ECRWeaponType::Projectile : ECRWeaponType::Sword;
+	static const ECRWeaponType Types[] = { ECRWeaponType::Sword, ECRWeaponType::Laser, ECRWeaponType::Projectile,
+		ECRWeaponType::Lightning, ECRWeaponType::Missile, ECRWeaponType::Flame };
+	const ECRWeaponType Type = Types[FMath::Clamp(Weapon, 1, 6) - 1];
 	Snowman->GetWeaponComponent()->Equip(Type);
 	SetTriggerHeld(true);
 	GetWorldTimerManager().SetTimer(AutoFireTimer, FTimerDelegate::CreateWeakLambda(this, [this]() { SetTriggerHeld(false); }),
 		FMath::Max(Seconds, 0.1f), false);
+}
+
+void ACRPlayerController::CRPunch()
+{
+	OnPunch();
+}
+
+void ACRPlayerController::CRSuper()
+{
+	OnSuper();
 }
 
 void ACRPlayerController::BeginPlay()
@@ -213,6 +229,22 @@ void ACRPlayerController::BeginPlay()
 				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 13))
 				.ColorAndOpacity(FLinearColor(1.f, 1.f, 0.6f, 0.95f))
 				.ShadowOffset(FVector2D(1.f, 1.f))
+			]
+			// 위 가운데: 토글 알림
+			+ SOverlay::Slot()
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Top)
+			.Padding(0.f, 60.f)
+			[
+				SNew(STextBlock)
+				.Text_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->ToastText : FText::GetEmpty(); })
+				.Visibility_Lambda([WeakThis]()
+				{
+					return WeakThis.IsValid() && FPlatformTime::Seconds() < WeakThis->ToastEnd ? EVisibility::HitTestInvisible : EVisibility::Collapsed;
+				})
+				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 18))
+				.ColorAndOpacity(FLinearColor(1.f, 0.9f, 0.4f))
+				.ShadowOffset(FVector2D(2.f, 2.f))
 			]
 			// 왼쪽 아래: 조작법
 			+ SOverlay::Slot()
@@ -271,6 +303,14 @@ void ACRPlayerController::CreateInputAssets()
 	BackAction = MakeAction(TEXT("IA_Back"), EInputActionValueType::Boolean, true);
 	FlyAction = MakeAction(TEXT("IA_Fly"), EInputActionValueType::Axis1D);
 	FastAction = MakeAction(TEXT("IA_Fast"), EInputActionValueType::Boolean);
+	LightningAction = MakeAction(TEXT("IA_Weapon4"), EInputActionValueType::Boolean);
+	MissileAction = MakeAction(TEXT("IA_Weapon5"), EInputActionValueType::Boolean);
+	FlameAction = MakeAction(TEXT("IA_Weapon6"), EInputActionValueType::Boolean);
+	PunchAction = MakeAction(TEXT("IA_Punch"), EInputActionValueType::Boolean);
+	SuperAction = MakeAction(TEXT("IA_Super"), EInputActionValueType::Boolean);
+	FxStepAction = MakeAction(TEXT("IA_FxStep"), EInputActionValueType::Boolean);
+	CharStepAction = MakeAction(TEXT("IA_CharStep"), EInputActionValueType::Boolean);
+	ImpactAction = MakeAction(TEXT("IA_Impact"), EInputActionValueType::Boolean);
 
 	MappingContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Default"));
 
@@ -306,6 +346,14 @@ void ACRPlayerController::CreateInputAssets()
 	FEnhancedActionKeyMapping& FlyDown = MappingContext->MapKey(FlyAction, EKeys::Q);
 	FlyDown.Modifiers.Add(NewObject<UInputModifierNegate>(this));
 	MappingContext->MapKey(FastAction, EKeys::LeftShift);
+	MappingContext->MapKey(LightningAction, EKeys::Four);
+	MappingContext->MapKey(MissileAction, EKeys::Five);
+	MappingContext->MapKey(FlameAction, EKeys::Six);
+	MappingContext->MapKey(PunchAction, EKeys::RightMouseButton);
+	MappingContext->MapKey(SuperAction, EKeys::F);
+	MappingContext->MapKey(FxStepAction, EKeys::T);
+	MappingContext->MapKey(CharStepAction, EKeys::Y);
+	MappingContext->MapKey(ImpactAction, EKeys::I);
 }
 
 void ACRPlayerController::SetupInputComponent()
@@ -330,6 +378,14 @@ void ACRPlayerController::SetupInputComponent()
 		Input->BindAction(FlyAction, ETriggerEvent::Triggered, this, &ACRPlayerController::OnFly);
 		Input->BindAction(FastAction, ETriggerEvent::Started, this, &ACRPlayerController::OnFastPressed);
 		Input->BindAction(FastAction, ETriggerEvent::Completed, this, &ACRPlayerController::OnFastReleased);
+		Input->BindAction(LightningAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSelectLightning);
+		Input->BindAction(MissileAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSelectMissile);
+		Input->BindAction(FlameAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSelectFlame);
+		Input->BindAction(PunchAction, ETriggerEvent::Started, this, &ACRPlayerController::OnPunch);
+		Input->BindAction(SuperAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSuper);
+		Input->BindAction(FxStepAction, ETriggerEvent::Started, this, &ACRPlayerController::OnToggleFxStep);
+		Input->BindAction(CharStepAction, ETriggerEvent::Started, this, &ACRPlayerController::OnToggleCharStep);
+		Input->BindAction(ImpactAction, ETriggerEvent::Started, this, &ACRPlayerController::OnToggleImpact);
 	}
 }
 
@@ -432,6 +488,10 @@ void ACRPlayerController::OnFastPressed()
 	{
 		FreeCamera->SetFast(true);
 	}
+	else if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
+	{
+		Snowman->SetSprinting(true);
+	}
 }
 
 void ACRPlayerController::OnFastReleased()
@@ -440,6 +500,88 @@ void ACRPlayerController::OnFastReleased()
 	{
 		FreeCamera->SetFast(false);
 	}
+	else if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
+	{
+		Snowman->SetSprinting(false);
+	}
+}
+
+void ACRPlayerController::SelectWeapon(ECRWeaponType Type)
+{
+	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
+	{
+		Snowman->GetWeaponComponent()->Equip(Type);
+	}
+}
+
+void ACRPlayerController::OnSelectLightning()
+{
+	SelectWeapon(ECRWeaponType::Lightning);
+}
+
+void ACRPlayerController::OnSelectMissile()
+{
+	SelectWeapon(ECRWeaponType::Missile);
+}
+
+void ACRPlayerController::OnSelectFlame()
+{
+	SelectWeapon(ECRWeaponType::Flame);
+}
+
+void ACRPlayerController::OnPunch()
+{
+	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
+	{
+		Snowman->TryPunch();
+	}
+}
+
+void ACRPlayerController::OnSuper()
+{
+	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
+	{
+		Snowman->TrySuper();
+	}
+}
+
+void ACRPlayerController::OnToggleFxStep()
+{
+	if (UCRTuningSubsystem* Tuning = UCRTuningSubsystem::Get(this))
+	{
+		const int32 NewFps = Tuning->GetMutableSettings()->FxFps > 0 ? 0 : SteppedFps;
+		Tuning->SetValue(GET_MEMBER_NAME_CHECKED(UCRTuningSettings, FxFps), NewFps);
+		Tuning->Save();
+		ShowToast(NewFps > 0 ? TEXT("이펙트 2코마 켬 (초당 12장)") : TEXT("이펙트 2코마 끔 (매끄럽게)"));
+	}
+}
+
+void ACRPlayerController::OnToggleCharStep()
+{
+	if (UCRTuningSubsystem* Tuning = UCRTuningSubsystem::Get(this))
+	{
+		const int32 NewFps = Tuning->GetMutableSettings()->CharFps > 0 ? 0 : SteppedFps;
+		Tuning->SetValue(GET_MEMBER_NAME_CHECKED(UCRTuningSettings, CharFps), NewFps);
+		Tuning->Save();
+		ShowToast(NewFps > 0 ? TEXT("캐릭터 2코마 켬 (초당 12장)") : TEXT("캐릭터 2코마 끔 (매끄럽게)"));
+	}
+}
+
+void ACRPlayerController::OnToggleImpact()
+{
+	if (UCRTuningSubsystem* Tuning = UCRTuningSubsystem::Get(this))
+	{
+		const bool bNew = !Tuning->GetMutableSettings()->bImpactFrame;
+		Tuning->SetValue(GET_MEMBER_NAME_CHECKED(UCRTuningSettings, bImpactFrame), bNew ? 1.f : 0.f);
+		Tuning->Save();
+		ShowToast(bNew ? TEXT("임팩트 프레임 켬") : TEXT("임팩트 프레임 끔"));
+	}
+}
+
+void ACRPlayerController::ShowToast(const FString& Message)
+{
+	ToastText = FText::FromString(Message);
+	ToastEnd = FPlatformTime::Seconds() + ToastSeconds;
 }
 
 void ACRPlayerController::OnBack()
@@ -471,10 +613,10 @@ FText ACRPlayerController::GetHelpText() const
 		const ACRInGameGameMode* GameMode = GetWorld()->GetAuthGameMode<ACRInGameGameMode>();
 		const FString MapFile = GameMode && !GameMode->GetMapFile().IsEmpty() ? GameMode->GetMapFile() : TEXT("없음");
 		return FText::FromString(FString::Printf(
-			TEXT("[인게임] 내용은 타격 테스트 뒤 결정 · 맵 파일: %s · WASD 이동 · 좌클릭 공격 · 1 / 2 / 3 무기 · V 시점 · Tab 옵션 · Esc 타이틀"), *MapFile));
+			TEXT("[인게임] 내용은 타격 테스트 뒤 결정 · 맵 파일: %s · WASD 이동 · 좌클릭 공격 · 우클릭 펀치 · 1~6 무기 · F 필살기 · V 시점 · Tab 옵션 · Esc 타이틀"), *MapFile));
 	}
 	default:
-		return FText::FromString(TEXT("[타격 체크] WASD 이동 · 마우스 시점 · 좌클릭 공격(꾹 누르면 연사) · 1 칼 / 2 레이저 / 3 투사체 · V 시점 전환 · Tab 튜닝 옵션 / 몬스터 생성 · Esc 타이틀"));
+		return FText::FromString(TEXT("[타격 체크] WASD 이동 · Shift 달리기 · 좌클릭 공격 · 우클릭 펀치 · 1 칼 / 2 레이저 / 3 투사체 / 4 번개 / 5 미사일 / 6 불꽃 · F 필살기 · V 시점 · T / Y 2코마 · I 임팩트 · Tab 옵션 · Esc 타이틀"));
 	}
 }
 

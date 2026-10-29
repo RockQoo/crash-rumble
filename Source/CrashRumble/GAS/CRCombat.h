@@ -16,6 +16,12 @@ namespace CRCombat
 	 */
 	CRASHRUMBLE_API bool ApplyWeaponHit(AActor* Attacker, AActor* Victim, ECRWeaponType Weapon, const FHitResult& Hit);
 
+	/** 폭발처럼 공격자 위치가 아닌 Origin에서 밀어내는 타격. */
+	CRASHRUMBLE_API bool ApplyWeaponHitFrom(AActor* Attacker, AActor* Victim, ECRWeaponType Weapon, const FHitResult& Hit, const FVector& Origin);
+
+	/** Center 반경 Radius 안의 눈사람을 모두 때린다 (Origin에서 밀어냄). 맞힌 수. */
+	CRASHRUMBLE_API int32 ApplyRadialHit(AActor* Attacker, ECRWeaponType Weapon, const FVector& Center, float Radius);
+
 	/** 무기 판정에 쓰는 오브젝트 타입 (바닥/벽 + 캐릭터). */
 	CRASHRUMBLE_API FCollisionObjectQueryParams GetWeaponQueryParams();
 }

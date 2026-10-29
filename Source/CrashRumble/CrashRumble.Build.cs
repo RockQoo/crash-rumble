@@ -18,7 +18,7 @@ public class CrashRumble : ModuleRules
 			"GameplayTasks"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "DeveloperSettings" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "DeveloperSettings", "MeshDescription", "StaticMeshDescription", "MeshConversion" });
 
 		PublicIncludePaths.Add(ModuleDirectory);
 	}

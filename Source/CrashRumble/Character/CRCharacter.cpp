@@ -13,9 +13,13 @@
 #include "Core/CRTuningSettings.h"
 #include "Core/CRTuningSubsystem.h"
 #include "Engine/StaticMesh.h"
+#include "Feedback/CRFxSubsystem.h"
+#include "Feedback/CRScreenFxSubsystem.h"
+#include "Engine/OverlapResult.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GAS/CRAttributeSet.h"
+#include "GAS/CRCombat.h"
 #include "GAS/CRGameplayTags.h"
 #include "GAS/CRWeaponAbilities.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -52,6 +56,30 @@ namespace
 	}
 	constexpr float ChunkRestSpeed = 40.f;
 	constexpr float ChunkGroundFriction = 3.f;
+
+	// 숨쉬기 / 블롭 그림자
+	constexpr float BodyBottomZ = -100.f;     // 캡슐 바닥 (몸통 구가 여기에 닿아 있음)
+	constexpr float BodyHeight = 100.f;       // 기본 몸통 지름
+	constexpr float HatExtraAmplitude = 1.15f;
+	constexpr float WalkBounceFrequency = 2.2f; // 초당 걸음 수
+	constexpr float BlobBaseRadius = 50.f;
+	constexpr float BlobFadeHeight = 600.f;
+	constexpr float BlobMinScale = 0.4f;
+	constexpr float BlobTraceDistance = 3000.f;
+	constexpr int32 HeroStencil = 1;
+	constexpr float HandDiameter = 22.f;
+
+	// 펀치: 왼손이 앞으로, 몸 가운데 쪽으로 뻗는다 (뻗는 거리는 튜닝)
+	const FVector PunchSideOffset(0.f, 40.f, 25.f);
+	constexpr float PunchStiffness = 180.f;
+	constexpr float PunchDamping = 16.f;
+	constexpr float SprintFocusMinSpeed = 200.f;
+
+	bool IsHeadPart(const FString& Name)
+	{
+		return Name.StartsWith(TEXT("Head")) || Name.StartsWith(TEXT("Eye")) || Name.StartsWith(TEXT("Nose"))
+			|| Name.StartsWith(TEXT("Mouth")) || Name.StartsWith(TEXT("Face"));
+	}
 }
 
 ACRCharacter::ACRCharacter()
@@ -130,6 +158,7 @@ void ACRCharacter::BeginPlay()
 	{
 		WeaponComponent->Equip(ECRWeaponType::Sword);
 	}
+	RefreshStencil();
 }
 
 void ACRCharacter::PossessedBy(AController* NewController)
@@ -140,6 +169,7 @@ void ACRCharacter::PossessedBy(AController* NewController)
 	{
 		WeaponComponent->Equip(ECRWeaponType::Sword);
 	}
+	RefreshStencil();
 }
 
 void ACRCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -161,6 +191,11 @@ void ACRCharacter::InitAbilitySystem()
 		AbilitySystem->GiveAbility(FGameplayAbilitySpec(UCRGA_SwordSwing::StaticClass()));
 		AbilitySystem->GiveAbility(FGameplayAbilitySpec(UCRGA_LaserFire::StaticClass()));
 		AbilitySystem->GiveAbility(FGameplayAbilitySpec(UCRGA_ProjectileFire::StaticClass()));
+		AbilitySystem->GiveAbility(FGameplayAbilitySpec(UCRGA_LightningFire::StaticClass()));
+		AbilitySystem->GiveAbility(FGameplayAbilitySpec(UCRGA_MissileFire::StaticClass()));
+		AbilitySystem->GiveAbility(FGameplayAbilitySpec(UCRGA_FlameFire::StaticClass()));
+		AbilitySystem->GiveAbility(FGameplayAbilitySpec(UCRGA_Punch::StaticClass()));
+		AbilitySystem->GiveAbility(FGameplayAbilitySpec(UCRGA_Super::StaticClass()));
 		bAbilitiesGranted = true;
 	}
 
@@ -455,6 +490,7 @@ void ACRCharacter::FellOutOfWorld(const UDamageType& DamageType)
 
 void ACRCharacter::Tick(float DeltaSeconds)
 {
+	RestoreCharStepping();
 	Super::Tick(DeltaSeconds);
 	if (bInPool)
 	{
@@ -474,6 +510,8 @@ void ACRCharacter::Tick(float DeltaSeconds)
 	}
 
 	UpdateChase(DeltaSeconds);
+	UpdatePunch(DeltaSeconds);
+	UpdateBreath(DeltaSeconds);
 	UpdateHands(DeltaSeconds);
 	UpdateFacing(DeltaSeconds);
 	UpdateFlash(DeltaSeconds);
@@ -481,6 +519,249 @@ void ACRCharacter::Tick(float DeltaSeconds)
 	if (bPoppedOff)
 	{
 		UpdatePopOff(DeltaSeconds); // 몸 기울기 뒤에 월드 좌표로 덮어쓴다
+	}
+	UpdateSmear(DeltaSeconds);
+	UpdateBlobShadow();
+	ApplyCharStepping();
+}
+
+void ACRCharacter::Landed(const FHitResult& Hit)
+{
+	// 착지 순간에는 아직 떨어지던 속도가 남아 있다
+	const float LandingSpeed = -GetCharacterMovement()->Velocity.Z;
+	Super::Landed(Hit);
+
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	if (Tuning.bDustRing && LandingSpeed >= Tuning.DustRingMinSpeed && !IsHidden())
+	{
+		if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+		{
+			const FVector Feet(GetActorLocation().X, GetActorLocation().Y, Hit.ImpactPoint.Z);
+			Fx->SpawnDustRing(Feet, FMath::Clamp(LandingSpeed / 900.f, 0.6f, 1.6f));
+		}
+	}
+}
+
+void ACRCharacter::UpdateBreath(float DeltaSeconds)
+{
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	BreathTime = FMath::Fmod(BreathTime + DeltaSeconds * Tuning.BreathSpeed * UE_TWO_PI, UE_TWO_PI * 100.f);
+
+	// 걸을 때만 통통 (속도에 비례해 서서히 켜짐)
+	const bool bWalking = GetCharacterMovement()->IsMovingOnGround() && !bDead;
+	const float TargetWalk = bWalking ? FMath::Clamp(GetVelocity().Size2D() / 300.f, 0.f, 1.f) : 0.f;
+	WalkAlpha = FMath::FInterpTo(WalkAlpha, TargetWalk, DeltaSeconds, 8.f);
+	WalkPhase = FMath::Fmod(WalkPhase + DeltaSeconds * WalkBounceFrequency * UE_PI * WalkAlpha, UE_PI * 100.f);
+	const float Bounce = FMath::Abs(FMath::Sin(WalkPhase)) * Tuning.BreathMoveBounce * WalkAlpha;
+
+	const float Amplitude = Tuning.bBreathing && !bDead ? Tuning.BreathAmplitude : 0.f;
+	const float Stretch = Amplitude * FMath::Sin(BreathTime);
+	const float HeadRise = BodyHeight * Amplitude * FMath::Sin(BreathTime - Tuning.BreathHeadLag);
+	const float HatRise = BodyHeight * Amplitude * HatExtraAmplitude * FMath::Sin(BreathTime - Tuning.BreathHeadLag - Tuning.BreathHatLag);
+
+	for (int32 i = 0; i < PartComponents.Num() && i < PartRestTransforms.Num() && i < PartBreathGroups.Num(); ++i)
+	{
+		UStaticMeshComponent* Part = PartComponents[i];
+		const EBreathGroup Group = PartBreathGroups[i];
+		if (!Part || Group == EBreathGroup::None)
+		{
+			continue;
+		}
+		const FTransform& Rest = PartRestTransforms[i];
+		FVector Location = Rest.GetLocation();
+		FVector Scale = Rest.GetScale3D();
+		switch (Group)
+		{
+		case EBreathGroup::Body:
+			// 바닥은 붙인 채 위로 늘어나고 옆으로 살짝 줄어든다
+			Location.Z = BodyBottomZ + (Location.Z - BodyBottomZ) * (1.f + Stretch);
+			Scale *= FVector(1.f - Stretch * 0.5f, 1.f - Stretch * 0.5f, 1.f + Stretch);
+			break;
+		case EBreathGroup::OnBody:
+			Location.Z = BodyBottomZ + (Location.Z - BodyBottomZ) * (1.f + Stretch);
+			Location.X *= 1.f - Stretch * 0.5f;
+			Location.Y *= 1.f - Stretch * 0.5f;
+			break;
+		case EBreathGroup::Head:
+			Location.Z += HeadRise;
+			break;
+		case EBreathGroup::Hat:
+			Location.Z += HatRise;
+			break;
+		default:
+			break;
+		}
+		Location.Z += Bounce;
+		Part->SetRelativeLocationAndRotation(Location, Rest.GetRotation());
+		Part->SetRelativeScale3D(Scale);
+	}
+}
+
+void ACRCharacter::UpdateBlobShadow()
+{
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	UCRFxSubsystem* Fx = Tuning.bBlobShadow ? UCRFxSubsystem::Get(this) : nullptr;
+	if (!Fx || IsHidden())
+	{
+		return;
+	}
+
+	// 걷는 중이면 이동 컴포넌트가 이미 찾은 바닥, 공중이면 한 번 쏜다
+	const FVector Location = GetActorLocation();
+	float GroundZ = 0.f;
+	const UCharacterMovementComponent* Movement = GetCharacterMovement();
+	if (Movement->IsMovingOnGround() && Movement->CurrentFloor.bBlockingHit)
+	{
+		GroundZ = Movement->CurrentFloor.HitResult.ImpactPoint.Z;
+	}
+	else
+	{
+		FCollisionObjectQueryParams GroundTypes;
+		GroundTypes.AddObjectTypesToQuery(ECC_WorldStatic);
+		GroundTypes.AddObjectTypesToQuery(ECC_WorldDynamic);
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(CRBlobShadow), false, this);
+		FHitResult Hit;
+		if (!GetWorld()->LineTraceSingleByObjectType(Hit, Location, Location - FVector(0.f, 0.f, BlobTraceDistance), GroundTypes, Params))
+		{
+			return;
+		}
+		GroundZ = Hit.ImpactPoint.Z;
+	}
+
+	// 공중에 있을수록 작고 옅게 (최소 40%)
+	const float Height = FMath::Max(0.f, Location.Z + BodyBottomZ - GroundZ);
+	const float Scale = FMath::Max(BlobMinScale, 1.f - Height / BlobFadeHeight);
+	Fx->AddBlobShadow(FVector(Location.X, Location.Y, GroundZ), BlobBaseRadius * Tuning.BlobShadowSize * Scale,
+		Tuning.BlobShadowStrength * Scale);
+}
+
+void ACRCharacter::UpdateSmear(float DeltaSeconds)
+{
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this);
+	if (!Fx || !Tuning.bSmear || IsHidden())
+	{
+		SmearHandLocations.Reset();
+		return;
+	}
+	SmearElapsed += DeltaSeconds;
+	// 그림이 바뀌는 프레임에만 비교한다 (지난 그림 ↔ 이번 그림)
+	if (!Fx->IsFxDrawFrame() || Fx->GetFxDrawCount() == SmearDrawCount)
+	{
+		return;
+	}
+	SmearDrawCount = Fx->GetFxDrawCount();
+	const float Elapsed = FMath::Max(SmearElapsed, 0.001f);
+	SmearElapsed = 0.f;
+
+	const FTransform ActorTransform = GetActorTransform();
+	for (const TPair<FName, FVector>& Rest : HandRestLocations)
+	{
+		const UStaticMeshComponent* Hand = FindPart(Rest.Key);
+		if (!Hand)
+		{
+			continue;
+		}
+		// 몸 기준 위치: 달리기만 해서는 늘어나지 않는다
+		const FVector Local = ActorTransform.InverseTransformPosition(Hand->GetComponentLocation());
+		if (const FVector* Previous = SmearHandLocations.Find(Rest.Key))
+		{
+			const float Distance = FVector::Dist(*Previous, Local);
+			if (Distance / Elapsed >= Tuning.SmearMinSpeed && Distance > HandDiameter)
+			{
+				Fx->SpawnSmear(ActorTransform.TransformPosition(*Previous), Hand->GetComponentLocation(), HandDiameter, AccentColor);
+			}
+		}
+		SmearHandLocations.Add(Rest.Key, Local);
+	}
+}
+
+void ACRCharacter::RestoreCharStepping()
+{
+	if (bStepApplied)
+	{
+		// 모션 계산은 원래 위치에서 이어간다
+		VisualRoot->SetRelativeTransform(StepRootMotion);
+		bStepApplied = false;
+	}
+}
+
+void ACRCharacter::ApplyCharStepping()
+{
+	const UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this);
+	if (!Fx || !Fx->IsCharSteppingEnabled())
+	{
+		bHasStepSnapshot = false;
+		return;
+	}
+	if (Fx->IsCharDrawFrame() || !bHasStepSnapshot || StepPartTransforms.Num() != PartComponents.Num())
+	{
+		// 이번 장을 기억 (루트는 월드 좌표, 파츠는 상대 좌표)
+		StepRootWorld = VisualRoot->GetComponentTransform();
+		StepPartTransforms.SetNum(PartComponents.Num());
+		for (int32 i = 0; i < PartComponents.Num(); ++i)
+		{
+			if (PartComponents[i])
+			{
+				StepPartTransforms[i] = PartComponents[i]->GetRelativeTransform();
+			}
+		}
+		bHasStepSnapshot = true;
+		return;
+	}
+	// 그리지 않는 프레임: 화면에는 마지막 장을 그대로 둔다
+	StepRootMotion = VisualRoot->GetRelativeTransform();
+	VisualRoot->SetWorldTransform(StepRootWorld);
+	for (int32 i = 0; i < PartComponents.Num(); ++i)
+	{
+		if (PartComponents[i])
+		{
+			PartComponents[i]->SetRelativeTransform(StepPartTransforms[i]);
+		}
+	}
+	bStepApplied = true;
+}
+
+void ACRCharacter::RefreshSurfaceMaterial()
+{
+	if (!bUseCustomPrimitiveData)
+	{
+		return;
+	}
+	// 외형 에셋이 머티리얼을 지정했으면 그대로 둔다
+	if (Appearance && !Appearance->Material.IsNull())
+	{
+		return;
+	}
+	UMaterialInterface* Material = UCRGameSettings::LoadSurfaceMaterial(this);
+	const bool bToon = UCRTuningSubsystem::GetSettings(this).bToonShading;
+	if (Material && Material != SurfaceMaterial)
+	{
+		SurfaceMaterial = Material;
+		for (UStaticMeshComponent* Part : PartComponents)
+		{
+			if (Part)
+			{
+				Part->SetMaterial(0, Material);
+				// Unlit 표면은 그림자를 받지 않으니 캐스팅도 끈다 (블롭 그림자가 대신함)
+				Part->SetCastShadow(!bToon);
+			}
+		}
+	}
+	WeaponComponent->RefreshSurfaceMaterial();
+}
+
+void ACRCharacter::RefreshStencil()
+{
+	const bool bHero = IsPlayerControlled();
+	TInlineComponentArray<UPrimitiveComponent*> Primitives(this);
+	for (UPrimitiveComponent* Primitive : Primitives)
+	{
+		if (Primitive != GetCapsuleComponent() && Primitive != GetMesh())
+		{
+			Primitive->SetRenderCustomDepth(bHero);
+			Primitive->SetCustomDepthStencilValue(bHero ? HeroStencil : 0);
+		}
 	}
 }
 
@@ -592,7 +873,7 @@ void ACRCharacter::SetAccentColor(const FLinearColor& InAccentColor)
 		{
 			if (bUseCustomPrimitiveData)
 			{
-				Part->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(AccentColor.R, AccentColor.G, AccentColor.B, 1.f));
+				Part->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(AccentColor.R, AccentColor.G, AccentColor.B, 0.f));
 			}
 			else if (UMaterialInstanceDynamic* Material = Cast<UMaterialInstanceDynamic>(Part->GetMaterial(0)))
 			{
@@ -695,7 +976,10 @@ void ACRCharacter::BuildParts()
 	}
 	PartComponents.Reset();
 	PartRestTransforms.Reset();
+	PartBreathGroups.Reset();
 	HandRestLocations.Reset();
+	StepPartTransforms.Reset();
+	bHasStepSnapshot = false;
 
 	const TArray<FCRCharacterPartSpec>& Specs = Appearance ? Appearance->Parts : UCRCharacterAppearance::MakeDefaultParts();
 
@@ -703,9 +987,11 @@ void ACRCharacter::BuildParts()
 	UMaterialInterface* BaseMaterial = Appearance && !Appearance->Material.IsNull() ? Appearance->Material.LoadSynchronous() : nullptr;
 	if (!BaseMaterial)
 	{
-		BaseMaterial = UCRGameSettings::LoadCharacterMaterial();
+		BaseMaterial = UCRGameSettings::LoadSurfaceMaterial(this);
 	}
 	bUseCustomPrimitiveData = BaseMaterial != nullptr;
+	SurfaceMaterial = BaseMaterial;
+	const bool bToon = UCRTuningSubsystem::GetSettings(this).bToonShading;
 	if (!BaseMaterial)
 	{
 		BaseMaterial = LoadObject<UMaterialInterface>(nullptr, FallbackMaterialPath);
@@ -731,13 +1017,14 @@ void ACRCharacter::BuildParts()
 		}
 		Part->SetupAttachment(VisualRoot);
 		Part->SetRelativeTransform(Spec.Transform);
+		Part->SetCastShadow(!bToon);
 		Part->RegisterComponent();
 
 		const FLinearColor Color = Spec.bUseAccentColor ? AccentColor : Spec.Color;
 		if (bUseCustomPrimitiveData)
 		{
 			Part->SetMaterial(0, BaseMaterial);
-			Part->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(Color.R, Color.G, Color.B, 1.f));
+			Part->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(Color.R, Color.G, Color.B, 0.f));
 			Part->SetCustomPrimitiveDataFloat(CRMaterialData::FlashIndex, 0.f);
 		}
 		else if (BaseMaterial)
@@ -747,23 +1034,40 @@ void ACRCharacter::BuildParts()
 			Part->SetMaterial(0, Material);
 		}
 
+		const FString IdName = Spec.Id.ToString();
+		EBreathGroup Group = EBreathGroup::None;
 		if (Spec.Id == HandLId || Spec.Id == HandRId)
 		{
 			HandRestLocations.Add(Spec.Id, Spec.Transform.GetLocation());
 		}
+		else if (IsHelmetPart(Spec.Id))
+		{
+			Group = EBreathGroup::Hat;
+		}
+		else if (IsHeadPart(IdName))
+		{
+			Group = EBreathGroup::Head;
+		}
+		else if (IdName.StartsWith(TEXT("Body")))
+		{
+			Group = EBreathGroup::Body;
+		}
+		else
+		{
+			Group = EBreathGroup::OnBody;
+		}
 		PartComponents.Add(Part);
 		PartRestTransforms.Add(Spec.Transform);
+		PartBreathGroups.Add(Group);
 	}
 }
 
 void ACRCharacter::ApplyTuning()
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
-	// 몬스터는 이동 입력 크기로 속도를 줄이므로 최대 속도는 둘 중 큰 값
-	GetCharacterMovement()->MaxWalkSpeed = bMonster
-		? FMath::Max3(Tuning.MoveSpeed, Tuning.MonsterMoveSpeed, Tuning.BattleMoveSpeed)
-		: Tuning.MoveSpeed;
+	UpdateMoveSpeed();
 	GetCharacterMovement()->MaxAcceleration = Tuning.MaxAcceleration;
+	RefreshSurfaceMaterial();
 
 	// 최대 체력이 바뀌면 비율 유지
 	if (AbilitySystem && AbilitySystem->AbilityActorInfo.IsValid() && !bDead)
@@ -775,6 +1079,122 @@ void ACRCharacter::ApplyTuning()
 			const float Ratio = GetHealth() / OldMax;
 			AbilitySystem->SetNumericAttributeBase(UCRAttributeSet::GetMaxHealthAttribute(), NewMax);
 			AbilitySystem->SetNumericAttributeBase(UCRAttributeSet::GetHealthAttribute(), FMath::Max(1.f, NewMax * Ratio));
+		}
+	}
+}
+
+void ACRCharacter::UpdateMoveSpeed()
+{
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	// 몬스터는 이동 입력 크기로 속도를 줄이므로 최대 속도는 둘 중 큰 값
+	GetCharacterMovement()->MaxWalkSpeed = bMonster
+		? FMath::Max3(Tuning.MoveSpeed, Tuning.MonsterMoveSpeed, Tuning.BattleMoveSpeed)
+		: Tuning.MoveSpeed * (bSprinting ? Tuning.SprintMultiplier : 1.f);
+}
+
+void ACRCharacter::SetSprinting(bool bInSprinting)
+{
+	bSprinting = bInSprinting;
+	UpdateMoveSpeed();
+}
+
+void ACRCharacter::TryPunch()
+{
+	if (bDead || PunchClock < NextPunchTime)
+	{
+		return;
+	}
+	if (AbilitySystem->TryActivateAbilityByClass(UCRGA_Punch::StaticClass()))
+	{
+		NextPunchTime = PunchClock + UCRTuningSubsystem::GetSettings(this).PunchInterval;
+	}
+}
+
+void ACRCharacter::TrySuper()
+{
+	const double Now = FPlatformTime::Seconds();
+	if (bDead || Now < NextSuperTime)
+	{
+		return;
+	}
+	if (AbilitySystem->TryActivateAbilityByClass(UCRGA_Super::StaticClass()))
+	{
+		const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+		NextSuperTime = Now + Tuning.SuperCooldown + Tuning.SuperFreezeDuration;
+	}
+}
+
+void ACRCharacter::PerformPunch()
+{
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+
+	// 커서 쪽으로 즉시 회전
+	FVector AimPoint;
+	if (GetWeaponAimPoint(AimPoint))
+	{
+		const FVector ToAim = AimPoint - GetActorLocation();
+		if (ToAim.SizeSquared2D() > 1.f)
+		{
+			SetActorRotation(FRotator(0.f, ToAim.Rotation().Yaw, 0.f));
+		}
+	}
+
+	// 왼손을 한 프레임에 뻗는다 (→ 스미어)
+	PunchExtend = 1.f;
+	PunchVelocity = 0.f;
+
+	const FVector* Rest = HandRestLocations.Find(HandLId);
+	const FVector LocalFist = (Rest ? *Rest : FVector::ZeroVector) + FVector(Tuning.PunchReach, 0.f, 0.f) + PunchSideOffset;
+	const FVector Fist = GetActorTransform().TransformPosition(LocalFist);
+
+	// 주먹 위치 반경 안의 가장 가까운 적
+	TArray<FOverlapResult> Overlaps;
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_Pawn);
+	GetWorld()->OverlapMultiByObjectType(Overlaps, Fist, FQuat::Identity, Objects, FCollisionShape::MakeSphere(Tuning.PunchRadius),
+		FCollisionQueryParams(SCENE_QUERY_STAT(CRPunch), false, this));
+	ACRCharacter* Best = nullptr;
+	float BestDistance = UE_BIG_NUMBER;
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		ACRCharacter* Candidate = Cast<ACRCharacter>(Overlap.GetActor());
+		const float Distance = Candidate ? FVector::DistSquared(Candidate->GetActorLocation(), Fist) : UE_BIG_NUMBER;
+		if (Candidate && Candidate != this && !Candidate->IsDead() && Distance < BestDistance)
+		{
+			Best = Candidate;
+			BestDistance = Distance;
+		}
+	}
+	if (Best)
+	{
+		FHitResult Hit(Best, Best->GetCapsuleComponent(), Fist, -GetActorForwardVector());
+		Hit.bBlockingHit = true;
+		CRCombat::ApplyWeaponHit(this, Best, ECRWeaponType::Punch, Hit);
+	}
+}
+
+void ACRCharacter::UpdatePunch(float DeltaSeconds)
+{
+	PunchClock += DeltaSeconds;
+	if (PunchExtend != 0.f || PunchVelocity != 0.f)
+	{
+		// 스프링으로 되돌아온다 (돌아올 때도 빠르면 스미어)
+		const float Accel = -PunchStiffness * PunchExtend - PunchDamping * PunchVelocity;
+		PunchVelocity += Accel * DeltaSeconds;
+		PunchExtend += PunchVelocity * DeltaSeconds;
+		if (FMath::Abs(PunchExtend) < 0.002f && FMath::Abs(PunchVelocity) < 0.02f)
+		{
+			PunchExtend = 0.f;
+			PunchVelocity = 0.f;
+		}
+	}
+
+	// 달리기: 가장자리 집중선
+	if (bSprinting && IsPlayerControlled() && GetVelocity().Size2D() > SprintFocusMinSpeed)
+	{
+		if (UCRScreenFxSubsystem* Screen = UCRScreenFxSubsystem::Get(this))
+		{
+			Screen->SetSustainedFocus(UCRTuningSubsystem::GetSettings(this).SprintFocus);
 		}
 	}
 }
@@ -884,7 +1304,13 @@ void ACRCharacter::UpdateHands(float DeltaSeconds)
 		}
 		else
 		{
-			Hand->SetRelativeLocationAndRotation(Rest.Value + Bob, FRotator::ZeroRotator);
+			FVector Location = Rest.Value + Bob;
+			if (Rest.Key == HandLId && PunchExtend != 0.f)
+			{
+				const UCRTuningSettings& PunchTuning = UCRTuningSubsystem::GetSettings(this);
+				Location += (FVector(PunchTuning.PunchReach, 0.f, 0.f) + PunchSideOffset) * PunchExtend;
+			}
+			Hand->SetRelativeLocationAndRotation(Location, FRotator::ZeroRotator);
 		}
 	}
 }

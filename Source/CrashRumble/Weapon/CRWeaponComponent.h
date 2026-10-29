@@ -6,6 +6,7 @@
 #include "CRWeaponComponent.generated.h"
 
 class UGameplayAbility;
+class UMaterialInterface;
 class UPointLightComponent;
 class UStaticMeshComponent;
 
@@ -53,6 +54,19 @@ public:
 	/** 맞힌 눈사람 목록을 채우고 개수를 돌려준다 (관통 수 반영). */
 	int32 FireLaser(TArray<FHitResult>& OutTargetHits);
 	void FireProjectile();
+	/** 번개 한 줄기. 맞힌 눈사람 (없으면 빈 배열). */
+	void FireLightning(TArray<FHitResult>& OutTargetHits);
+	/** 미사일 Count발을 간격을 두고 차례로 쏜다 (bSuper면 간격 절반). */
+	void FireMissiles(int32 Count, bool bSuper = false);
+	/** 조준 지점 바닥에 폴리곤 불꽃. 불꽃 중심(바닥)을 돌려준다. */
+	FVector FireFlame();
+	FVector GetMuzzleLocation() const;
+
+	/** 필살기 준비 자세처럼 오른손 포즈를 Duration(오너 시간)초 동안 덮어쓴다. */
+	void SetHandOverride(const FVector& Location, const FRotator& Rotation, float Duration);
+
+	/** 툰 셰이딩 토글에 맞춰 무기 표면 머티리얼을 바꾼다 (발광 파츠는 그대로). */
+	void RefreshSurfaceMaterial();
 
 	/** 오른손 포즈 (캡슐 기준). false면 기본 자세. */
 	bool GetHandPose(FVector& OutLocation, FRotator& OutRotation) const;
@@ -76,8 +90,9 @@ private:
 	void UpdateSwordBlade();
 
 	void PlayFireFeedback();
-	FVector GetMuzzleLocation() const;
 	FVector GetFireDirection(const FVector& Start) const;
+	void UpdateMissileQueue();
+	void LaunchOneMissile();
 	TSubclassOf<UGameplayAbility> GetAbilityClass(ECRWeaponType Type) const;
 
 	UPROPERTY()
@@ -85,6 +100,13 @@ private:
 
 	UPROPERTY()
 	TMap<ECRWeaponType, FCRWeaponVisual> Visuals;
+
+	/** 발광이 아닌 무기 파츠 (툰 / 조명 머티리얼 전환 대상). */
+	UPROPERTY()
+	TArray<TObjectPtr<UStaticMeshComponent>> SurfaceParts;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInterface> SurfaceMaterial;
 
 	UPROPERTY()
 	TObjectPtr<UStaticMeshComponent> SwordBlade;
@@ -123,6 +145,20 @@ private:
 	float Recoil = 0.f;
 	float RecoilVelocity = 0.f;
 	FVector RecoilJitterOffset = FVector::ZeroVector;
+
+	// 미사일 일제 사격 대기열 (오너 시간)
+	int32 PendingMissiles = 0;
+	int32 MissileSalvoIndex = 0;
+	int32 MissileSalvoSize = 0;
+	float NextMissileTime = 0.f;
+	float MissileSpacing = 0.05f;
+	TWeakObjectPtr<AActor> MissileTarget;
+	FVector MissileTargetPoint = FVector::ZeroVector;
+
+	// 손 포즈 덮어쓰기 (필살기)
+	FVector OverrideHandLocation = FVector::ZeroVector;
+	FRotator OverrideHandRotation = FRotator::ZeroRotator;
+	float OverrideTimeLeft = 0.f;
 
 	// 이펙트 (실시간 기준)
 	float MuzzleFlashTimeLeft = 0.f;

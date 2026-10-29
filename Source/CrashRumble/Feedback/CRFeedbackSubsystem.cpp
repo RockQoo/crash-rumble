@@ -8,6 +8,8 @@
 #include "Core/CRTuningSubsystem.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
+#include "Feedback/CRFxSubsystem.h"
+#include "Feedback/CRScreenFxSubsystem.h"
 #include "HAL/PlatformTime.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -37,6 +39,36 @@ namespace
 	};
 	constexpr float ConfettiFlutterFrequency = 9.f;
 
+	// 슈퍼 프리즈: 월드 0.05배, 주인공만 20배 (= 정상 속도)
+	constexpr float FreezeWorldDilation = 0.05f;
+
+	// 히트 스파크 별 크기 (반지름 cm)
+	float GetHitStarSize(ECRWeaponType Weapon)
+	{
+		switch (Weapon)
+		{
+		case ECRWeaponType::Sword: return 40.f;
+		case ECRWeaponType::Laser: return 18.f;
+		case ECRWeaponType::Punch: return 60.f;
+		case ECRWeaponType::Lightning: return 30.f;
+		default: return 22.f;
+		}
+	}
+
+	// 큐브 잔해 개수 (총알 1발 = 5개, 연사 레이저는 적게)
+	int32 GetDebrisCount(ECRWeaponType Weapon)
+	{
+		switch (Weapon)
+		{
+		case ECRWeaponType::Sword: return 8;
+		case ECRWeaponType::Laser: return 3;
+		case ECRWeaponType::Punch: return 8;
+		case ECRWeaponType::Missile: return 2; // 폭발 잔해가 따로 있다
+		case ECRWeaponType::Flame: return 3;
+		default: return 5;
+		}
+	}
+
 	FLinearColor GetWeaponColor(ECRWeaponType Weapon)
 	{
 		switch (Weapon)
@@ -44,6 +76,10 @@ namespace
 		case ECRWeaponType::Sword: return FLinearColor(1.f, 0.85f, 0.5f);
 		case ECRWeaponType::Laser: return FLinearColor(0.2f, 0.85f, 1.f);
 		case ECRWeaponType::Projectile: return FLinearColor(1.f, 0.55f, 0.15f);
+		case ECRWeaponType::Lightning: return FLinearColor(0.4f, 0.8f, 1.6f);
+		case ECRWeaponType::Missile: return FLinearColor(1.f, 0.6f, 0.2f);
+		case ECRWeaponType::Flame: return FLinearColor(1.f, 0.3f, 0.8f);
+		case ECRWeaponType::Punch: return FLinearColor(1.f, 0.9f, 0.4f);
 		default: return FLinearColor::White;
 		}
 	}
@@ -120,6 +156,56 @@ void UCRFeedbackSubsystem::OnHit(AActor* Attacker, ACRCharacter* Victim, ECRWeap
 	const FLinearColor WeaponColor = GetWeaponColor(Weapon);
 	const float GroundZ = Victim->GetActorLocation().Z - VictimHalfHeight;
 	const bool bKill = Victim->IsDead(); // 데미지가 먼저 적용되므로 이 타격으로 죽었으면 true
+
+	// 도형 애니 연출 (노션 1·2차)
+	if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+	{
+		if (Tuning.bHitStar)
+		{
+			Fx->SpawnHitStar(HitLocation, GetHitStarSize(Weapon) * (bKill ? 1.6f : 1.f), WeaponColor);
+		}
+		if (Tuning.bCubeDebris)
+		{
+			// 맞은 대상의 색(눈 + 모자/손 색)으로, 맞은 면에서 튀어나온다
+			const FVector Normal = (HitLocation - Victim->GetActorLocation()).GetSafeNormal() - Direction * 0.5f;
+			Fx->SpawnDebris(HitLocation, Normal.GetSafeNormal(), GetDebrisCount(Weapon), SnowColor, Victim->GetAccentColor(), 1.f, GroundZ);
+		}
+		if (bKill)
+		{
+			const FVector Center = Victim->GetActorLocation();
+			if (Tuning.bSphereExplosion)
+			{
+				Fx->SpawnSphereExplosion(Center, Tuning.ExplosionRadius, GroundZ);
+			}
+			if (Tuning.bCubeDebris)
+			{
+				Fx->SpawnDebris(Center, FVector::UpVector, 14, SnowColor, Victim->GetAccentColor(), 1.2f, GroundZ);
+			}
+		}
+	}
+	const APawn* AttackerPawn = Cast<APawn>(Attacker);
+	if (Weapon == ECRWeaponType::Punch)
+	{
+		// 펀치: 카나다 빛 + 임팩트 프레임 (플레이어가 때렸을 때만)
+		if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this); Fx && Tuning.bKanada)
+		{
+			Fx->SpawnKanada(HitLocation, 80.f);
+		}
+		if (AttackerPawn && AttackerPawn->IsPlayerControlled())
+		{
+			if (UCRScreenFxSubsystem* Screen = UCRScreenFxSubsystem::Get(this))
+			{
+				Screen->RequestImpactFrame();
+			}
+		}
+	}
+	if (bKill && Tuning.bImpactOnPlayerKill && AttackerPawn && AttackerPawn->IsPlayerControlled())
+	{
+		if (UCRScreenFxSubsystem* Screen = UCRScreenFxSubsystem::Get(this))
+		{
+			Screen->RequestImpactFrame();
+		}
+	}
 
 	if (Tuning.bHitParticles)
 	{
@@ -245,12 +331,87 @@ void UCRFeedbackSubsystem::SpawnImpactParticles(const FVector& Location, const F
 	{
 		EmitBurst(Color, Location, 0.5f);
 	}
+	if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+	{
+		// 벽/바닥: 돌색 큐브 잔해 + 작은 별
+		if (Tuning.bCubeDebris)
+		{
+			Fx->SpawnDebris(Location, Normal, FMath::Max(1, FMath::RoundToInt(5 * CountScale)),
+				FLinearColor(0.55f, 0.55f, 0.6f), FLinearColor(0.35f, 0.35f, 0.4f), 0.8f, Location.Z - 1.f);
+		}
+		if (Tuning.bHitStar)
+		{
+			Fx->SpawnHitStar(Location + Normal * 4.f, 14.f, Color);
+		}
+	}
+}
+
+void UCRFeedbackSubsystem::StartTimeFreeze(AActor* Hero, float Duration, FSimpleDelegate OnFinished)
+{
+	// 진행 중인 히트스톱은 정리하고 시간 정지 하나만 남긴다 (겹치면 복구가 꼬인다)
+	for (const FHitStopEntry& Entry : HitStops)
+	{
+		if (AActor* Actor = Entry.Actor.Get())
+		{
+			Actor->CustomTimeDilation = 1.f;
+		}
+	}
+	HitStops.Reset();
+	GlobalHitStopEnd = 0.0;
+
+	FreezeStart = FPlatformTime::Seconds();
+	FreezeEnd = FreezeStart + FMath::Max(Duration, 0.01f);
+	FreezeHero = Hero;
+	OnFreezeFinished = OnFinished;
+	UGameplayStatics::SetGlobalTimeDilation(this, FreezeWorldDilation);
+	if (Hero)
+	{
+		Hero->CustomTimeDilation = 1.f / FreezeWorldDilation;
+	}
+}
+
+void UCRFeedbackSubsystem::UpdateTimeFreeze()
+{
+	if (FreezeEnd <= 0.0)
+	{
+		return;
+	}
+	const double Now = FPlatformTime::Seconds();
+	UCRScreenFxSubsystem* Screen = UCRScreenFxSubsystem::Get(this);
+	if (Now < FreezeEnd)
+	{
+		if (Screen)
+		{
+			// 배경 2톤은 빠르게 들어온다
+			Screen->SetFreezeAmount(FMath::Clamp(float(Now - FreezeStart) / 0.08f, 0.f, 1.f));
+		}
+		return;
+	}
+	FreezeEnd = 0.0;
+	UGameplayStatics::SetGlobalTimeDilation(this, 1.f);
+	if (AActor* Hero = FreezeHero.Get())
+	{
+		Hero->CustomTimeDilation = 1.f;
+	}
+	FreezeHero.Reset();
+	if (Screen)
+	{
+		Screen->SetFreezeAmount(0.f);
+	}
+	FSimpleDelegate Finished = OnFreezeFinished;
+	OnFreezeFinished.Unbind();
+	Finished.ExecuteIfBound();
 }
 
 void UCRFeedbackSubsystem::StartHitStop(AActor* Attacker, AActor* Victim, float Duration)
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	const double EndTime = FPlatformTime::Seconds() + Duration;
+
+	if (IsTimeFrozen())
+	{
+		return; // 시간 정지 중에는 히트스톱을 걸지 않는다
+	}
 
 	if (Tuning.bHitStopGlobal)
 	{
@@ -411,6 +572,8 @@ void UCRFeedbackSubsystem::EmitParticles(const FLinearColor& Color, const FVecto
 void UCRFeedbackSubsystem::UpdateParticles(float DeltaTime)
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	// 계산은 매 프레임, 그리기는 2코마 시계에 맞춘다
+	const bool bDraw = UCRFxSubsystem::IsFxDrawFrame(this);
 	for (FParticleBatch& Batch : ParticleBatches)
 	{
 		if (!Batch.bAnyAlive)
@@ -489,10 +652,17 @@ void UCRFeedbackSubsystem::UpdateParticles(float DeltaTime)
 				}
 				bAnyAlive = true;
 			}
-			Component->UpdateInstanceTransform(i, Transform, true, false, true);
+			if (bDraw)
+			{
+				Component->UpdateInstanceTransform(i, Transform, true, false, true);
+			}
 		}
-		Component->MarkRenderStateDirty();
-		Batch.bAnyAlive = bAnyAlive;
+		if (bDraw)
+		{
+			Component->MarkRenderStateDirty();
+		}
+		// 그리지 않은 프레임에 다 죽었으면 다음 그리는 프레임에 숨기도록 한 번 더 돈다
+		Batch.bAnyAlive = bAnyAlive || !bDraw;
 	}
 }
 
@@ -501,6 +671,7 @@ void UCRFeedbackSubsystem::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	UpdateHitStop();
+	UpdateTimeFreeze();
 
 	const float RealDelta = FApp::GetDeltaTime();
 	for (FCRDamageNumber& Number : DamageNumbers)

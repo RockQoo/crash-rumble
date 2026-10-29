@@ -57,6 +57,9 @@ public:
 	/** 카메라 반동: 위로 튀었다가 복귀. */
 	void AddRecoil(float PitchDegrees);
 
+	/** FOV 배율 (필살기 줌인). 실제 시간으로 부드럽게 따라간다. */
+	void SetFovScale(float Scale) { TargetFovScale = Scale; }
+
 	FCROnViewModeChanged OnViewModeChanged;
 
 private:
@@ -69,6 +72,8 @@ private:
 	float ShakeAmplitude = 0.f;
 	float ShakeClock = 0.f;
 	float RecoilPitchOffset = 0.f;
+	float FovScale = 1.f;
+	float TargetFovScale = 1.f;
 
 	UPROPERTY()
 	TObjectPtr<USpringArmComponent> SpringArm;

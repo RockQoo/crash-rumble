@@ -12,10 +12,14 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "Feedback/CRFeedbackSubsystem.h"
+#include "Feedback/CRFxSubsystem.h"
 #include "GAS/CRCombat.h"
 #include "GAS/CRWeaponAbilities.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/App.h"
+#include "Core/CRTargetSpawner.h"
+#include "Engine/OverlapResult.h"
+#include "Weapon/CRMissile.h"
 #include "Weapon/CRProjectile.h"
 
 namespace
@@ -41,6 +45,13 @@ namespace
 
 	const FLinearColor LaserColor(0.2f, 0.85f, 1.f);
 	const FLinearColor ProjectileFlashColor(1.f, 0.55f, 0.15f);
+	const FLinearColor LightningGunColor(0.4f, 0.8f, 1.6f);
+	const FLinearColor MissileFlashColor(1.f, 0.7f, 0.3f);
+	const FLinearColor FlameGunColor(1.f, 0.3f, 0.8f);
+
+	// 미사일 표적: 커서 근처(300cm)에 적이 있으면 그 적
+	constexpr float MissileLockRadius = 300.f;
+	constexpr float SuperMissileSpacingScale = 0.5f;
 	constexpr float GlowIntensity = 12.f;
 
 	FVector SwordHandLocation(float Yaw)
@@ -88,17 +99,24 @@ UStaticMeshComponent* UCRWeaponComponent::MakePart(USceneComponent* Parent, cons
 	Part->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Part->SetGenerateOverlapEvents(false);
 	Part->SetCanEverAffectNavigation(false);
-	Part->SetCastShadow(!bGlow);
+	const bool bToon = UCRTuningSubsystem::GetSettings(this).bToonShading;
+	Part->SetCastShadow(!bGlow && !bToon);
 	Part->SetupAttachment(Parent ? Parent : GetOwner()->GetRootComponent());
 	Part->SetRelativeTransform(FTransform(Rotation, Location, Scale));
 	Part->RegisterComponent();
 
-	UMaterialInterface* Material = bGlow ? UCRGameSettings::LoadGlowMaterial() : UCRGameSettings::LoadCharacterMaterial();
+	UMaterialInterface* Material = bGlow ? UCRGameSettings::LoadGlowMaterial() : UCRGameSettings::LoadSurfaceMaterial(this);
 	if (Material)
 	{
 		Part->SetMaterial(0, Material);
-		Part->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(Color.R, Color.G, Color.B, Color.A));
+		// 알파 = 툰 Flat 플래그 (0 = 명암 있음)
+		Part->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(Color.R, Color.G, Color.B, bGlow ? Color.A : 0.f));
 		Part->SetCustomPrimitiveDataFloat(CRMaterialData::FlashIndex, bGlow ? Intensity : 0.f);
+	}
+	if (!bGlow)
+	{
+		SurfaceParts.Add(Part);
+		SurfaceMaterial = Material;
 	}
 	return Part;
 }
@@ -136,6 +154,41 @@ void UCRWeaponComponent::BuildVisuals()
 		Visual.FlashColor = ProjectileFlashColor;
 	}
 
+	// 번개총: 몸통 + 코일 링 + 발광 끝
+	{
+		FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Lightning);
+		Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(12, 0, 4), FVector(0.3f, 0.13f, 0.16f), FRotator::ZeroRotator, FLinearColor(0.2f, 0.22f, 0.3f), false));
+		for (int32 i = 0; i < 3; ++i)
+		{
+			Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(30 + i * 7, 0, 6), FVector(0.12f, 0.12f, 0.03f), AlongX, FLinearColor(0.9f, 0.75f, 0.2f), false));
+		}
+		Visual.Parts.Add(MakePart(WeaponRoot, SphereMesh, FVector(52, 0, 6), FVector(0.1f), FRotator::ZeroRotator, LightningGunColor, true, 4.f));
+		Visual.MuzzleOffset = FVector(56, 0, 6);
+		Visual.FlashColor = LightningGunColor;
+	}
+
+	// 미사일 발사대: 몸통 + 발사관 3개
+	{
+		FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Missile);
+		Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(10, 0, 6), FVector(0.3f, 0.2f, 0.2f), FRotator::ZeroRotator, FLinearColor(0.3f, 0.35f, 0.2f), false));
+		for (int32 i = -1; i <= 1; ++i)
+		{
+			Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(30, i * 7.f, 12), FVector(0.06f, 0.06f, 0.3f), AlongX, FLinearColor(0.75f, 0.75f, 0.8f), false));
+		}
+		Visual.MuzzleOffset = FVector(46, 0, 12);
+		Visual.FlashColor = MissileFlashColor;
+	}
+
+	// 불꽃 발사기: 통 + 분홍 노즐
+	{
+		FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Flame);
+		Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(8, 0, 6), FVector(0.14f, 0.14f, 0.3f), AlongX, FLinearColor(0.6f, 0.15f, 0.4f), false));
+		Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(32, 0, 6), FVector(0.06f, 0.06f, 0.22f), AlongX, FLinearColor(0.25f, 0.25f, 0.3f), false));
+		Visual.Parts.Add(MakePart(WeaponRoot, SphereMesh, FVector(44, 0, 6), FVector(0.08f), FRotator::ZeroRotator, FlameGunColor, true, 4.f));
+		Visual.MuzzleOffset = FVector(48, 0, 6);
+		Visual.FlashColor = FlameGunColor;
+	}
+
 	MuzzleFlash = MakePart(WeaponRoot, SphereMesh, FVector::ZeroVector, FVector(0.3f, 0.18f, 0.18f), FRotator::ZeroRotator, FLinearColor::White, true, GlowIntensity);
 	MuzzleFlash->SetVisibility(false);
 
@@ -156,6 +209,7 @@ void UCRWeaponComponent::BuildVisuals()
 
 void UCRWeaponComponent::Equip(ECRWeaponType Type)
 {
+	const bool bChanged = Equipped != Type;
 	Equipped = Type;
 	for (TPair<ECRWeaponType, FCRWeaponVisual>& Pair : Visuals)
 	{
@@ -174,6 +228,39 @@ void UCRWeaponComponent::Equip(ECRWeaponType Type)
 	Recoil = 0.f;
 	RecoilVelocity = 0.f;
 	NextFireTime = FMath::Min(NextFireTime, WeaponClock + 0.1f);
+
+	// 무기 전환 신호: 총구(칼은 칼끝)에 십자 반짝임 (플레이어만)
+	const APawn* Pawn = Cast<APawn>(GetOwner());
+	if (bChanged && Type != ECRWeaponType::None && Pawn && Pawn->IsPlayerControlled()
+		&& UCRTuningSubsystem::GetSettings(this).bSparkle && WeaponRoot)
+	{
+		if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+		{
+			const FVector Tip = Type == ECRWeaponType::Sword
+				? WeaponRoot->GetComponentTransform().TransformPosition(FVector(BladeStart + UCRTuningSubsystem::GetSettings(this).SwordLength, 0.f, 0.f))
+				: GetMuzzleLocation();
+			Fx->SpawnSparkle(Tip, 28.f, WeaponRoot);
+		}
+	}
+}
+
+void UCRWeaponComponent::RefreshSurfaceMaterial()
+{
+	UMaterialInterface* Material = UCRGameSettings::LoadSurfaceMaterial(this);
+	if (!Material || Material == SurfaceMaterial)
+	{
+		return;
+	}
+	SurfaceMaterial = Material;
+	const bool bToon = UCRTuningSubsystem::GetSettings(this).bToonShading;
+	for (UStaticMeshComponent* Part : SurfaceParts)
+	{
+		if (Part)
+		{
+			Part->SetMaterial(0, Material);
+			Part->SetCastShadow(!bToon);
+		}
+	}
 }
 
 TSubclassOf<UGameplayAbility> UCRWeaponComponent::GetAbilityClass(ECRWeaponType Type) const
@@ -183,6 +270,9 @@ TSubclassOf<UGameplayAbility> UCRWeaponComponent::GetAbilityClass(ECRWeaponType 
 	case ECRWeaponType::Sword: return UCRGA_SwordSwing::StaticClass();
 	case ECRWeaponType::Laser: return UCRGA_LaserFire::StaticClass();
 	case ECRWeaponType::Projectile: return UCRGA_ProjectileFire::StaticClass();
+	case ECRWeaponType::Lightning: return UCRGA_LightningFire::StaticClass();
+	case ECRWeaponType::Missile: return UCRGA_MissileFire::StaticClass();
+	case ECRWeaponType::Flame: return UCRGA_FlameFire::StaticClass();
 	default: return nullptr;
 	}
 }
@@ -203,7 +293,9 @@ void UCRWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FAc
 		UpdateSwordBlade();
 	}
 	TryFire();
+	UpdateMissileQueue();
 	UpdateSwing(DeltaTime);
+	OverrideTimeLeft = FMath::Max(0.f, OverrideTimeLeft - DeltaTime);
 	UpdateRecoil(DeltaTime);
 	UpdateHandPose(DeltaTime);
 	UpdateEffects(FApp::GetDeltaTime());
@@ -342,12 +434,17 @@ void UCRWeaponComponent::UpdateHandPose(float DeltaTime)
 	FVector TargetLocation;
 	FRotator TargetRotation;
 
-	if (Equipped == ECRWeaponType::Sword)
+	if (OverrideTimeLeft > 0.f)
+	{
+		TargetLocation = OverrideHandLocation;
+		TargetRotation = OverrideHandRotation;
+	}
+	else if (Equipped == ECRWeaponType::Sword)
 	{
 		TargetLocation = SwordHandLocation(IdleYaw);
 		TargetRotation = FRotator(IdlePitch, IdleYaw, 0.f);
 	}
-	else if (Equipped == ECRWeaponType::Laser || Equipped == ECRWeaponType::Projectile)
+	else if (Equipped != ECRWeaponType::None)
 	{
 		// 조준점을 향하도록 손을 돌린다
 		const AActor* Owner = GetOwner();
@@ -516,6 +613,171 @@ void UCRWeaponComponent::FireProjectile()
 		Projectile->Launch(GetOwner(), Direction);
 	}
 	PlayFireFeedback();
+}
+
+void UCRWeaponComponent::SetHandOverride(const FVector& Location, const FRotator& Rotation, float Duration)
+{
+	OverrideHandLocation = Location;
+	OverrideHandRotation = Rotation;
+	OverrideTimeLeft = Duration;
+}
+
+void UCRWeaponComponent::FireLightning(TArray<FHitResult>& OutTargetHits)
+{
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	const FVector Start = GetMuzzleLocation();
+	const FVector End = Start + GetFireDirection(Start) * Tuning.LightningRange;
+
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CRLightning), false, GetOwner());
+	const ACRCharacter* Shooter = Cast<ACRCharacter>(GetOwner());
+	const ECRTeam ShooterTeam = Shooter ? Shooter->GetTeam() : ECRTeam::None;
+	FVector BoltEnd = End;
+	for (int32 Iteration = 0; Iteration < 16; ++Iteration)
+	{
+		FHitResult Hit;
+		if (!GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, CRCombat::GetWeaponQueryParams(), Params))
+		{
+			break;
+		}
+		const ACRCharacter* HitSnowman = Cast<ACRCharacter>(Hit.GetActor());
+		if (HitSnowman && (HitSnowman->IsDead() || (ShooterTeam != ECRTeam::None && HitSnowman->GetTeam() == ShooterTeam)))
+		{
+			Params.AddIgnoredActor(Hit.GetActor());
+			continue;
+		}
+		// 끝점은 대상 중심이 아니라 표면 (중심이면 끝 섬광이 몸 안에 묻혀 목에 링처럼 보인다)
+		BoltEnd = Hit.ImpactPoint;
+		if (HitSnowman)
+		{
+			OutTargetHits.Add(Hit);
+		}
+		else if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+		{
+			// 바닥에 맞으면 큐브 잔해 8개
+			if (Tuning.bCubeDebris)
+			{
+				Fx->SpawnDebris(Hit.ImpactPoint, Hit.ImpactNormal, 8, FLinearColor(0.55f, 0.55f, 0.6f), FLinearColor(0.35f, 0.35f, 0.4f), 1.f, Hit.ImpactPoint.Z - 1.f);
+			}
+		}
+		break;
+	}
+	if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+	{
+		Fx->SpawnLightning(Start, BoltEnd);
+	}
+	PlayFireFeedback();
+}
+
+void UCRWeaponComponent::FireMissiles(int32 Count, bool bSuper)
+{
+	const ACRCharacter* Snowman = Cast<ACRCharacter>(GetOwner());
+	FVector AimPoint = GetOwner()->GetActorLocation() + GetOwner()->GetActorForwardVector() * 1000.f;
+	if (Snowman)
+	{
+		Snowman->GetWeaponAimPoint(AimPoint);
+	}
+	// 커서 근처(300cm)에 적이 있으면 그 적, 없으면 커서 아래 바닥
+	MissileTarget.Reset();
+	MissileTargetPoint = AimPoint;
+	if (const UCRTargetSpawnerSubsystem* Spawner = UCRTargetSpawnerSubsystem::Get(this))
+	{
+		ACRCharacter* Nearest = Spawner->FindNearestTarget(AimPoint);
+		if (Nearest && Nearest != Snowman && FVector::Dist(Nearest->GetActorLocation(), AimPoint) < MissileLockRadius)
+		{
+			MissileTarget = Nearest;
+		}
+	}
+	if (!MissileTarget.IsValid())
+	{
+		// 맵에 놓인 허수아비도 표적이 될 수 있게
+		TArray<FOverlapResult> Overlaps;
+		FCollisionObjectQueryParams Objects;
+		Objects.AddObjectTypesToQuery(ECC_Pawn);
+		GetWorld()->OverlapMultiByObjectType(Overlaps, AimPoint, FQuat::Identity, Objects, FCollisionShape::MakeSphere(MissileLockRadius),
+			FCollisionQueryParams(SCENE_QUERY_STAT(CRMissileLock), false, GetOwner()));
+		float Best = UE_BIG_NUMBER;
+		for (const FOverlapResult& Overlap : Overlaps)
+		{
+			ACRCharacter* Candidate = Cast<ACRCharacter>(Overlap.GetActor());
+			const float Distance = Candidate ? FVector::DistSquared(Candidate->GetActorLocation(), AimPoint) : UE_BIG_NUMBER;
+			if (Candidate && !Candidate->IsDead() && Distance < Best)
+			{
+				Best = Distance;
+				MissileTarget = Candidate;
+			}
+		}
+	}
+	PendingMissiles = FMath::Max(Count, 1);
+	MissileSalvoSize = PendingMissiles;
+	MissileSalvoIndex = 0;
+	MissileSpacing = 0.05f * (bSuper ? SuperMissileSpacingScale : 1.f);
+	NextMissileTime = WeaponClock;
+	UpdateMissileQueue();
+}
+
+void UCRWeaponComponent::UpdateMissileQueue()
+{
+	while (PendingMissiles > 0 && WeaponClock >= NextMissileTime)
+	{
+		LaunchOneMissile();
+		--PendingMissiles;
+		NextMissileTime += MissileSpacing;
+	}
+}
+
+void UCRWeaponComponent::LaunchOneMissile()
+{
+	UCRActorPoolSubsystem* Pool = UCRActorPoolSubsystem::Get(this);
+	if (!Pool || !WeaponRoot)
+	{
+		return;
+	}
+	const AActor* Owner = GetOwner();
+	// 위 + 약간 뒤 + 좌우로 크게 부채꼴. 한 발씩 다른 방향
+	const float Fan = MissileSalvoSize > 1 ? FMath::Lerp(-1.f, 1.f, float(MissileSalvoIndex) / (MissileSalvoSize - 1)) : 0.f;
+	++MissileSalvoIndex;
+	const FVector Direction = (FVector::UpVector * 1.f - Owner->GetActorForwardVector() * 0.1f
+		+ Owner->GetActorRightVector() * (Fan * 1.3f + FMath::FRandRange(-0.2f, 0.2f)) + FMath::VRand() * 0.15f).GetSafeNormal();
+	const FVector Start = GetMuzzleLocation();
+	if (ACRMissile* Missile = Pool->Acquire<ACRMissile>(FTransform(Direction.Rotation(), Start)))
+	{
+		Missile->Launch(GetOwner(), Direction, MissileTarget.Get(), MissileTargetPoint);
+	}
+	PlayFireFeedback();
+}
+
+FVector UCRWeaponComponent::FireFlame()
+{
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	const AActor* Owner = GetOwner();
+	const ACRCharacter* Snowman = Cast<ACRCharacter>(Owner);
+	FVector AimPoint = Owner->GetActorLocation() + Owner->GetActorForwardVector() * 400.f;
+	if (Snowman)
+	{
+		Snowman->GetWeaponAimPoint(AimPoint);
+	}
+	// 사거리 안으로 당기고, 그 지점 바닥에 세운다
+	FVector Flat = AimPoint - Owner->GetActorLocation();
+	if (Flat.Size2D() > Tuning.FlameRange)
+	{
+		AimPoint = Owner->GetActorLocation() + Flat.GetSafeNormal2D() * Tuning.FlameRange;
+	}
+	FVector Ground = AimPoint;
+	FHitResult Hit;
+	FCollisionObjectQueryParams GroundTypes;
+	GroundTypes.AddObjectTypesToQuery(ECC_WorldStatic);
+	GroundTypes.AddObjectTypesToQuery(ECC_WorldDynamic);
+	if (GetWorld()->LineTraceSingleByObjectType(Hit, AimPoint + FVector(0.f, 0.f, 300.f), AimPoint - FVector(0.f, 0.f, 2000.f), GroundTypes,
+		FCollisionQueryParams(SCENE_QUERY_STAT(CRFlameGround), false, GetOwner())))
+	{
+		Ground = Hit.ImpactPoint;
+	}
+	if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+	{
+		Fx->SpawnFlame(Ground, Tuning.FlameRadius, Tuning.FlameHeight, Tuning.FlameDuration);
+	}
+	PlayFireFeedback();
+	return Ground;
 }
 
 void UCRWeaponComponent::PlayFireFeedback()

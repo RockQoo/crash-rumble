@@ -58,3 +58,64 @@ public:
 	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 };
+
+/** GA_LightningFire: 지그재그 번개 히트스캔 한 줄기. */
+UCLASS()
+class CRASHRUMBLE_API UCRGA_LightningFire : public UCRGA_Weapon
+{
+	GENERATED_BODY()
+
+public:
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+};
+
+/** GA_MissileFire: 미사일 일제 사격. 판정은 미사일 폭발(범위)이 한다. */
+UCLASS()
+class CRASHRUMBLE_API UCRGA_MissileFire : public UCRGA_Weapon
+{
+	GENERATED_BODY()
+
+public:
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+};
+
+/** GA_FlameFire: 조준 지점 바닥에 폴리곤 불꽃, 반경 안 대상에 피해. */
+UCLASS()
+class CRASHRUMBLE_API UCRGA_FlameFire : public UCRGA_Weapon
+{
+	GENERATED_BODY()
+
+public:
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+};
+
+/** GA_Punch: 왼손 펀치 (우클릭). 손을 한 프레임에 뻗고 주먹 위치에서 판정, 맞으면 때린 쪽 히트스톱. */
+UCLASS()
+class CRASHRUMBLE_API UCRGA_Punch : public UCRGA_Weapon
+{
+	GENERATED_BODY()
+
+public:
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+};
+
+/**
+ * GA_Super: 필살기 (F). 오른손을 들고 눈에 반짝임 → 시간 정지(배경 2톤, 집중선, 줌인)
+ * → 해제 순간 미사일 일제 사격 + 카나다 빛 + 임팩트 프레임.
+ */
+UCLASS()
+class CRASHRUMBLE_API UCRGA_Super : public UCRGA_Weapon
+{
+	GENERATED_BODY()
+
+public:
+	virtual void ActivateAbility(const FGameplayAbilitySpecHandle Handle, const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
+
+private:
+	void HandleFreezeFinished();
+};

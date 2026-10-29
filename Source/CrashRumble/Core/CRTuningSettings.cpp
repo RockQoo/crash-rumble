@@ -56,6 +56,24 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 	{
 		CR_TUNE_BOOL("옵션창", bPauseOnOptions, "옵션창 열면 일시정지");
 
+		CR_TUNE_BOOL("툰 / 화면", bToonShading, "툰 셰이딩 (끄면 예전 조명)");
+		CR_TUNE_BOOL("툰 / 화면", bToonFloor, "바닥도 툰 (체크무늬)");
+		CR_TUNE_BOOL("툰 / 화면", bAnimePostProcess, "포스트 프로세스 (노출 고정, 비네트·모션 블러 끔)");
+		CR_TUNE("툰 / 화면", ExposureBias, "노출 보정", -4.f, 4.f, 0.1f);
+		CR_TUNE_BOOL("툰 / 화면", bBlobShadow, "블롭 그림자");
+		CR_TUNE("툰 / 화면", BlobShadowStrength, "블롭 그림자 진하기", 0.f, 1.f, 0.05f);
+		CR_TUNE("툰 / 화면", BlobShadowSize, "블롭 그림자 크기", 0.3f, 3.f, 0.05f);
+
+		CR_TUNE("2코마", FxFps, "이펙트 초당 그림 (0 = 매끄럽게, 12 = 2코마, 8 = 3코마) · T", 0.f, 60.f, 1.f);
+		CR_TUNE("2코마", CharFps, "캐릭터 초당 그림 (0 = 매끄럽게) · Y", 0.f, 60.f, 1.f);
+
+		CR_TUNE_BOOL("숨쉬기", bBreathing, "켜기");
+		CR_TUNE("숨쉬기", BreathAmplitude, "몸 늘어남 비율", 0.f, 0.2f, 0.005f);
+		CR_TUNE("숨쉬기", BreathSpeed, "초당 숨 횟수", 0.1f, 4.f, 0.05f);
+		CR_TUNE("숨쉬기", BreathHeadLag, "머리 늦게 따라옴(라디안)", 0.f, 2.f, 0.05f);
+		CR_TUNE("숨쉬기", BreathHatLag, "모자 더 늦게(라디안)", 0.f, 2.f, 0.05f);
+		CR_TUNE("숨쉬기", BreathMoveBounce, "걸을 때 통통 튐(cm)", 0.f, 30.f, 0.5f);
+
 		CR_TUNE("이동", MoveSpeed, "이동 속도", 100.f, 2000.f, 10.f);
 		CR_TUNE("이동", MaxAcceleration, "가속도", 200.f, 20000.f, 100.f);
 		CR_TUNE("이동", TurnSpeed, "회전 속도", 1.f, 40.f, 0.5f);
@@ -187,6 +205,76 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE_BOOL("총구 화염", bMuzzleFlash, "켜기");
 		CR_TUNE("총구 화염", MuzzleFlashDuration, "화염 시간(초)", 0.01f, 0.3f, 0.005f);
 		CR_TUNE("총구 화염", MuzzleLightIntensity, "빛 세기", 0.f, 50000.f, 500.f);
+
+		CR_TUNE_BOOL("큐브 잔해", bCubeDebris, "켜기 (유타폰 큐브)");
+		CR_TUNE("큐브 잔해", DebrisCountScale, "개수 배율", 0.f, 5.f, 0.1f);
+		CR_TUNE("큐브 잔해", DebrisSize, "크기 배율", 0.2f, 4.f, 0.05f);
+		CR_TUNE("큐브 잔해", DebrisGravity, "중력", 0.f, 5000.f, 50.f);
+
+		CR_TUNE_BOOL("구체 폭발", bSphereExplosion, "켜기 (처치, 미사일)");
+		CR_TUNE("구체 폭발", ExplosionRadius, "처치 폭발 반경", 10.f, 300.f, 5.f);
+
+		CR_TUNE_BOOL("히트 스파크 별", bHitStar, "켜기");
+		CR_TUNE("히트 스파크 별", HitStarSize, "크기 배율", 0.2f, 4.f, 0.05f);
+		CR_TUNE_BOOL("십자 반짝임", bSparkle, "켜기 (무기 전환, 필살기)");
+
+		CR_TUNE_BOOL("임팩트 프레임", bImpactFrame, "켜기 · I");
+		CR_TUNE_BOOL("임팩트 프레임", bImpactOnPlayerKill, "플레이어 처치 때도");
+		CR_TUNE("임팩트 프레임", ImpactFrameDuration, "장당 시간(초)", 0.01f, 0.3f, 0.005f);
+		CR_TUNE("임팩트 프레임", ImpactFrameCooldown, "쿨다운(초)", 0.f, 3.f, 0.05f);
+
+		CR_TUNE_BOOL("스미어", bSmear, "켜기 (빠른 손)");
+		CR_TUNE("스미어", SmearMinSpeed, "몸 기준 최소 속도", 50.f, 3000.f, 25.f);
+		CR_TUNE_BOOL("카나다 빛", bKanada, "켜기");
+		CR_TUNE("카나다 빛", KanadaSize, "크기 배율", 0.2f, 4.f, 0.05f);
+		CR_TUNE_BOOL("먼지 링", bDustRing, "켜기 (착지)");
+		CR_TUNE("먼지 링", DustRingMinSpeed, "착지 최소 속도", 100.f, 3000.f, 25.f);
+		CR_TUNE_BOOL("집중선", bFocusLines, "켜기");
+		CR_TUNE("집중선", SprintFocus, "달리기 집중선 세기", 0.f, 1.f, 0.05f);
+
+		CR_TUNE("번개", LightningDamage, "데미지", 0.f, 500.f, 1.f);
+		CR_TUNE("번개", LightningInterval, "발사 간격(초)", 0.05f, 3.f, 0.01f);
+		CR_TUNE("번개", LightningRange, "사거리", 200.f, 6000.f, 50.f);
+		CR_TUNE("번개", LightningKnockback, "넉백", 0.f, 3000.f, 25.f);
+		CR_TUNE("번개", LightningHitStop, "히트스톱(초)", 0.f, 0.5f, 0.005f);
+		CR_TUNE("번개", LightningShake, "카메라 흔들림 배율", 0.f, 5.f, 0.05f);
+
+		CR_TUNE("미사일", MissileDamage, "데미지(폭발)", 0.f, 500.f, 1.f);
+		CR_TUNE("미사일", MissileInterval, "일제 사격 간격(초)", 0.1f, 5.f, 0.05f);
+		CR_TUNE("미사일", MissileCount, "한 번에 발수", 1.f, 30.f, 1.f);
+		CR_TUNE("미사일", MissileRadius, "폭발 반경", 20.f, 600.f, 5.f);
+		CR_TUNE("미사일", MissileStartSpeed, "출발 속도", 50.f, 3000.f, 10.f);
+		CR_TUNE("미사일", MissileAcceleration, "가속도", 0.f, 8000.f, 50.f);
+		CR_TUNE("미사일", MissileMaxSpeed, "최대 속도", 100.f, 6000.f, 50.f);
+		CR_TUNE("미사일", MissileTurnStart, "처음 선회 속도(도/초)", 0.f, 720.f, 5.f);
+		CR_TUNE("미사일", MissileTurnEnd, "나중 선회 속도(도/초)", 0.f, 2000.f, 10.f);
+		CR_TUNE("미사일", MissileTurnRampTime, "선회 세지는 시간(초)", 0.05f, 4.f, 0.05f);
+		CR_TUNE("미사일", MissileKnockback, "넉백", 0.f, 3000.f, 25.f);
+		CR_TUNE("미사일", MissileHitStop, "히트스톱(초)", 0.f, 0.5f, 0.005f);
+		CR_TUNE("미사일", MissileShake, "카메라 흔들림 배율", 0.f, 5.f, 0.05f);
+
+		CR_TUNE("폴리곤 불꽃", FlameDamage, "데미지", 0.f, 500.f, 1.f);
+		CR_TUNE("폴리곤 불꽃", FlameInterval, "발사 간격(초)", 0.1f, 5.f, 0.05f);
+		CR_TUNE("폴리곤 불꽃", FlameRadius, "반경", 20.f, 400.f, 5.f);
+		CR_TUNE("폴리곤 불꽃", FlameHeight, "높이", 20.f, 800.f, 10.f);
+		CR_TUNE("폴리곤 불꽃", FlameDuration, "지속(초)", 0.2f, 5.f, 0.05f);
+		CR_TUNE("폴리곤 불꽃", FlameRange, "사거리", 200.f, 5000.f, 50.f);
+		CR_TUNE("폴리곤 불꽃", FlameKnockback, "넉백", 0.f, 3000.f, 25.f);
+
+		CR_TUNE("펀치", PunchDamage, "데미지", 0.f, 500.f, 1.f);
+		CR_TUNE("펀치", PunchInterval, "간격(초)", 0.05f, 3.f, 0.01f);
+		CR_TUNE("펀치", PunchReach, "주먹 뻗는 거리", 10.f, 300.f, 5.f);
+		CR_TUNE("펀치", PunchRadius, "판정 반경", 5.f, 200.f, 1.f);
+		CR_TUNE("펀치", PunchKnockback, "넉백", 0.f, 4000.f, 25.f);
+		CR_TUNE("펀치", PunchHitStop, "때린 쪽 히트스톱(초)", 0.f, 0.5f, 0.005f);
+		CR_TUNE("펀치", PunchShake, "카메라 흔들림 배율", 0.f, 5.f, 0.05f);
+
+		CR_TUNE("필살기", SuperFreezeDuration, "시간 정지(초)", 0.1f, 3.f, 0.05f);
+		CR_TUNE("필살기", SuperMissileCount, "미사일 수", 1.f, 60.f, 1.f);
+		CR_TUNE("필살기", SuperCooldown, "쿨다운(초)", 0.f, 30.f, 0.5f);
+		CR_TUNE("필살기", SuperZoom, "줌 FOV 배율", 0.3f, 1.f, 0.05f);
+
+		CR_TUNE("달리기", SprintMultiplier, "달리기 배율 (Shift)", 1.f, 4.f, 0.05f);
 
 		CR_TUNE("다수 타격 테스트", MonsterMaxHealth, "몬스터 최대 체력", 1.f, 5000.f, 10.f);
 		CR_TUNE("다수 타격 테스트", MonsterMoveSpeed, "몬스터 이동 속도 (0 = 정지)", 0.f, 1000.f, 10.f);

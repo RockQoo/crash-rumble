@@ -37,6 +37,13 @@ public:
 
 	void SpawnImpactParticles(const FVector& Location, const FVector& Normal, const FLinearColor& Color, float CountScale = 1.f);
 
+	/**
+	 * 슈퍼 프리즈: 월드 시간을 거의 멈추고 Hero만 정상 속도로 움직인다 (실제 시간 Duration초).
+	 * 월드 시간을 건드리는 연출(히트스톱 포함)은 여기서만 관리한다. 끝나면 OnFinished.
+	 */
+	void StartTimeFreeze(AActor* Hero, float Duration, FSimpleDelegate OnFinished);
+	bool IsTimeFrozen() const { return FreezeEnd > 0.0; }
+
 	const TArray<FCRDamageNumber>& GetDamageNumbers() const { return DamageNumbers; }
 
 	virtual void Tick(float DeltaTime) override;
@@ -98,8 +105,15 @@ private:
 	void EmitRing(const FLinearColor& Color, const FVector& Location, float SizeScale);
 	void UpdateParticles(float DeltaTime);
 
+	void UpdateTimeFreeze();
+
 	TArray<FHitStopEntry> HitStops;
 	double GlobalHitStopEnd = 0.0;
+
+	double FreezeEnd = 0.0;
+	double FreezeStart = 0.0;
+	TWeakObjectPtr<AActor> FreezeHero;
+	FSimpleDelegate OnFreezeFinished;
 
 	TArray<FCRDamageNumber> DamageNumbers;
 	int32 NextDamageNumber = 0;

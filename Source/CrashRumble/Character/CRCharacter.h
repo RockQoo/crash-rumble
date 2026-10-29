@@ -13,6 +13,7 @@ class UCRAttributeSet;
 class UCRCharacterAppearance;
 class UCRViewComponent;
 class UCRWeaponComponent;
+class UMaterialInterface;
 class USpringArmComponent;
 class UStaticMeshComponent;
 struct FOnAttributeChangeData;
@@ -43,6 +44,7 @@ public:
 	virtual void PossessedBy(AController* NewController) override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 	virtual void FellOutOfWorld(const UDamageType& DamageType) override;
+	virtual void Landed(const FHitResult& Hit) override;
 
 	// 풀 (다수 타격 테스트 몬스터)
 	virtual void OnPoolAcquired() override;
@@ -58,6 +60,7 @@ public:
 	bool IsInPool() const { return bInPool; }
 	ECRTeam GetTeam() const { return Team; }
 	void SetAccentColor(const FLinearColor& InAccentColor);
+	const FLinearColor& GetAccentColor() const { return AccentColor; }
 
 	/** 관전: 숨기고 다른 눈사람과 부딪히지 않게 한다. */
 	void SetSpectating(bool bInSpectating);
@@ -77,6 +80,15 @@ public:
 	float GetHealth() const;
 	float GetMaxHealth() const;
 	bool IsDead() const { return bDead; }
+
+	/** 왼손 펀치: 커서 쪽으로 즉시 돌고 왼손을 한 프레임에 뻗은 뒤 주먹 위치에서 판정 (GA_Punch가 호출). */
+	void PerformPunch();
+	/** 우클릭: 간격이 지났으면 펀치 어빌리티 실행. */
+	void TryPunch();
+	/** F: 쿨다운이 지났으면 필살기 어빌리티 실행. */
+	void TrySuper();
+	void SetSprinting(bool bInSprinting);
+	bool IsSprinting() const { return bSprinting; }
 
 	// 타격감
 	void PlayHitFlash(float Duration, float Intensity);
@@ -142,9 +154,63 @@ private:
 	void UpdateFall(float DeltaSeconds);
 	void SetPartsFlash(float Value);
 
+	// 애니 연출 바탕 (10단계)
+	/** 숨쉬기: 몸통이 위아래로 늘었다 줄고, 머리와 모자가 조금씩 늦게 따라온다. 걸을 때는 통통 튄다. */
+	void UpdateBreath(float DeltaSeconds);
+	void UpdateBlobShadow();
+	/** 빠르게 움직인 손을 지난 그림과 이번 그림 사이에 늘린 구체로 채운다 (몸 기준 속도). */
+	void UpdateSmear(float DeltaSeconds);
+	/** 캐릭터 2코마: 모션은 매 프레임 계산하고, 그리지 않는 프레임엔 마지막 그림의 트랜스폼으로 되돌린다. */
+	void ApplyCharStepping();
+	void RestoreCharStepping();
+	/** 툰 셰이딩 토글에 맞춰 파츠/무기 머티리얼과 그림자 캐스팅을 바꾼다. */
+	void RefreshSurfaceMaterial();
+	/** 플레이어는 스텐실 1 (임팩트 프레임 실루엣, 슈퍼 프리즈 컬러 유지). 계속 켜 둔다. */
+	void RefreshStencil();
+
+	enum class EBreathGroup : uint8
+	{
+		None,   // 손 등 (따로 움직임)
+		Body,   // 몸통: 바닥을 기준으로 늘어남
+		OnBody, // 단추: 몸통 표면을 따라감
+		Head,   // 머리와 얼굴
+		Hat,    // 모자: 머리보다 더 늦게
+	};
+
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UStaticMeshComponent>> PartComponents;
 	TArray<FTransform> PartRestTransforms; // PartComponents와 같은 순서
+	TArray<EBreathGroup> PartBreathGroups;  // PartComponents와 같은 순서
+
+	void UpdateMoveSpeed();
+	void UpdatePunch(float DeltaSeconds);
+
+	// 펀치: 1 = 다 뻗음, 스프링으로 0에 돌아온다
+	float PunchExtend = 0.f;
+	float PunchVelocity = 0.f;
+	float PunchClock = 0.f;
+	float NextPunchTime = 0.f;
+	bool bSprinting = false;
+	double NextSuperTime = 0.0;
+
+	float BreathTime = 0.f;
+	float WalkPhase = 0.f;
+	float WalkAlpha = 0.f;
+
+	// 스미어: 마지막으로 그린 장의 손 위치 (몸 기준)
+	TMap<FName, FVector> SmearHandLocations;
+	int32 SmearDrawCount = -1;
+	float SmearElapsed = 0.f;
+
+	// 캐릭터 2코마
+	FTransform StepRootWorld;
+	FTransform StepRootMotion;
+	TArray<FTransform> StepPartTransforms;
+	bool bHasStepSnapshot = false;
+	bool bStepApplied = false;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInterface> SurfaceMaterial;
 
 	struct FDeathChunk
 	{

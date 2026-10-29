@@ -9,6 +9,7 @@ class UInputAction;
 class UInputMappingContext;
 class SWidget;
 enum class ECRViewMode : uint8;
+enum class ECRWeaponType : uint8;
 struct FInputActionValue;
 
 /**
@@ -50,9 +51,17 @@ public:
 
 	virtual void PlayerTick(float DeltaTime) override;
 
-	/** Weapon: 1 칼, 2 레이저, 3 투사체. Seconds 동안 공격 버튼을 누르고 있는다. */
+	/** Weapon: 1 칼, 2 레이저, 3 투사체, 4 번개, 5 미사일, 6 불꽃. Seconds 동안 공격 버튼을 누르고 있는다. */
 	UFUNCTION(Exec)
 	void CRAutoFire(int32 Weapon, float Seconds);
+
+	/** 우클릭 펀치 (녹화/자동 테스트용). */
+	UFUNCTION(Exec)
+	void CRPunch();
+
+	/** F 필살기 (녹화/자동 테스트용). */
+	UFUNCTION(Exec)
+	void CRSuper();
 
 protected:
 	virtual void BeginPlay() override;
@@ -85,6 +94,45 @@ private:
 	void OnFastPressed();
 	void OnFastReleased();
 	FText GetHelpText() const;
+
+	void SelectWeapon(ECRWeaponType Type);
+	void OnSelectLightning();
+	void OnSelectMissile();
+	void OnSelectFlame();
+	void OnPunch();
+	void OnSuper();
+	/** T / Y / I: 이펙트 2코마, 캐릭터 2코마, 임팩트 프레임 켜고 끄기 (튜닝 값을 바꾸고 화면에 잠깐 표시). */
+	void OnToggleFxStep();
+	void OnToggleCharStep();
+	void OnToggleImpact();
+	void ShowToast(const FString& Message);
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> LightningAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> MissileAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> FlameAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> PunchAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> SuperAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> FxStepAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> CharStepAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> ImpactAction;
+
+	FText ToastText;
+	double ToastEnd = 0.0;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> MappingContext;

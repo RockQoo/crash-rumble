@@ -37,6 +37,27 @@ public:
 	// 옵션창
 	UPROPERTY() bool bPauseOnOptions = false;
 
+	// 툰 / 화면 (10단계)
+	UPROPERTY() bool bToonShading = true;
+	UPROPERTY() bool bAnimePostProcess = true;
+	UPROPERTY() float ExposureBias = 0.f;
+	UPROPERTY() bool bToonFloor = true;
+	UPROPERTY() bool bBlobShadow = true;
+	UPROPERTY() float BlobShadowStrength = 0.6f;
+	UPROPERTY() float BlobShadowSize = 1.1f;
+
+	// 2코마 (초당 그림 수, 0 = 매 프레임)
+	UPROPERTY() int32 FxFps = 12;
+	UPROPERTY() int32 CharFps = 0;
+
+	// 숨쉬기 (Idle)
+	UPROPERTY() bool bBreathing = true;
+	UPROPERTY() float BreathAmplitude = 0.045f;
+	UPROPERTY() float BreathSpeed = 1.1f;
+	UPROPERTY() float BreathHeadLag = 0.6f;
+	UPROPERTY() float BreathHatLag = 0.5f;
+	UPROPERTY() float BreathMoveBounce = 6.f;
+
 	// 이동
 	UPROPERTY() float MoveSpeed = 600.f;
 	UPROPERTY() float MaxAcceleration = 4096.f;
@@ -121,7 +142,7 @@ public:
 	UPROPERTY() float CameraShakeIntensity = 1.5f;
 	UPROPERTY() float CameraShakeDuration = 0.2f;
 	UPROPERTY() float CameraShakeFrequency = 25.f;
-	UPROPERTY() bool bHitParticles = true;
+	UPROPERTY() bool bHitParticles = false;
 	UPROPERTY() int32 HitParticleCount = 20;
 	UPROPERTY() float HitParticleSpeed = 750.f;
 	UPROPERTY() float HitParticleLifetime = 0.6f;
@@ -130,14 +151,14 @@ public:
 	UPROPERTY() float ParticleStretch = 0.0015f;
 	UPROPERTY() bool bParticleBounce = true;
 	UPROPERTY() float ParticleBounce = 0.45f;
-	UPROPERTY() bool bHitBurst = true;
+	UPROPERTY() bool bHitBurst = false;
 	UPROPERTY() float HitBurstSize = 1.f;
 	UPROPERTY() float HitBurstDuration = 0.09f;
-	UPROPERTY() bool bShockwave = true;
+	UPROPERTY() bool bShockwave = false;
 	UPROPERTY() int32 ShockwaveCount = 16;
 	UPROPERTY() float ShockwaveSpeed = 900.f;
 	UPROPERTY() float ShockwaveSize = 0.12f;
-	UPROPERTY() bool bKillExplosion = true;
+	UPROPERTY() bool bKillExplosion = false;
 	UPROPERTY() int32 KillExplosionCount = 28;
 	UPROPERTY() float KillExplosionSpeed = 1.3f;
 	UPROPERTY() float KillExplosionSize = 0.9f;
@@ -162,6 +183,29 @@ public:
 	UPROPERTY() float ConfettiFlutter = 120.f;
 	UPROPERTY() float ConfettiSpin = 720.f;
 
+	// 애니 연출 (12단계)
+	UPROPERTY() bool bCubeDebris = true;
+	UPROPERTY() float DebrisCountScale = 1.f;
+	UPROPERTY() float DebrisSize = 1.f;
+	UPROPERTY() float DebrisGravity = 1400.f;
+	UPROPERTY() bool bSphereExplosion = true;
+	UPROPERTY() float ExplosionRadius = 70.f;
+	UPROPERTY() bool bHitStar = true;
+	UPROPERTY() float HitStarSize = 1.f;
+	UPROPERTY() bool bSparkle = true;
+	UPROPERTY() bool bImpactFrame = true;
+	UPROPERTY() float ImpactFrameDuration = 0.045f;
+	UPROPERTY() float ImpactFrameCooldown = 0.4f;
+	UPROPERTY() bool bImpactOnPlayerKill = false;
+	UPROPERTY() bool bSmear = true;
+	UPROPERTY() float SmearMinSpeed = 400.f;
+	UPROPERTY() bool bKanada = true;
+	UPROPERTY() float KanadaSize = 1.f;
+	UPROPERTY() bool bDustRing = true;
+	UPROPERTY() float DustRingMinSpeed = 450.f;
+	UPROPERTY() bool bFocusLines = true;
+	UPROPERTY() float SprintFocus = 0.35f;
+
 	// 타격감 - 사격 반동
 	UPROPERTY() bool bWeaponRecoil = true;
 	UPROPERTY() float RecoilKickback = 12.f;
@@ -175,6 +219,56 @@ public:
 	UPROPERTY() bool bMuzzleFlash = true;
 	UPROPERTY() float MuzzleFlashDuration = 0.04f;
 	UPROPERTY() float MuzzleLightIntensity = 8000.f;
+
+	// 번개 (13단계)
+	UPROPERTY() float LightningDamage = 30.f;
+	UPROPERTY() float LightningInterval = 0.35f;
+	UPROPERTY() float LightningRange = 2500.f;
+	UPROPERTY() float LightningKnockback = 250.f;
+	UPROPERTY() float LightningHitStop = 0.05f;
+	UPROPERTY() float LightningShake = 0.6f;
+
+	// 미사일 (이타노 서커스)
+	UPROPERTY() float MissileDamage = 40.f;
+	UPROPERTY() float MissileInterval = 1.2f;
+	UPROPERTY() int32 MissileCount = 6;
+	UPROPERTY() float MissileRadius = 170.f;
+	UPROPERTY() float MissileStartSpeed = 350.f;
+	UPROPERTY() float MissileAcceleration = 1600.f;
+	UPROPERTY() float MissileMaxSpeed = 1700.f;
+	UPROPERTY() float MissileTurnStart = 30.f;
+	UPROPERTY() float MissileTurnEnd = 600.f;
+	UPROPERTY() float MissileTurnRampTime = 1.f;
+	UPROPERTY() float MissileKnockback = 700.f;
+	UPROPERTY() float MissileHitStop = 0.06f;
+	UPROPERTY() float MissileShake = 1.5f;
+
+	// 폴리곤 불꽃
+	UPROPERTY() float FlameDamage = 15.f;
+	UPROPERTY() float FlameInterval = 0.6f;
+	UPROPERTY() float FlameRadius = 90.f;
+	UPROPERTY() float FlameHeight = 220.f;
+	UPROPERTY() float FlameDuration = 1.1f;
+	UPROPERTY() float FlameRange = 1500.f;
+	UPROPERTY() float FlameKnockback = 200.f;
+
+	// 펀치 (우클릭)
+	UPROPERTY() float PunchDamage = 35.f;
+	UPROPERTY() float PunchInterval = 0.35f;
+	UPROPERTY() float PunchReach = 75.f;
+	UPROPERTY() float PunchRadius = 45.f;
+	UPROPERTY() float PunchKnockback = 900.f;
+	UPROPERTY() float PunchHitStop = 0.07f;
+	UPROPERTY() float PunchShake = 1.2f;
+
+	// 필살기 (F)
+	UPROPERTY() float SuperFreezeDuration = 0.8f;
+	UPROPERTY() int32 SuperMissileCount = 24;
+	UPROPERTY() float SuperCooldown = 3.f;
+	UPROPERTY() float SuperZoom = 0.8f;
+
+	// 달리기 (Shift)
+	UPROPERTY() float SprintMultiplier = 1.6f;
 
 	// 다수 타격 테스트
 	UPROPERTY() float MonsterMaxHealth = 100.f;

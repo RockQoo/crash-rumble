@@ -4,11 +4,13 @@
 #include "Core/CRActorPool.h"
 #include "Core/CRHUD.h"
 #include "Core/CRPlayerController.h"
+#include "Weapon/CRMissile.h"
 #include "Weapon/CRProjectile.h"
 
 namespace
 {
 	constexpr int32 ProjectilePrewarmCount = 32;
+	constexpr int32 MissilePrewarmCount = 32;
 }
 
 ACRGameMode::ACRGameMode()
@@ -26,5 +28,6 @@ void ACRGameMode::BeginPlay()
 	if (UCRActorPoolSubsystem* Pool = UCRActorPoolSubsystem::Get(this))
 	{
 		Pool->Prewarm(ACRProjectile::StaticClass(), ProjectilePrewarmCount);
+		Pool->Prewarm(ACRMissile::StaticClass(), MissilePrewarmCount);
 	}
 }

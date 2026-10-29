@@ -8,8 +8,48 @@
 #include "Feedback/CRFeedbackSubsystem.h"
 #include "GAS/CRDamageEffect.h"
 #include "GAS/CRGameplayTags.h"
+#include "Engine/OverlapResult.h"
+#include "Engine/World.h"
 
 bool CRCombat::ApplyWeaponHit(AActor* Attacker, AActor* Victim, ECRWeaponType Weapon, const FHitResult& Hit)
+{
+	return ApplyWeaponHitFrom(Attacker, Victim, Weapon, Hit, Attacker ? Attacker->GetActorLocation() : FVector::ZeroVector);
+}
+
+int32 CRCombat::ApplyRadialHit(AActor* Attacker, ECRWeaponType Weapon, const FVector& Center, float Radius)
+{
+	UWorld* World = Attacker ? Attacker->GetWorld() : nullptr;
+	if (!World)
+	{
+		return 0;
+	}
+	TArray<FOverlapResult> Overlaps;
+	FCollisionObjectQueryParams Objects;
+	Objects.AddObjectTypesToQuery(ECC_Pawn);
+	World->OverlapMultiByObjectType(Overlaps, Center, FQuat::Identity, Objects, FCollisionShape::MakeSphere(Radius),
+		FCollisionQueryParams(SCENE_QUERY_STAT(CRRadialHit), false));
+	TSet<AActor*> Done;
+	int32 Count = 0;
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		AActor* Victim = Overlap.GetActor();
+		if (!Victim || Done.Contains(Victim))
+		{
+			continue;
+		}
+		Done.Add(Victim);
+		const FVector Point = Victim->GetActorLocation();
+		FHitResult Hit(Victim, Overlap.GetComponent(), Point, (Point - Center).GetSafeNormal());
+		Hit.bBlockingHit = true;
+		if (ApplyWeaponHitFrom(Attacker, Victim, Weapon, Hit, Center))
+		{
+			++Count;
+		}
+	}
+	return Count;
+}
+
+bool CRCombat::ApplyWeaponHitFrom(AActor* Attacker, AActor* Victim, ECRWeaponType Weapon, const FHitResult& Hit, const FVector& Origin)
 {
 	ACRCharacter* Target = Cast<ACRCharacter>(Victim);
 	if (!Attacker || !Target || Target == Attacker || Target->IsDead())
@@ -45,7 +85,7 @@ bool CRCombat::ApplyWeaponHit(AActor* Attacker, AActor* Victim, ECRWeaponType We
 
 	if (UCRFeedbackSubsystem* Feedback = UCRFeedbackSubsystem::Get(Attacker))
 	{
-		FVector Direction = Target->GetActorLocation() - Attacker->GetActorLocation();
+		FVector Direction = Target->GetActorLocation() - Origin;
 		Direction.Z = 0.f;
 		const FVector HitLocation = Hit.bBlockingHit || Hit.ImpactPoint != FVector::ZeroVector
 			? FVector(Hit.ImpactPoint)

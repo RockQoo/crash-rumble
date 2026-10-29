@@ -65,6 +65,10 @@ void UCRViewComponent::UpdateCameraOffset(float RealDeltaTime)
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 
+	FovScale = FMath::FInterpTo(FovScale, TargetFovScale, RealDeltaTime, 12.f);
+	const float BaseFov = FMath::Lerp(Tuning.ShoulderFOV, Tuning.TopDownFOV, BlendAlpha);
+	Camera->SetFieldOfView(BaseFov * FovScale);
+
 	FRotator Offset(RecoilPitchOffset, 0.f, 0.f);
 	RecoilPitchOffset = FMath::FInterpTo(RecoilPitchOffset, 0.f, RealDeltaTime, Tuning.CameraRecoilRecover);
 
@@ -149,7 +153,6 @@ void UCRViewComponent::UpdateCamera(float DeltaTime)
 	SpringArm->TargetArmLength = FMath::Lerp(Tuning.ShoulderArmLength, Tuning.TopDownArmLength, BlendAlpha);
 	const FVector ShoulderOffset(0.f, Tuning.ShoulderOffsetY, Tuning.ShoulderOffsetZ);
 	SpringArm->SocketOffset = FMath::Lerp(ShoulderOffset, FVector::ZeroVector, BlendAlpha);
-	Camera->SetFieldOfView(FMath::Lerp(Tuning.ShoulderFOV, Tuning.TopDownFOV, BlendAlpha));
 }
 
 void UCRViewComponent::UpdateAim()
