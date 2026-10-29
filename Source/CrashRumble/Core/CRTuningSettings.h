@@ -372,6 +372,8 @@ public:
 	UPROPERTY() float FlameDuration = 1.1f;
 	UPROPERTY() float FlameRange = 1500.f;
 	UPROPERTY() float FlameKnockback = 200.f;
+	UPROPERTY() float FlameHitStop = 0.02f;
+	UPROPERTY() float FlameShake = 0.4f;
 	UPROPERTY() int32 FlameCount = 22;
 	UPROPERTY() float FlameGrowTime = 0.15f;
 	UPROPERTY() float FlameSinkFrom = 0.6f;

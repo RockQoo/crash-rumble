@@ -23,7 +23,7 @@ FCRWeaponFeel CRWeapon::GetFeel(const UCRTuningSettings& Tuning, ECRWeaponType T
 		Feel = { Tuning.MissileDamage, Tuning.MissileInterval, Tuning.MissileKnockback, Tuning.MissileHitStop, Tuning.MissileShake };
 		break;
 	case ECRWeaponType::Flame:
-		Feel = { Tuning.FlameDamage, Tuning.FlameInterval, Tuning.FlameKnockback, 0.02f, 0.4f };
+		Feel = { Tuning.FlameDamage, Tuning.FlameInterval, Tuning.FlameKnockback, Tuning.FlameHitStop, Tuning.FlameShake };
 		break;
 	case ECRWeaponType::Punch:
 		Feel = { Tuning.PunchDamage, Tuning.PunchInterval, Tuning.PunchKnockback, Tuning.PunchHitStop, Tuning.PunchShake };

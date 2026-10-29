@@ -372,6 +372,8 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("폴리곤 불꽃", FlameDuration, "지속(초)", 0.2f, 5.f, 0.05f);
 		CR_TUNE("폴리곤 불꽃", FlameRange, "사거리", 200.f, 5000.f, 50.f);
 		CR_TUNE("폴리곤 불꽃", FlameKnockback, "넉백", 0.f, 3000.f, 25.f);
+		CR_TUNE("폴리곤 불꽃", FlameHitStop, "히트스톱(초)", 0.f, 0.3f, 0.005f);
+		CR_TUNE("폴리곤 불꽃", FlameShake, "카메라 흔들림", 0.f, 5.f, 0.05f);
 		CR_TUNE("폴리곤 불꽃", FlameCount, "삼각뿔 개수", 1.f, 128.f, 1.f);
 		CR_TUNE("폴리곤 불꽃", FlameGrowTime, "자라는 시간(초)", 0.01f, 2.f, 0.01f);
 		CR_TUNE("폴리곤 불꽃", FlameSinkFrom, "가라앉기 시작 (수명 비율)", 0.f, 1.f, 0.05f);
