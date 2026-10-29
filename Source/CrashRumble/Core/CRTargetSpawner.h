@@ -47,6 +47,8 @@ public:
 
 	void SpawnTargets(int32 Count);
 	void ClearTargets();
+	/** 기존 몬스터를 정리하고 Start부터 Direction으로 Spacing 간격 Count마리를 제자리에 세운다 (LOD 미리보기). */
+	void SpawnLine(const FVector& Start, const FVector& Direction, int32 Count, float Spacing);
 	int32 GetActiveCount() const { return ActiveTargets.Num(); }
 
 	/** 기존 몬스터를 정리하고 플레이어 양옆에 레드/블루 진영을 PerTeam 마리씩 세운다. */

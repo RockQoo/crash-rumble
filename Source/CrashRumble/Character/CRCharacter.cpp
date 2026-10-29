@@ -1,6 +1,8 @@
 ﻿#include "Character/CRCharacter.h"
 
 #include "ProfilingDebugging/CpuProfilerTrace.h"
+#include "Camera/PlayerCameraManager.h"
+#include "GameFramework/PlayerController.h"
 #include "AbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/CRViewComponent.h"
@@ -541,8 +543,28 @@ void ACRCharacter::Tick(float DeltaSeconds)
 	UpdateChase(DeltaSeconds);
 	UpdatePatrol(DeltaSeconds);
 	UpdatePunch(DeltaSeconds);
-	UpdateBreath(DeltaSeconds);
-	UpdateHands(DeltaSeconds);
+	// 캐릭터 LOD: 멀수록 파츠 움직임(숨쉬기, 손, 무기 자세)을 덜 갱신. 몸 이동/회전/넘어짐은 그대로
+	VisualLod = ComputeVisualLod();
+	LodPendingDelta += DeltaSeconds;
+	const UCRTuningSettings& LodTuning = UCRTuningSubsystem::GetSettings(this);
+	const int32 MidInterval = FMath::Max(LodTuning.CharLodMidInterval, 1);
+	if (VisualLod == 0 || (VisualLod == 1 && (GFrameCounter + GetUniqueID()) % uint64(MidInterval) == 0))
+	{
+		UpdateBreath(LodPendingDelta);
+		UpdateHands(LodPendingDelta);
+		LodPendingDelta = 0.f;
+	}
+	else if (VisualLod == 2)
+	{
+		LodPendingDelta = 0.f;
+	}
+	const int32 DebugLod = LodTuning.bCharLodDebug ? VisualLod : -1;
+	if (DebugLod != LodDebugShown)
+	{
+		static const FLinearColor LodColors[] = { FLinearColor(0.1f, 0.9f, 0.2f), FLinearColor(1.f, 0.85f, 0.1f), FLinearColor(1.f, 0.1f, 0.1f) };
+		SetAccentPartsColor(DebugLod >= 0 ? LodColors[DebugLod] : AccentColor);
+		LodDebugShown = DebugLod;
+	}
 	UpdateFacing(DeltaSeconds);
 	UpdateFlash(DeltaSeconds);
 	UpdateFall(DeltaSeconds);
@@ -550,9 +572,28 @@ void ACRCharacter::Tick(float DeltaSeconds)
 	{
 		UpdatePopOff(DeltaSeconds); // 몸 기울기 뒤에 월드 좌표로 덮어쓴다
 	}
-	UpdateSmear(DeltaSeconds);
+	if (VisualLod == 0)
+	{
+		UpdateSmear(DeltaSeconds);
+	}
 	UpdateBlobShadow();
 	ApplyCharStepping();
+}
+
+int32 ACRCharacter::ComputeVisualLod() const
+{
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	if (!Tuning.bCharLod || IsPlayerControlled())
+	{
+		return 0;
+	}
+	const APlayerController* Viewer = GetWorld()->GetFirstPlayerController();
+	if (!Viewer || !Viewer->PlayerCameraManager)
+	{
+		return 0;
+	}
+	const float DistSq = FVector::DistSquared(Viewer->PlayerCameraManager->GetCameraLocation(), GetActorLocation());
+	return DistSq < FMath::Square(Tuning.CharLodNear) ? 0 : DistSq < FMath::Square(Tuning.CharLodFar) ? 1 : 2;
 }
 
 void ACRCharacter::Landed(const FHitResult& Hit)
@@ -622,8 +663,7 @@ void ACRCharacter::UpdateBreath(float DeltaSeconds)
 			break;
 		}
 		Location.Z += Bounce;
-		Part->SetRelativeLocationAndRotation(Location, Rest.GetRotation());
-		Part->SetRelativeScale3D(Scale);
+		Part->SetRelativeTransform(FTransform(Rest.GetRotation(), Location, Scale));
 	}
 }
 
@@ -797,7 +837,7 @@ void ACRCharacter::RefreshStencil()
 
 void ACRCharacter::UpdateChase(float DeltaSeconds)
 {
-	if (!bMonster || bDead)
+	if (!bMonster || bDead || TrainingRole != ECRTrainingRole::None)
 	{
 		return;
 	}
@@ -895,6 +935,7 @@ void ACRCharacter::SetupAsMonster(const FLinearColor& InAccentColor, ECRTeam InT
 {
 	bMonster = true;
 	Team = InTeam;
+	TrainingRole = ECRTrainingRole::None;
 	BattleWeapon = InWeapon == ECRWeaponType::None ? ECRWeaponType::Sword : InWeapon;
 	TargetEnemy.Reset();
 	RetargetTimeLeft = 0.f;
@@ -922,17 +963,23 @@ void ACRCharacter::SetSpectating(bool bInSpectating)
 void ACRCharacter::SetAccentColor(const FLinearColor& InAccentColor)
 {
 	AccentColor = InAccentColor;
+	LodDebugShown = -1;
+	SetAccentPartsColor(AccentColor);
+}
+
+void ACRCharacter::SetAccentPartsColor(const FLinearColor& Color)
+{
 	for (UStaticMeshComponent* Part : PartComponents)
 	{
 		if (Part && Part->ComponentTags.Contains(AccentTag))
 		{
 			if (bUseCustomPrimitiveData)
 			{
-				Part->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(AccentColor.R, AccentColor.G, AccentColor.B, 0.f));
+				Part->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(Color.R, Color.G, Color.B, 0.f));
 			}
 			else if (UMaterialInstanceDynamic* Material = Cast<UMaterialInstanceDynamic>(Part->GetMaterial(0)))
 			{
-				Material->SetVectorParameterValue(ColorParam, AccentColor);
+				Material->SetVectorParameterValue(ColorParam, Color);
 			}
 		}
 	}

@@ -209,6 +209,32 @@ void UCRTargetSpawnerSubsystem::StartBattle(const FCRBattleSetup& Setup)
 	SetPlayerSpectating(Setup.bSpectate);
 }
 
+void UCRTargetSpawnerSubsystem::SpawnLine(const FVector& Start, const FVector& Direction, int32 Count, float Spacing)
+{
+	ClearTargets();
+	UCRActorPoolSubsystem* Pool = UCRActorPoolSubsystem::Get(this);
+	if (!Pool)
+	{
+		return;
+	}
+	const FVector Flat = Direction.GetSafeNormal2D();
+	const FRotator Facing(0.f, (-Flat).Rotation().Yaw, 0.f);
+	for (int32 i = 0; i < Count; ++i)
+	{
+		FVector Location;
+		if (!FindGroundAround(Start + Flat * Spacing * i, 0.f, 1.f, 0.f, Location))
+		{
+			continue;
+		}
+		if (ACRCharacter* Target = Pool->Acquire<ACRCharacter>(FTransform(Facing, Location)))
+		{
+			Target->SetupAsMonster(MonsterAccent);
+			Target->SetupTraining(ECRTrainingRole::Dummy);
+			ActiveTargets.Add(Target);
+		}
+	}
+}
+
 void UCRTargetSpawnerSubsystem::ClearTargets()
 {
 	if (UCRActorPoolSubsystem* Pool = UCRActorPoolSubsystem::Get(this))

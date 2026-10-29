@@ -111,6 +111,11 @@ void ACRPlayerController::CRBench()
 	}
 }
 
+void ACRPlayerController::CRLodLine()
+{
+	CRPreview(TEXT("캐릭터 LOD"));
+}
+
 void ACRPlayerController::CRBenchStop()
 {
 	if (UCRBenchmarkSubsystem* Bench = UCRBenchmarkSubsystem::Get(this))
@@ -268,6 +273,18 @@ void ACRPlayerController::CRPreview(const FString& Category)
 		return;
 	}
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+
+	// 캐릭터 LOD: 카메라 앞 3m부터 시선 방향으로 한 줄
+	if (Category == TEXT("캐릭터 LOD"))
+	{
+		if (UCRTargetSpawnerSubsystem* Spawner = UCRTargetSpawnerSubsystem::Get(this); Spawner && PlayerCameraManager)
+		{
+			const FVector Look = FRotator(0.f, PlayerCameraManager->GetCameraRotation().Yaw, 0.f).Vector();
+			Spawner->SpawnLine(Snowman->GetActorLocation() + Look * PreviewDistance, Look, Tuning.CharLodLineCount, Tuning.CharLodLineSpacing);
+			ShowToast(FString::Printf(TEXT("%d마리를 %.0fm 간격으로 줄 세움 (구간 색 표시를 켜고 비교)"), Tuning.CharLodLineCount, Tuning.CharLodLineSpacing / 100.f));
+		}
+		return;
+	}
 
 	// 플레이어 앞 3m, 그 아래 바닥
 	const FVector Forward = Snowman->GetActorForwardVector();

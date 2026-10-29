@@ -88,6 +88,14 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("2코마", FxFps, "이펙트 초당 그림 (0 = 매끄럽게, 12 = 2코마, 8 = 3코마) · T", 0.f, 60.f, 1.f);
 		CR_TUNE("2코마", CharFps, "캐릭터 초당 그림 (0 = 매끄럽게) · Y", 0.f, 60.f, 1.f);
 
+		CR_TUNE_BOOL("캐릭터 LOD", bCharLod, "켜기 (끄면 모두 매 프레임)");
+		CR_TUNE("캐릭터 LOD", CharLodNear, "가까움 → 중간 거리 (카메라에서)", 200.f, 10000.f, 100.f);
+		CR_TUNE("캐릭터 LOD", CharLodFar, "중간 → 멀리 거리", 500.f, 20000.f, 100.f);
+		CR_TUNE("캐릭터 LOD", CharLodMidInterval, "중간: 몇 프레임에 한 번 갱신", 1.f, 10.f, 1.f);
+		CR_TUNE_BOOL("캐릭터 LOD", bCharLodDebug, "구간을 모자 색으로 표시 (초록/노랑/빨강)");
+		CR_TUNE("캐릭터 LOD", CharLodLineCount, "미리보기: 줄 세울 수", 2.f, 60.f, 1.f);
+		CR_TUNE("캐릭터 LOD", CharLodLineSpacing, "미리보기: 간격", 50.f, 1000.f, 25.f);
+
 		CR_TUNE_BOOL("숨쉬기", bBreathing, "켜기");
 		CR_TUNE("숨쉬기", BreathAmplitude, "몸 늘어남 비율", 0.f, 0.2f, 0.005f);
 		CR_TUNE("숨쉬기", BreathSpeed, "초당 숨 횟수", 0.1f, 4.f, 0.05f);
@@ -437,6 +445,7 @@ FText UCRTuningSettings::GetCategoryDescription(const FString& Category)
 		Descriptions.Add(TEXT("벤치마크"), FText::FromString(TEXT("버튼 하나로 성능 측정: 큰 평지(80m, 블럭 약 13만 개) 양 끝에 레드/블루가 여러 줄로 서서, 레이저·투사체·미사일을 섞어 들고 앞으로 전진하다 교전 거리 안의 적과 옆걸음치며 싸운다 (전선 전체에서 흩어져 싸움). 죽으면 자기 진영 뒷줄 아무 데서나 다시 떨어지고, 땅이 크게 파인다. 준비 시간 뒤 측정 시간 동안 FPS와 게임/렌더/GPU 시간, 유닛·미사일·블럭 수를 기록해 화면과 Saved/Profiling/CRBench/에 저장 (트레이스를 켜면 Unreal Insights용 .utrace도). 시작하면 옵션창은 닫힌다 (옵션창도 프레임을 먹으므로). 측정이 끝나도 전투는 계속되고, 중지하면 원래 맵으로.")));
 		Descriptions.Add(TEXT("툰 / 화면"), FText::FromString(TEXT("애니풍 렌더링 바탕. 툰 셰이딩(2단 명암, 보라 그림자, 실루엣 어둡게), 노출 고정, 바닥 체크무늬, 캐릭터 밑 반투명 원판 그림자.")));
 		Descriptions.Add(TEXT("2코마"), FText::FromString(TEXT("이펙트/캐릭터를 초당 12장처럼 끊어서 그린다 (애니 2코마). 계산은 매 프레임. T: 이펙트, Y: 캐릭터 토글.")));
+		Descriptions.Add(TEXT("캐릭터 LOD"), FText::FromString(TEXT("카메라에서 먼 눈사람은 파츠 움직임(숨쉬기, 손 흔들림, 무기 자세)을 덜 갱신한다. 가까움: 매 프레임 / 중간: N프레임에 한 번 / 멀리: 멈춤 (이동·회전·넘어짐은 그대로). 눈사람 하나가 파츠 수십 개라, 파츠를 움직이는 비용이 다수 전투에서 가장 크다. 미리보기: 카메라 앞에 한 줄로 세운다 (기존 몬스터는 정리). 구간 색 표시를 켜고 비교.")));
 		Descriptions.Add(TEXT("숨쉬기"), FText::FromString(TEXT("가만히 있을 때 몸통이 위아래로 늘었다 줄고, 머리와 모자가 조금씩 늦게 따라온다. 걸을 때는 통통 튄다.")));
 		Descriptions.Add(TEXT("이동"), FText::FromString(TEXT("플레이어 이동 속도, 가속, 회전, Shift 달리기 배율.")));
 		Descriptions.Add(TEXT("카메라"), FText::FromString(TEXT("숄더뷰 / 탑다운 / 맵 제작 자유 카메라 수치와 마우스 감도.")));
@@ -486,7 +495,7 @@ FText UCRTuningSettings::GetCategoryDescription(const FString& Category)
 
 bool UCRTuningSettings::HasPreview(const FString& Category)
 {
-	static const TSet<FString> Previews = { TEXT("큐브 잔해"), TEXT("구체 폭발"), TEXT("히트 스파크 별"), TEXT("십자 반짝임"), TEXT("임팩트 프레임"), TEXT("스미어"), TEXT("카나다 빛"), TEXT("먼지 링"), TEXT("집중선"), TEXT("번개"), TEXT("미사일"), TEXT("미사일 연기"), TEXT("폴리곤 불꽃"), TEXT("펀치"), TEXT("필살기"), TEXT("피격 번쩍임"), TEXT("데미지 숫자"), TEXT("히트스톱"), TEXT("넉백"), TEXT("카메라 흔들림"), TEXT("사망 연출"), TEXT("색종이"), TEXT("훈련장") };
+	static const TSet<FString> Previews = { TEXT("큐브 잔해"), TEXT("구체 폭발"), TEXT("히트 스파크 별"), TEXT("십자 반짝임"), TEXT("임팩트 프레임"), TEXT("스미어"), TEXT("카나다 빛"), TEXT("먼지 링"), TEXT("집중선"), TEXT("번개"), TEXT("미사일"), TEXT("미사일 연기"), TEXT("폴리곤 불꽃"), TEXT("펀치"), TEXT("필살기"), TEXT("피격 번쩍임"), TEXT("데미지 숫자"), TEXT("히트스톱"), TEXT("넉백"), TEXT("카메라 흔들림"), TEXT("사망 연출"), TEXT("색종이"), TEXT("훈련장"), TEXT("캐릭터 LOD") };
 	return Previews.Contains(Category);
 }
 

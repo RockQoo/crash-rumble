@@ -175,6 +175,10 @@ private:
 	/** 숨쉬기: 몸통이 위아래로 늘었다 줄고, 머리와 모자가 조금씩 늦게 따라온다. 걸을 때는 통통 튄다. */
 	void UpdateBreath(float DeltaSeconds);
 	void UpdateBlobShadow();
+	/** 카메라 거리로 LOD 구간(0 가까움, 1 중간, 2 멀리)을 정한다. 플레이어는 늘 0. */
+	int32 ComputeVisualLod() const;
+	/** 모자 등 강조 파츠 색만 바꾼다 (AccentColor는 그대로). */
+	void SetAccentPartsColor(const FLinearColor& Color);
 	/** 빠르게 움직인 손을 지난 그림과 이번 그림 사이에 늘린 구체로 채운다 (몸 기준 속도). */
 	void UpdateSmear(float DeltaSeconds);
 	/** 캐릭터 2코마: 모션은 매 프레임 계산하고, 그리지 않는 프레임엔 마지막 그림의 트랜스폼으로 되돌린다. */
@@ -222,6 +226,9 @@ private:
 	float BreathTime = 0.f;
 	float WalkPhase = 0.f;
 	float WalkAlpha = 0.f;
+	int32 VisualLod = 0;
+	float LodPendingDelta = 0.f;
+	int32 LodDebugShown = -1;
 
 	// 스미어: 마지막으로 그린 장의 손 위치 (몸 기준)
 	TMap<FName, FVector> SmearHandLocations;

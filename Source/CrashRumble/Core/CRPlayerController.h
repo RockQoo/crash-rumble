@@ -42,6 +42,10 @@ public:
 	UFUNCTION(Exec)
 	void CRBench();
 
+	/** 캐릭터 LOD 미리보기: 카메라 앞에 한 줄로 세운다 (옵션창 캐릭터 LOD 탭의 미리보기와 같음). */
+	UFUNCTION(Exec)
+	void CRLodLine();
+
 	/** 벤치마크 중지, 원래 맵으로. */
 	UFUNCTION(Exec)
 	void CRBenchStop();

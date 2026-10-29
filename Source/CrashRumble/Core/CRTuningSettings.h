@@ -79,6 +79,15 @@ public:
 	UPROPERTY() int32 CharFps = 0;
 
 	// 숨쉬기 (Idle)
+	// 캐릭터 LOD (카메라에서 멀수록 파츠 움직임을 덜 갱신)
+	UPROPERTY() bool bCharLod = true;
+	UPROPERTY() float CharLodNear = 1500.f;
+	UPROPERTY() float CharLodFar = 4000.f;
+	UPROPERTY() int32 CharLodMidInterval = 3;
+	UPROPERTY() bool bCharLodDebug = false;
+	UPROPERTY() int32 CharLodLineCount = 20;
+	UPROPERTY() float CharLodLineSpacing = 300.f;
+
 	UPROPERTY() bool bBreathing = true;
 	UPROPERTY() float BreathAmplitude = 0.045f;
 	UPROPERTY() float BreathSpeed = 1.1f;
