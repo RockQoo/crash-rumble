@@ -159,6 +159,7 @@ void SCRTuningPanel::Construct(const FArguments& InArgs)
 {
 	Subsystem = InArgs._Subsystem;
 	OnCloseRequested = InArgs._OnCloseRequested;
+	OnBackToTitle = InArgs._OnBackToTitle;
 	OnSpawnTargets = InArgs._OnSpawnTargets;
 	OnClearTargets = InArgs._OnClearTargets;
 	OnStartBattle = InArgs._OnStartBattle;
@@ -170,14 +171,17 @@ void SCRTuningPanel::Construct(const FArguments& InArgs)
 	// 탭 = 레지스트리 카테고리 (효과 하나당 하나). 첫 탭은 몬스터/팀전 버튼.
 	TArray<FString> TabNames;
 	TArray<TSharedRef<SWidget>> Pages;
-	TabNames.Add(TEXT("몬스터 · 팀전"));
-	Pages.Add(MakeSpawnPage(InArgs, HeaderFont, RowFont));
+	if (InArgs._ShowSpawnPage)
+	{
+		TabNames.Add(TEXT("몬스터 · 팀전"));
+		Pages.Add(MakeSpawnPage(InArgs, HeaderFont, RowFont));
+	}
 
 	TSharedPtr<SVerticalBox> CurrentRows;
 	for (const FCRTuningItem& Item : UCRTuningSettings::GetItems())
 	{
 		const FString Category = Item.Category.ToString();
-		if (TabNames.Last() != Category)
+		if (TabNames.IsEmpty() || TabNames.Last() != Category)
 		{
 			CurrentRows = SNew(SVerticalBox);
 			CurrentRows->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f)
@@ -280,6 +284,17 @@ void SCRTuningPanel::Construct(const FArguments& InArgs)
 							{
 								Subsystem->ResetToDefaults();
 							}
+							return FReply::Handled();
+						})
+					]
+					+ SHorizontalBox::Slot().FillWidth(1.f).Padding(4.f, 0.f)
+					[
+						SNew(SButton)
+						.HAlign(HAlign_Center)
+						.Text(FText::FromString(TEXT("타이틀로")))
+						.OnClicked_Lambda([this]()
+						{
+							OnBackToTitle.ExecuteIfBound();
 							return FReply::Handled();
 						})
 					]

@@ -1,6 +1,7 @@
 ﻿#include "Core/CRPlayerController.h"
 
 #include "Camera/PlayerCameraManager.h"
+#include "Camera/CRFreeCameraPawn.h"
 #include "Camera/CRViewComponent.h"
 #include "Character/CRCharacter.h"
 #include "Core/CRTuningSubsystem.h"
@@ -15,6 +16,8 @@
 #include "Styling/CoreStyle.h"
 #include "Weapon/CRWeaponComponent.h"
 #include "Core/CRActorPool.h"
+#include "Core/CRInGameGameMode.h"
+#include "Core/CRModes.h"
 #include "Core/CRTargetSpawner.h"
 #include "Core/CRTuningSettings.h"
 #include "Misc/App.h"
@@ -28,6 +31,7 @@ namespace
 {
 	constexpr int32 OptionsZOrder = 100;
 	constexpr int32 HelpZOrder = 10;
+	constexpr float FreeCameraLookScale = 0.15f;
 }
 
 FText ACRPlayerController::GetStatsText()
@@ -217,7 +221,7 @@ void ACRPlayerController::BeginPlay()
 			.Padding(16.f)
 			[
 				SNew(STextBlock)
-				.Text(FText::FromString(TEXT("WASD 이동 · 마우스 시점 · 좌클릭 공격(꾹 누르면 연사) · 1 칼 / 2 레이저 / 3 투사체 · V 시점 전환 · Tab 튜닝 옵션 / 몬스터 생성")))
+				.Text(GetHelpText())
 				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 11))
 				.ColorAndOpacity(FLinearColor(1.f, 1.f, 1.f, 0.7f))
 				.ShadowOffset(FVector2D(1.f, 1.f))
@@ -264,6 +268,9 @@ void ACRPlayerController::CreateInputAssets()
 	SwordAction = MakeAction(TEXT("IA_Weapon1"), EInputActionValueType::Boolean);
 	LaserAction = MakeAction(TEXT("IA_Weapon2"), EInputActionValueType::Boolean);
 	ProjectileAction = MakeAction(TEXT("IA_Weapon3"), EInputActionValueType::Boolean);
+	BackAction = MakeAction(TEXT("IA_Back"), EInputActionValueType::Boolean, true);
+	FlyAction = MakeAction(TEXT("IA_Fly"), EInputActionValueType::Axis1D);
+	FastAction = MakeAction(TEXT("IA_Fast"), EInputActionValueType::Boolean);
 
 	MappingContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Default"));
 
@@ -292,6 +299,13 @@ void ACRPlayerController::CreateInputAssets()
 	MappingContext->MapKey(SwordAction, EKeys::One);
 	MappingContext->MapKey(LaserAction, EKeys::Two);
 	MappingContext->MapKey(ProjectileAction, EKeys::Three);
+	MappingContext->MapKey(BackAction, EKeys::Escape);
+
+	// 자유 카메라 위/아래 (E / Q), 빠르게 (Shift)
+	MappingContext->MapKey(FlyAction, EKeys::E);
+	FEnhancedActionKeyMapping& FlyDown = MappingContext->MapKey(FlyAction, EKeys::Q);
+	FlyDown.Modifiers.Add(NewObject<UInputModifierNegate>(this));
+	MappingContext->MapKey(FastAction, EKeys::LeftShift);
 }
 
 void ACRPlayerController::SetupInputComponent()
@@ -312,6 +326,10 @@ void ACRPlayerController::SetupInputComponent()
 		Input->BindAction(SwordAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSelectSword);
 		Input->BindAction(LaserAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSelectLaser);
 		Input->BindAction(ProjectileAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSelectProjectile);
+		Input->BindAction(BackAction, ETriggerEvent::Started, this, &ACRPlayerController::OnBack);
+		Input->BindAction(FlyAction, ETriggerEvent::Triggered, this, &ACRPlayerController::OnFly);
+		Input->BindAction(FastAction, ETriggerEvent::Started, this, &ACRPlayerController::OnFastPressed);
+		Input->BindAction(FastAction, ETriggerEvent::Completed, this, &ACRPlayerController::OnFastReleased);
 	}
 }
 
@@ -370,9 +388,17 @@ void ACRPlayerController::OnPossess(APawn* InPawn)
 
 void ACRPlayerController::OnMove(const FInputActionValue& Value)
 {
+	const FVector2D Axis = Value.Get<FVector2D>();
 	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
 	{
-		Snowman->MoveInput(Value.Get<FVector2D>());
+		Snowman->MoveInput(Axis);
+	}
+	else if (APawn* FreeCamera = GetPawn())
+	{
+		// 자유 카메라: 바라보는 방향 그대로 (아래를 보고 W면 내려간다)
+		const FRotationMatrix View(GetControlRotation());
+		FreeCamera->AddMovementInput(View.GetUnitAxis(EAxis::X), Axis.Y);
+		FreeCamera->AddMovementInput(View.GetUnitAxis(EAxis::Y), Axis.X);
 	}
 }
 
@@ -381,6 +407,74 @@ void ACRPlayerController::OnLook(const FInputActionValue& Value)
 	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
 	{
 		Snowman->LookInput(Value.Get<FVector2D>());
+	}
+	else if (GetPawn())
+	{
+		const FVector2D Axis = Value.Get<FVector2D>();
+		const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+		const float Scale = FreeCameraLookScale * Tuning.MouseSensitivity;
+		AddYawInput(Axis.X * Scale);
+		AddPitchInput(Axis.Y * Scale * (Tuning.bInvertMouseY ? -1.f : 1.f));
+	}
+}
+
+void ACRPlayerController::OnFly(const FInputActionValue& Value)
+{
+	if (APawn* FreeCamera = GetPawn(); FreeCamera && !Cast<ACRCharacter>(FreeCamera))
+	{
+		FreeCamera->AddMovementInput(FVector::UpVector, Value.Get<float>());
+	}
+}
+
+void ACRPlayerController::OnFastPressed()
+{
+	if (ACRFreeCameraPawn* FreeCamera = GetPawn<ACRFreeCameraPawn>())
+	{
+		FreeCamera->SetFast(true);
+	}
+}
+
+void ACRPlayerController::OnFastReleased()
+{
+	if (ACRFreeCameraPawn* FreeCamera = GetPawn<ACRFreeCameraPawn>())
+	{
+		FreeCamera->SetFast(false);
+	}
+}
+
+void ACRPlayerController::OnBack()
+{
+	if (IsOptionsOpen())
+	{
+		ToggleOptions();
+	}
+	else
+	{
+		GoToTitle();
+	}
+}
+
+void ACRPlayerController::GoToTitle()
+{
+	SetPause(false);
+	CRModes::Open(this, ECRMode::Title);
+}
+
+FText ACRPlayerController::GetHelpText() const
+{
+	switch (CRModes::GetCurrent(this))
+	{
+	case ECRMode::MapEdit:
+		return FText::FromString(TEXT("[맵 제작] WASD 이동 · E / Q 위 / 아래 · Shift 빠르게 · 마우스 시점 · Tab 옵션 · Esc 타이틀    (맵 파일 불러오기 / 블럭 부수기는 11단계)"));
+	case ECRMode::InGame:
+	{
+		const ACRInGameGameMode* GameMode = GetWorld()->GetAuthGameMode<ACRInGameGameMode>();
+		const FString MapFile = GameMode && !GameMode->GetMapFile().IsEmpty() ? GameMode->GetMapFile() : TEXT("없음");
+		return FText::FromString(FString::Printf(
+			TEXT("[인게임] 내용은 타격 테스트 뒤 결정 · 맵 파일: %s · WASD 이동 · 좌클릭 공격 · 1 / 2 / 3 무기 · V 시점 · Tab 옵션 · Esc 타이틀"), *MapFile));
+	}
+	default:
+		return FText::FromString(TEXT("[타격 체크] WASD 이동 · 마우스 시점 · 좌클릭 공격(꾹 누르면 연사) · 1 칼 / 2 레이저 / 3 투사체 · V 시점 전환 · Tab 튜닝 옵션 / 몬스터 생성 · Esc 타이틀"));
 	}
 }
 
@@ -420,7 +514,9 @@ void ACRPlayerController::ToggleOptions()
 		TWeakObjectPtr<ACRPlayerController> WeakThis(this);
 		OptionsPanel = SNew(SCRTuningPanel)
 			.Subsystem(UCRTuningSubsystem::Get(this))
+			.ShowSpawnPage(CRModes::GetCurrent(this) == ECRMode::HitCheck)
 			.OnCloseRequested(FSimpleDelegate::CreateUObject(this, &ACRPlayerController::ToggleOptions))
+			.OnBackToTitle(FSimpleDelegate::CreateUObject(this, &ACRPlayerController::GoToTitle))
 			.OnSpawnTargets(FCROnSpawnTargets::CreateUObject(this, &ACRPlayerController::CRSpawn))
 			.OnClearTargets(FSimpleDelegate::CreateUObject(this, &ACRPlayerController::CRClear))
 			.OnStartBattle(FCROnSpawnTargets::CreateUObject(this, &ACRPlayerController::CRBattle))

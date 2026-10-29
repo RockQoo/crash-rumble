@@ -5,6 +5,7 @@
 #include "CRGameSettings.generated.h"
 
 class UMaterialInterface;
+class UWorld;
 
 /**
  * 에셋 참조 모음 (프로젝트 설정 > Game > Crash Rumble).
@@ -32,6 +33,10 @@ public:
 	 */
 	UPROPERTY(config, EditAnywhere, Category = "Materials")
 	TSoftObjectPtr<UMaterialInterface> ParticleMaterial;
+
+	/** 모드(타이틀 / 타격 체크 / 맵 제작 / 인게임)를 열 때 쓰는 맵. 모드는 게임모드로만 나뉜다. */
+	UPROPERTY(config, EditAnywhere, Category = "Modes")
+	TSoftObjectPtr<UWorld> ModeMap;
 
 	static UMaterialInterface* LoadCharacterMaterial();
 	static UMaterialInterface* LoadGlowMaterial();

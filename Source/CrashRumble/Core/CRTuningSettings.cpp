@@ -70,6 +70,8 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("카메라", TopDownArmLength, "탑다운 거리", 400.f, 4000.f, 50.f);
 		CR_TUNE("카메라", TopDownPitch, "탑다운 각도", 30.f, 89.f, 1.f);
 		CR_TUNE("카메라", TopDownFOV, "탑다운 FOV", 30.f, 120.f, 1.f);
+		CR_TUNE("카메라", FreeCameraSpeed, "자유 카메라 속도 (맵 제작)", 100.f, 6000.f, 50.f);
+		CR_TUNE("카메라", FreeCameraFastMultiplier, "자유 카메라 Shift 배속", 1.f, 10.f, 0.5f);
 
 		CR_TUNE("손", HandBobAmplitude, "손 흔들림 크기", 0.f, 30.f, 0.5f);
 		CR_TUNE("손", HandBobSpeed, "손 흔들림 속도", 0.f, 10.f, 0.1f);

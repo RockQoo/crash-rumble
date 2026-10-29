@@ -58,6 +58,10 @@ public:
 	UPROPERTY() float TopDownPitch = 60.f;
 	UPROPERTY() float TopDownFOV = 70.f;
 
+	// 카메라 - 자유 카메라 (맵 제작 모드)
+	UPROPERTY() float FreeCameraSpeed = 1200.f;
+	UPROPERTY() float FreeCameraFastMultiplier = 3.f;
+
 	// 손
 	UPROPERTY() float HandBobAmplitude = 4.f;
 	UPROPERTY() float HandBobSpeed = 2.f;

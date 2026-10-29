@@ -76,8 +76,27 @@ private:
 	void OnSelectProjectile();
 	void SetTriggerHeld(bool bHeld);
 
+	/** Esc: 옵션창이 열려 있으면 닫고, 아니면 타이틀로. (에디터 PIE에서는 Esc가 플레이 종료라 옵션창 버튼을 쓴다) */
+	void OnBack();
+	void GoToTitle();
+
+	// 맵 제작 모드 자유 카메라 (폰이 캐릭터가 아닐 때)
+	void OnFly(const FInputActionValue& Value);
+	void OnFastPressed();
+	void OnFastReleased();
+	FText GetHelpText() const;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UInputMappingContext> MappingContext;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> BackAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> FlyAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> FastAction;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> MoveAction;

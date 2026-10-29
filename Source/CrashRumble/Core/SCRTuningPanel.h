@@ -14,9 +14,14 @@ DECLARE_DELEGATE_OneParam(FCROnSpawnTargets, int32);
 class SCRTuningPanel : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SCRTuningPanel) {}
+	SLATE_BEGIN_ARGS(SCRTuningPanel)
+		: _ShowSpawnPage(true)
+	{}
 		SLATE_ARGUMENT(TWeakObjectPtr<UCRTuningSubsystem>, Subsystem)
+		/** 몬스터 · 팀전 탭 (타격 체크 모드에서만). */
+		SLATE_ARGUMENT(bool, ShowSpawnPage)
 		SLATE_EVENT(FSimpleDelegate, OnCloseRequested)
+		SLATE_EVENT(FSimpleDelegate, OnBackToTitle)
 		SLATE_EVENT(FCROnSpawnTargets, OnSpawnTargets)
 		SLATE_EVENT(FSimpleDelegate, OnClearTargets)
 		SLATE_EVENT(FCROnSpawnTargets, OnStartBattle)
@@ -35,6 +40,7 @@ private:
 
 	TWeakObjectPtr<UCRTuningSubsystem> Subsystem;
 	FSimpleDelegate OnCloseRequested;
+	FSimpleDelegate OnBackToTitle;
 	FCROnSpawnTargets OnSpawnTargets;
 	FSimpleDelegate OnClearTargets;
 	FCROnSpawnTargets OnStartBattle;
