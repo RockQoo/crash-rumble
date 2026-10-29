@@ -52,6 +52,33 @@ namespace
 		}
 	};
 
+	// JSON 숫자 → 정수: 무한대/NaN은 기본값, 아주 큰 값은 잘라서 (정수 변환 범위와 루프 길이 제한)
+	constexpr double MaxJsonInt = 4096.0;
+	// 구조물 좌표는 맵(최대 256칸) 주변까지만 의미가 있다
+	constexpr int32 MinCoord = -256;
+	constexpr int32 MaxCoord = 512;
+	constexpr int32 MaxThickness = 16;
+	constexpr int32 MaxRadius = 64;
+	constexpr int32 MaxObjects = 1024;
+
+	int32 ToSafeInt(double Value, int32 Default)
+	{
+		return FMath::IsFinite(Value) ? FMath::RoundToInt(FMath::Clamp(Value, -MaxJsonInt, MaxJsonInt)) : Default;
+	}
+
+	int32 ToCoord(double Value)
+	{
+		return FMath::Clamp(ToSafeInt(Value, 0), MinCoord, MaxCoord);
+	}
+
+	/** [Lo, Hi]를 [Min, Max]와 교차. 겹치는 칸이 없으면 false. */
+	bool IntersectRange(int32& Lo, int32& Hi, int32 Min, int32 Max)
+	{
+		Lo = FMath::Max(Lo, Min);
+		Hi = FMath::Min(Hi, Max);
+		return Lo <= Hi;
+	}
+
 	bool ReadInt2(const TSharedPtr<FJsonObject>& Object, const TCHAR* Field, FIntPoint& Out)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* Values = nullptr;
@@ -59,7 +86,7 @@ namespace
 		{
 			return false;
 		}
-		Out = FIntPoint(FMath::RoundToInt((*Values)[0]->AsNumber()), FMath::RoundToInt((*Values)[1]->AsNumber()));
+		Out = FIntPoint(ToCoord((*Values)[0]->AsNumber()), ToCoord((*Values)[1]->AsNumber()));
 		return true;
 	}
 
@@ -70,15 +97,15 @@ namespace
 		{
 			return false;
 		}
-		Out = FIntVector(FMath::RoundToInt((*Values)[0]->AsNumber()), FMath::RoundToInt((*Values)[1]->AsNumber()),
-			Values->Num() > 2 ? FMath::RoundToInt((*Values)[2]->AsNumber()) : 0);
+		Out = FIntVector(ToCoord((*Values)[0]->AsNumber()), ToCoord((*Values)[1]->AsNumber()),
+			Values->Num() > 2 ? ToCoord((*Values)[2]->AsNumber()) : 0);
 		return true;
 	}
 
 	int32 ReadInt(const TSharedPtr<FJsonObject>& Object, const TCHAR* Field, int32 Default)
 	{
 		double Value = Default;
-		return Object->TryGetNumberField(Field, Value) ? FMath::RoundToInt(Value) : Default;
+		return Object->TryGetNumberField(Field, Value) ? ToSafeInt(Value, Default) : Default;
 	}
 
 	bool ReadBool(const TSharedPtr<FJsonObject>& Object, const TCHAR* Field, bool bDefault)
@@ -253,8 +280,8 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 					Spec.Warnings.Add(Describe(i, Type) + TEXT(": from / to 필요"));
 					continue;
 				}
-				const int32 Height = ReadInt(Item, TEXT("height"), 5);
-				const int32 Thickness = FMath::Max(1, ReadInt(Item, TEXT("thickness"), 1));
+				const int32 Height = FMath::Clamp(ReadInt(Item, TEXT("height"), 5), 0, Spec.StructureLayers);
+				const int32 Thickness = FMath::Clamp(ReadInt(Item, TEXT("thickness"), 1), 1, MaxThickness);
 				const TArray<FIntPoint> Line = LineCells(From, To);
 				const bool bAlongX = FMath::Abs(To.X - From.X) >= FMath::Abs(To.Y - From.Y);
 				int32 GateCenter = -1, GateWidth = 0, GateHeight = 0;
@@ -292,8 +319,8 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 					Spec.Warnings.Add(Describe(i, Type) + TEXT(": at 필요"));
 					continue;
 				}
-				const int32 Radius = FMath::Max(1, ReadInt(Item, TEXT("radius"), 3));
-				const int32 Height = ReadInt(Item, TEXT("height"), 10);
+				const int32 Radius = FMath::Clamp(ReadInt(Item, TEXT("radius"), 3), 1, MaxRadius);
+				const int32 Height = FMath::Clamp(ReadInt(Item, TEXT("height"), 10), 0, Spec.StructureLayers);
 				const bool bHollow = ReadBool(Item, TEXT("hollow"), true);
 				const bool bDoor = ReadBool(Item, TEXT("door"), true);
 				for (int32 Dy = -Radius; Dy <= Radius; ++Dy)
@@ -330,19 +357,24 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 					Spec.Warnings.Add(Describe(i, Type) + TEXT(": at 필요"));
 					continue;
 				}
-				const int32 Base = FMath::Max(1, ReadInt(Item, TEXT("base"), 9));
-				for (int32 Z = 0; ; ++Z)
+				const int32 Base = FMath::Clamp(ReadInt(Item, TEXT("base"), 9), 1, 2 * FMath::Max(Spec.SizeX, Spec.SizeY) + 1);
+				for (int32 Z = 0; Z < Spec.StructureLayers; ++Z)
 				{
 					const int32 Half = (Base - 1) / 2 - Z;
 					if (Half < 0)
 					{
 						break;
 					}
-					for (int32 Dy = -Half; Dy <= Half; ++Dy)
+					int32 X0 = At.X - Half, X1 = At.X + Half, Y0 = At.Y - Half, Y1 = At.Y + Half;
+					if (!IntersectRange(X0, X1, 0, Spec.SizeX - 1) || !IntersectRange(Y0, Y1, 0, Spec.SizeY - 1))
 					{
-						for (int32 Dx = -Half; Dx <= Half; ++Dx)
+						break;
+					}
+					for (int32 Y = Y0; Y <= Y1; ++Y)
+					{
+						for (int32 X = X0; X <= X1; ++X)
 						{
-							Build.Set(At.X + Dx, At.Y + Dy, Z, Block);
+							Build.Set(X, Y, Z, Block);
 						}
 					}
 				}
@@ -355,8 +387,8 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 					Spec.Warnings.Add(Describe(i, Type) + TEXT(": from / to 필요"));
 					continue;
 				}
-				const int32 Deck = FMath::Max(1, ReadInt(Item, TEXT("height"), 4)) - 1;
-				const int32 Width = FMath::Max(1, ReadInt(Item, TEXT("width"), 2));
+				const int32 Deck = FMath::Clamp(ReadInt(Item, TEXT("height"), 4), 1, Spec.StructureLayers) - 1;
+				const int32 Width = FMath::Clamp(ReadInt(Item, TEXT("width"), 2), 1, MaxThickness);
 				const bool bAlongX = FMath::Abs(To.X - From.X) >= FMath::Abs(To.Y - From.Y);
 				const TArray<FIntPoint> Line = LineCells(From, To);
 				for (const FIntPoint& Point : Line)
@@ -389,13 +421,20 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 				ReadInt3(Item, TEXT("size"), BoxSize);
 				BoxSize.Z = BoxSize.Z > 0 ? BoxSize.Z : BoxSize.X;
 				const int32 BaseZ = ReadInt(Item, TEXT("z"), 0);
-				for (int32 Z = 0; Z < BoxSize.Z; ++Z)
+				int32 X0 = At.X, X1 = At.X + BoxSize.X - 1, Y0 = At.Y, Y1 = At.Y + BoxSize.Y - 1, Z0 = BaseZ, Z1 = BaseZ + BoxSize.Z - 1;
+				if (!IntersectRange(X0, X1, 0, Spec.SizeX - 1) || !IntersectRange(Y0, Y1, 0, Spec.SizeY - 1)
+					|| !IntersectRange(Z0, Z1, -Spec.GroundLayers, Spec.StructureLayers - 1))
 				{
-					for (int32 Dy = 0; Dy < BoxSize.Y; ++Dy)
+					Spec.Warnings.Add(Describe(i, Type) + TEXT(": 맵 밖이라 건너뜀"));
+					continue;
+				}
+				for (int32 Z = Z0; Z <= Z1; ++Z)
+				{
+					for (int32 Y = Y0; Y <= Y1; ++Y)
 					{
-						for (int32 Dx = 0; Dx < BoxSize.X; ++Dx)
+						for (int32 X = X0; X <= X1; ++X)
 						{
-							Build.Set(At.X + Dx, At.Y + Dy, BaseZ + Z, Block);
+							Build.Set(X, Y, Z, Block);
 						}
 					}
 				}
@@ -407,7 +446,7 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 					Spec.Warnings.Add(Describe(i, Type) + TEXT(": at 필요"));
 					continue;
 				}
-				const int32 Height = ReadInt(Item, TEXT("height"), 4);
+				const int32 Height = FMath::Clamp(ReadInt(Item, TEXT("height"), 4), 0, Spec.StructureLayers);
 				for (int32 Z = 0; Z < Height; ++Z)
 				{
 					Build.Set(At.X, At.Y, Z, Block);
@@ -422,11 +461,20 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 					Spec.Warnings.Add(Describe(i, Type) + TEXT(": from / to 필요 ([x, y, z])"));
 					continue;
 				}
-				for (int32 Z = FMath::Min(A.Z, B.Z); Z <= FMath::Max(A.Z, B.Z); ++Z)
+				int32 X0 = FMath::Min(A.X, B.X), X1 = FMath::Max(A.X, B.X);
+				int32 Y0 = FMath::Min(A.Y, B.Y), Y1 = FMath::Max(A.Y, B.Y);
+				int32 Z0 = FMath::Min(A.Z, B.Z), Z1 = FMath::Max(A.Z, B.Z);
+				if (!IntersectRange(X0, X1, 0, Spec.SizeX - 1) || !IntersectRange(Y0, Y1, 0, Spec.SizeY - 1)
+					|| !IntersectRange(Z0, Z1, -Spec.GroundLayers, Spec.StructureLayers - 1))
 				{
-					for (int32 Y = FMath::Min(A.Y, B.Y); Y <= FMath::Max(A.Y, B.Y); ++Y)
+					Spec.Warnings.Add(Describe(i, Type) + TEXT(": 맵 밖이라 건너뜀"));
+					continue;
+				}
+				for (int32 Z = Z0; Z <= Z1; ++Z)
+				{
+					for (int32 Y = Y0; Y <= Y1; ++Y)
 					{
-						for (int32 X = FMath::Min(A.X, B.X); X <= FMath::Max(A.X, B.X); ++X)
+						for (int32 X = X0; X <= X1; ++X)
 						{
 							Build.Set(X, Y, Z, Block);
 						}
@@ -441,10 +489,17 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 					Spec.Warnings.Add(Describe(i, Type) + TEXT(": from / to 필요"));
 					continue;
 				}
-				const int32 Depth = FMath::Max(1, ReadInt(Item, TEXT("depth"), Spec.GroundLayers));
-				for (int32 Y = FMath::Min(From.Y, To.Y); Y <= FMath::Max(From.Y, To.Y); ++Y)
+				const int32 Depth = FMath::Clamp(ReadInt(Item, TEXT("depth"), Spec.GroundLayers), 1, Spec.GroundLayers);
+				int32 X0 = FMath::Min(From.X, To.X), X1 = FMath::Max(From.X, To.X);
+				int32 Y0 = FMath::Min(From.Y, To.Y), Y1 = FMath::Max(From.Y, To.Y);
+				if (!IntersectRange(X0, X1, 0, Spec.SizeX - 1) || !IntersectRange(Y0, Y1, 0, Spec.SizeY - 1))
 				{
-					for (int32 X = FMath::Min(From.X, To.X); X <= FMath::Max(From.X, To.X); ++X)
+					Spec.Warnings.Add(Describe(i, Type) + TEXT(": 맵 밖이라 건너뜀"));
+					continue;
+				}
+				for (int32 Y = Y0; Y <= Y1; ++Y)
+				{
+					for (int32 X = X0; X <= X1; ++X)
 					{
 						for (int32 D = 0; D < Depth; ++D)
 						{
@@ -486,9 +541,16 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 					continue;
 				}
 				const int32 Spacing = FMath::Max(2, ReadInt(Item, TEXT("spacing"), 4));
-				for (int32 Y = FMath::Min(From.Y, To.Y); Y <= FMath::Max(From.Y, To.Y); Y += Spacing)
+				int32 X0 = FMath::Min(From.X, To.X), X1 = FMath::Max(From.X, To.X);
+				int32 Y0 = FMath::Min(From.Y, To.Y), Y1 = FMath::Max(From.Y, To.Y);
+				if (!IntersectRange(X0, X1, 0, Spec.SizeX - 1) || !IntersectRange(Y0, Y1, 0, Spec.SizeY - 1))
 				{
-					for (int32 X = FMath::Min(From.X, To.X); X <= FMath::Max(From.X, To.X); X += Spacing)
+					Spec.Warnings.Add(FString::Printf(TEXT("objects[%d] (dummy_grid): 맵 밖이라 건너뜀"), i));
+					continue;
+				}
+				for (int32 Y = Y0; Y <= Y1 && Spec.Objects.Num() < MaxObjects; Y += Spacing)
+				{
+					for (int32 X = X0; X <= X1 && Spec.Objects.Num() < MaxObjects; X += Spacing)
 					{
 						FCRMapObjectSpec& Dummy = Spec.Objects.AddDefaulted_GetRef();
 						Dummy.Type = ECRMapObject::Dummy;
@@ -532,6 +594,12 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 			}
 			Spec.Objects.Add(Object);
 		}
+	}
+
+	if (Spec.Objects.Num() >= MaxObjects)
+	{
+		Spec.Warnings.Add(FString::Printf(TEXT("objects: 최대 %d개까지만 놓음"), MaxObjects));
+		Spec.Objects.SetNum(MaxObjects);
 	}
 
 	OutSpec = MoveTemp(Spec);
