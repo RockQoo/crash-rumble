@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>캐릭터 리소스 만드는 법</title>
+<style>
+  :root {
+    --bg: #f7f6f2; --panel: #ffffff; --text: #1f2328; --muted: #5d6470; --line: #dedbd2;
+    --accent: #e8642c; --accent-soft: #fde8dc; --code: #f1efe8; --ok: #2f8f4e; --warn: #b7791f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16181c; --panel: #1e2126; --text: #e6e6e6; --muted: #9aa1ab; --line: #2f343b;
+      --accent: #ff8a50; --accent-soft: #3a2a20; --code: #262a30; --ok: #5cc27e; --warn: #e0a84a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.65 "Pretendard", "Malgun Gothic", system-ui, sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 28px; }
+  h2 { font-size: 20px; margin: 40px 0 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+  h3 { font-size: 16px; margin: 24px 0 8px; }
+  .step { display: inline-block; background: var(--accent); color: #fff; border-radius: 6px; padding: 0 8px; margin-right: 6px; font-size: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; margin: 12px 0; }
+  .note { background: var(--accent-soft); border-left: 4px solid var(--accent); border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--code); }
+  code { background: var(--code); border-radius: 4px; padding: 1px 5px; font-family: Consolas, monospace; font-size: 13px; }
+  .prompt { position: relative; background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 8px 0 14px;
+            font-family: Consolas, monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+  .prompt button { position: absolute; top: 8px; right: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text);
+                   border-radius: 6px; padding: 2px 10px; cursor: pointer; font-size: 12px; }
+  ol, ul { padding-left: 22px; }
+  li { margin: 3px 0; }
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+  .flow span { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; }
+  .flow b { color: var(--accent); }
+  .tag-ok { color: var(--ok); font-weight: bold; }
+  .tag-later { color: var(--warn); font-weight: bold; }
+  pre.tree { background: var(--code); border-radius: 8px; padding: 12px 14px; font-family: Consolas, monospace; font-size: 13px; overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>캐릭터 리소스 만드는 법</h1>
+  <p class="sub">ChatGPT 이미지 → Tripo 3D → Blender 정리 → 폴더에 넣기. 시제품 캐릭터 1명(오버쿡풍 기사) 기준. 2026-10-29</p>
+
+  <div class="note">
+    <b>이번에 만들 것은 캐릭터 1명뿐입니다.</b> 무기는 당분간 코드에서 도형 막대기로 만듭니다(칼 / 총 / 런처). 무기와 환경(나무, 바위, 풀) 모델링은 세계관을 정한 뒤 따로 정리합니다.
+  </div>
+
+  <div class="flow">
+    <span><b>1</b> ChatGPT로 그림</span>→<span><b>2</b> Tripo로 3D</span>→<span><b>3</b> Blender로 정리</span>→<span><b>4</b> 폴더에 넣기</span>→<span><b>5</b> Claude가 언리얼 연결</span>
+  </div>
+
+  <h2>만들 것 목록</h2>
+  <table>
+    <tr><th>부품</th><th>파일 이름</th><th>설명</th><th>목표 삼각형 수</th></tr>
+    <tr><td>몸통</td><td><code>SM_Body_Knight.fbx</code></td><td>머리와 몸통이 붙은 한 덩어리. 발 없음, 팔 없음. <b>얼굴은 비워 둠</b>(매끈한 면)</td><td>2,000~3,000</td></tr>
+    <tr><td>투구</td><td><code>SM_Helmet_Knight.fbx</code></td><td>죽으면 벗겨져 날아가는 부분. 따로 만듦</td><td>500~1,000</td></tr>
+    <tr><td>손</td><td><code>SM_Hand.fbx</code></td><td>둥근 장갑 손 하나. 좌우 공용(코드에서 뒤집음)</td><td>~200</td></tr>
+    <tr><td>몸통 텍스처</td><td><code>T_Body_Knight.png</code></td><td>Tripo가 만든 텍스처 그대로</td><td>1024×1024</td></tr>
+    <tr><td>얼굴 표정</td><td><code>T_Face_Idle.png</code><br><code>T_Face_Hit.png</code><br><code>T_Face_Dead.png</code></td><td>투명 배경 얼굴 그림 3장. 게임이 상황에 맞게 바꿔 끼움<br>(선택: <code>T_Face_Blink.png</code> 눈 깜빡임, <code>T_Face_Attack.png</code> 공격)</td><td>512×512</td></tr>
+  </table>
+  <p>얼굴을 몸통 텍스처에 그리지 않고 따로 두는 이유: 평소 / 맞을 때 / 죽을 때 표정을 바꾸려면 얼굴만 갈아 끼울 수 있어야 하기 때문입니다. 얼굴을 붙일 납작한 판은 언리얼에서 만듭니다.</p>
+
+  <h2><span class="step">1</span>ChatGPT로 그림 만들기</h2>
+  <p>Tripo는 그림 한 장(또는 정면·측면·뒷면)으로 3D를 만듭니다. <b>그림이 깔끔할수록 결과가 좋습니다.</b> 아래 프롬프트를 그대로 복사해 쓰세요. 영어가 이미지 생성에 더 정확해서 영어로 적었습니다.</p>
+
+  <h3>그림 규칙</h3>
+  <ul>
+    <li>흰 배경 하나, 그림자 없음, 바닥 없음</li>
+    <li>정면에서 똑바로(원근 없음), 부품 하나만</li>
+    <li>단색 면 위주(로우폴리 장난감 느낌), 잔무늬 없음</li>
+    <li>몸통 그림에는 <b>얼굴과 투구를 빼고</b> 그리기</li>
+  </ul>
+
+  <h3>1-1. 콘셉트 (전체 모습 확인용)</h3>
+  <div class="prompt"><button onclick="copyPrompt(this)">복사</button>A cute chubby knight character in the style of Overcooked: one round bean-shaped body where head and torso are a single piece, no legs, no arms, two floating round mitten hands beside the body, a simple knight helmet with a small plume, toy-like low poly look with flat solid colors, soft rounded edges. Front view, orthographic, centered, plain white background, no shadow, no floor, full body visible.</div>
+  <p>마음에 드는 콘셉트가 나오면 그 그림을 첨부한 채로 아래 1-2~1-5를 요청하면 같은 캐릭터로 맞춰집니다.</p>
+
+  <h3>1-2. 몸통 (얼굴, 투구 없이)</h3>
+  <div class="prompt"><button onclick="copyPrompt(this)">복사</button>Using the attached character as reference, draw ONLY the body: the single bean-shaped head-and-torso piece, with NO helmet, NO face (leave the face area as a smooth blank skin-colored surface), NO hands. Keep the same colors and clothing details. Show three orthographic views side by side: front, side, back. Plain white background, no shadow, flat solid colors, toy-like low poly style.</div>
+
+  <h3>1-3. 투구</h3>
+  <div class="prompt"><button onclick="copyPrompt(this)">복사</button>Using the attached character as reference, draw ONLY the knight helmet as a separate object, empty inside, no head. Same colors and style. Three orthographic views side by side: front, side, back. Plain white background, no shadow, flat solid colors, toy-like low poly style.</div>
+
+  <h3>1-4. 손</h3>
+  <div class="prompt"><button onclick="copyPrompt(this)">복사</button>A single round cartoon mitten hand (like Overcooked characters), closed fist slightly open so it could hold a stick, matching the attached character's glove color. Front and side orthographic views. Plain white background, no shadow, flat solid colors, toy-like low poly style.</div>
+
+  <h3>1-5. 얼굴 표정 3장</h3>
+  <div class="prompt"><button onclick="copyPrompt(this)">복사</button>A face expression sheet for the attached cute character, drawn as flat 2D cartoon facial features only (eyes, eyebrows, mouth, small blush), no head outline, no skin, on a transparent background. Three separate expressions in a row, each centered in its own square: 1) idle - calm happy, 2) hit - eyes squeezed shut with a pained open mouth, 3) dead - X X eyes with a wavy mouth. Thick clean outlines, bold simple shapes that read well when small.</div>
+  <p>받은 그림을 세 칸으로 잘라 <code>T_Face_Idle.png</code>, <code>T_Face_Hit.png</code>, <code>T_Face_Dead.png</code>로 저장합니다(각 512×512, 투명 배경). 투명 배경이 안 나오면 흰 배경도 괜찮습니다. 제가 처리하겠습니다.</p>
+
+  <h2><span class="step">2</span>Tripo로 3D 만들기</h2>
+  <ol>
+    <li><b>Image to 3D</b>를 고릅니다. 정면·측면·뒷면 그림이 있으면 <b>Multi-view</b>로 세 장을 넣습니다(정확도가 크게 올라갑니다).</li>
+    <li><b>부품마다 따로</b> 생성합니다: 몸통, 투구, 손. 한 번에 만들면 Blender에서 잘라야 해서 일이 많아집니다.</li>
+    <li>옵션
+      <ul>
+        <li>메시: <b>Low Poly / Smart Low Poly</b>(있으면), 또는 생성 후 Retopology(Quad, 낮은 면 수)</li>
+        <li>텍스처: <b>켬</b>(기본 색만 있으면 됨). PBR(금속성/거칠기)은 필요 없음</li>
+        <li>스타일 변환 옵션은 쓰지 않음</li>
+      </ul>
+    </li>
+    <li>결과를 돌려 보며 확인: 뒷면이 뭉개지지 않았는지, 바닥이 뚫리지 않았는지. 이상하면 다시 생성합니다(무료 크레딧이 허락하는 만큼).</li>
+    <li><b>FBX</b>(또는 GLB)로 내려받습니다. 텍스처가 함께 들어 있습니다.</li>
+  </ol>
+
+  <h2><span class="step">3</span>Blender로 정리하기</h2>
+  <p>Tripo 결과는 크기, 방향, 원점(피벗)이 제각각이고 면 수가 많습니다. 아래 순서대로 정리합니다. 부품 하나씩 따로 합니다.</p>
+
+  <div class="card">
+    <h3 style="margin-top:0">3-1. 불러오기</h3>
+    <ul>
+      <li>File → Import → FBX(또는 glTF). 화면 오른쪽 위 Overlays → <b>Statistics</b>를 켜서 삼각형 수를 봅니다.</li>
+    </ul>
+
+    <h3>3-2. 면 수 줄이기</h3>
+    <ul>
+      <li>오브젝트 선택 → Modifier 추가 → <b>Decimate</b> → Ratio를 낮춰 위 표의 목표 삼각형 수에 맞춥니다.</li>
+      <li>모양이 무너지기 직전까지만 줄입니다. 각진 로우폴리 느낌이 나면 오히려 좋습니다.</li>
+      <li>Modifier 드롭다운 → <b>Apply</b>.</li>
+    </ul>
+
+    <h3>3-3. 크기와 방향</h3>
+    <ul>
+      <li>Blender 기본 단위(미터)로 <b>몸통 높이 약 1.6m</b>가 되게 키웁니다(N 키 → Dimensions의 Z 확인).</li>
+      <li>정면 보기(넘패드 <code>1</code>)에서 <b>얼굴 쪽이 보이게</b> 돌립니다.</li>
+      <li>방향이 조금 틀어져도 괜찮습니다. 언리얼 쪽 데이터에서 회전을 보정할 수 있습니다.</li>
+    </ul>
+
+    <h3>3-4. 원점(피벗) 맞추기</h3>
+    <table>
+      <tr><th>부품</th><th>원점 위치</th><th>하는 법</th></tr>
+      <tr><td>몸통</td><td>바닥 중앙</td><td>메시를 옮겨 바닥이 Z=0에 닿고 가운데가 X=0, Y=0에 오게 → Object → Set Origin → <b>Origin to 3D Cursor</b>(커서는 Shift+C로 원점)</td></tr>
+      <tr><td>투구</td><td>머리에 씌워지는 안쪽 중심</td><td>투구 안쪽 가운데를 0,0,0에 맞추고 같은 방법</td></tr>
+      <tr><td>손</td><td>손 중심</td><td>Object → Set Origin → <b>Origin to Geometry</b> → 위치를 0,0,0으로</td></tr>
+    </table>
+
+    <h3>3-5. 팀 색 영역 (선택이지만 추천)</h3>
+    <ul>
+      <li>레드/블루 팀 색을 게임에서 칠하려면 그 부분이 <b>다른 머티리얼 슬롯</b>이어야 합니다.</li>
+      <li>편집 모드(Tab) → 팀 색으로 칠할 면 선택(예: 투구 깃털, 목도리, 옷 띠) → Material 탭에서 슬롯 추가 → 이름 <code>TeamColor</code> → <b>Assign</b>.</li>
+      <li>나머지 면은 첫 번째 슬롯(텍스처)에 그대로 둡니다.</li>
+    </ul>
+
+    <h3>3-6. 얼굴 자리</h3>
+    <ul>
+      <li>얼굴이 들어갈 자리는 <b>매끈하게</b> 두기만 하면 됩니다. 판은 제가 언리얼에서 붙입니다.</li>
+      <li>Tripo가 얼굴을 조금 만들어 버렸다면 편집 모드에서 그 면들을 선택해 Smooth Vertices(또는 Sculpt의 Smooth 브러시)로 평평하게 해 주세요.</li>
+    </ul>
+
+    <h3>3-7. 마무리와 내보내기</h3>
+    <ul>
+      <li>오브젝트 모드에서 <b>Ctrl+A → All Transforms</b>(크기·회전 적용).</li>
+      <li>File → Export → <b>FBX</b>: Limit to <b>Selected Objects</b>, Object Types는 <b>Mesh</b>만, Geometry의 Smoothing은 <b>Face</b>, <b>Apply Modifiers</b> 켬, Path Mode는 <b>Copy</b>(텍스처 같이 저장, 옆의 상자 아이콘 켬).</li>
+      <li>부품마다 따로 내보냅니다: 몸통, 투구, 손.</li>
+    </ul>
+  </div>
+
+  <h2><span class="step">4</span>폴더에 넣기</h2>
+  <pre class="tree">snow-battle/
+  SourceArt/
+    Characters/
+      Knight/
+        SM_Body_Knight.fbx
+        SM_Helmet_Knight.fbx
+        SM_Hand.fbx
+        T_Body_Knight.png
+        T_Face_Idle.png
+        T_Face_Hit.png
+        T_Face_Dead.png
+        concept.png        (ChatGPT 콘셉트 그림, 참고용)</pre>
+  <p>넣고 나서 "넣었어"라고 말해 주시면 됩니다. 커밋은 제가 확인 후 합니다(FBX/PNG는 Git LFS로 관리).</p>
+
+  <h2><span class="step">5</span>그 다음은 Claude가 하는 일</h2>
+  <ul>
+    <li>언리얼로 임포트(크기·방향 확인, 콜리전 끔)</li>
+    <li>캐릭터 외형 데이터(파츠 목록)에 몸통·투구·손·얼굴 판을 연결 → 코드 수정 없이 눈사람이 기사로 바뀜</li>
+    <li>표정 교체: 평소 → 맞으면 잠깐 피격 표정 → 죽으면 X X 표정</li>
+    <li>사망 연출: 투구와 무기가 벗겨져 튀어 나가고 색종이 (이미 만들어 둠, 눈사람 모자로 확인 가능)</li>
+    <li>팀 색 슬롯에 레드/블루 칠하기</li>
+  </ul>
+
+  <h2>체크리스트 (넘기기 전에)</h2>
+  <table>
+    <tr><th>항목</th><th>확인</th></tr>
+    <tr><td>몸통·투구·손이 각각 따로 된 FBX</td><td>☐</td></tr>
+    <tr><td>몸통에 얼굴이 그려져 있지 않음(매끈한 면)</td><td>☐</td></tr>
+    <tr><td>삼각형 수가 목표 안쪽 (몸통 3,000 이하)</td><td>☐</td></tr>
+    <tr><td>몸통 높이 약 1.6m, 원점이 바닥 중앙</td><td>☐</td></tr>
+    <tr><td>Ctrl+A → All Transforms 적용</td><td>☐</td></tr>
+    <tr><td>얼굴 표정 PNG 3장 (512×512)</td><td>☐</td></tr>
+    <tr><td>(선택) 팀 색 면이 <code>TeamColor</code> 슬롯</td><td>☐</td></tr>
+  </table>
+
+  <h2>지금은 안 해도 되는 것</h2>
+  <ul>
+    <li><span class="tag-later">나중</span> 무기 모델: 당분간 코드의 막대기 도형(칼 = 막대 + 가드, 총 = 막대 + 손잡이, 런처 = 굵은 통). 세계관(장난감 / 카툰 전쟁 / 판타지)을 정한 뒤 정리</li>
+    <li><span class="tag-later">나중</span> 환경: 각진 로우폴리 나무, 바위, 풀 (참고 그림 <code>Ref/objects.png</code>). 블럭 지형 자체는 정육면체라 모델링 불필요</li>
+    <li><span class="tag-later">나중</span> 리깅, 애니메이션: <b>필요 없음</b>. 손 흔들림, 휘두르기, 넘어짐은 전부 코드로 움직입니다</li>
+  </ul>
+</main>
+<script>
+  function copyPrompt(button) {
+    const text = button.parentElement.innerText.replace(/^복사\s*/, '').replace(/^복사됨\s*/, '');
+    navigator.clipboard.writeText(text).then(() => {
+      button.textContent = '복사됨';
+      setTimeout(() => { button.textContent = '복사'; }, 1200);
+    });
+  }
+</script>
+</body>
+</html>
