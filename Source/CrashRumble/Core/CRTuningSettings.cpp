@@ -253,6 +253,13 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("미사일", MissileHitStop, "히트스톱(초)", 0.f, 0.5f, 0.005f);
 		CR_TUNE("미사일", MissileShake, "카메라 흔들림 배율", 0.f, 5.f, 0.05f);
 
+		CR_TUNE("미사일 연기", MissileSmokeSize, "연기 덩이 크기 (1 = 지름 100cm)", 0.02f, 2.f, 0.01f);
+		CR_TUNE("미사일 연기", MissileSmokeSpacing, "연기 간격 (cm, 작을수록 촘촘)", 5.f, 200.f, 1.f);
+		CR_TUNE("미사일 연기", MissileSmokeLifetime, "연기 수명(초)", 0.1f, 5.f, 0.05f);
+		CR_TUNE("미사일 연기", MissileSmokeRise, "떠오르는 속도 (cm/s)", 0.f, 300.f, 5.f);
+		CR_TUNE("미사일 연기", MissileSmokeRingEvery, "도넛 링 간격 (연기 N개마다, 0 = 끔)", 0.f, 50.f, 1.f);
+		CR_TUNE("미사일 연기", MissileSmokeRingSize, "도넛 링 최대 지름 (cm)", 10.f, 300.f, 5.f);
+
 		CR_TUNE("폴리곤 불꽃", FlameDamage, "데미지", 0.f, 500.f, 1.f);
 		CR_TUNE("폴리곤 불꽃", FlameInterval, "발사 간격(초)", 0.1f, 5.f, 0.05f);
 		CR_TUNE("폴리곤 불꽃", FlameRadius, "반경", 20.f, 400.f, 5.f);

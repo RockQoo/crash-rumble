@@ -243,6 +243,14 @@ public:
 	UPROPERTY() float MissileHitStop = 0.06f;
 	UPROPERTY() float MissileShake = 1.5f;
 
+	// 미사일 연기 궤적
+	UPROPERTY() float MissileSmokeSize = 0.22f;
+	UPROPERTY() float MissileSmokeSpacing = 26.f;
+	UPROPERTY() float MissileSmokeLifetime = 1.f;
+	UPROPERTY() float MissileSmokeRise = 25.f;
+	UPROPERTY() int32 MissileSmokeRingEvery = 10;
+	UPROPERTY() float MissileSmokeRingSize = 60.f;
+
 	// 폴리곤 불꽃
 	UPROPERTY() float FlameDamage = 15.f;
 	UPROPERTY() float FlameInterval = 0.6f;

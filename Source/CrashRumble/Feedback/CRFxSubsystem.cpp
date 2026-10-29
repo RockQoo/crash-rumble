@@ -402,7 +402,7 @@ void UCRFxSubsystem::SpawnSmokePuff(const FVector& Location, float Size, const F
 		P.Shape = ECRFxShape::Sphere;
 		P.Location = Location;
 		P.Size = Size;
-		P.Lifetime = FMath::FRandRange(0.8f, 1.1f);
+		P.Lifetime = UCRTuningSubsystem::GetSettings(this).MissileSmokeLifetime * FMath::FRandRange(0.85f, 1.15f);
 	}
 	if (bRing)
 	{
@@ -491,7 +491,7 @@ void UCRFxSubsystem::UpdatePieces(float DeltaTime, float RealDeltaTime)
 			break;
 		}
 		case EPieceKind::Smoke:
-			P.Location.Z += 25.f * DeltaTime;
+			P.Location.Z += Tuning.MissileSmokeRise * DeltaTime;
 			break;
 		case EPieceKind::DustPuff:
 			P.Velocity *= FMath::Max(0.f, 1.f - 6.f * DeltaTime);
@@ -594,7 +594,7 @@ void UCRFxSubsystem::DrawPieces()
 		case EPieceKind::SmokeRing:
 		{
 			// 작게(16cm) 시작해 넓어지며 얇아짐
-			const float Diameter = FMath::Lerp(16.f, 60.f, EaseOut(Alpha));
+			const float Diameter = FMath::Lerp(16.f, UCRTuningSubsystem::GetSettings(this).MissileSmokeRingSize, EaseOut(Alpha));
 			const float Thin = FMath::Lerp(1.f, 0.3f, Alpha);
 			Emit(P.Shape, FTransform(P.Rotation, P.Location, FVector(Diameter / 100.f, Diameter / 100.f, 0.25f * Thin)), P.Color, 0.f);
 			break;

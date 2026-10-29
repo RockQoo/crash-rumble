@@ -18,9 +18,6 @@ namespace
 {
 	constexpr float MaxLifetime = 4.f;    // 4초가 지나면 자폭
 	constexpr float HitDistance = 35.f;   // 목표 35cm 이내면 명중
-	constexpr float SmokeSpacing = 26.f;  // 26cm마다 연기 하나
-	constexpr int32 RingEvery = 10;       // 연기 10개마다 도넛 링
-	constexpr float SmokeSize = 0.16f;
 	constexpr float ExplosionVisualRadius = 60.f;
 	constexpr float WobbleDegrees = 18.f;
 	constexpr float GroundNearDistance = 120.f;
@@ -177,12 +174,15 @@ void ACRMissile::Tick(float DeltaSeconds)
 	SmokeDistance += FVector::Dist(Start, End);
 	if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
 	{
-		while (SmokeDistance >= SmokeSpacing)
+		// 간격마다 한 덩이, 링은 N개마다 (튜닝 "미사일 연기" 탭)
+		const float Spacing = FMath::Max(Tuning.MissileSmokeSpacing, 1.f);
+		while (SmokeDistance >= Spacing)
 		{
-			SmokeDistance -= SmokeSpacing;
+			SmokeDistance -= Spacing;
 			const FVector Puff = End - Direction * SmokeDistance;
 			++SmokeCount;
-			Fx->SpawnSmokePuff(Puff, SmokeSize * FMath::FRandRange(0.8f, 1.2f), Direction, SmokeCount % RingEvery == 0);
+			const bool bRing = Tuning.MissileSmokeRingEvery > 0 && SmokeCount % Tuning.MissileSmokeRingEvery == 0;
+			Fx->SpawnSmokePuff(Puff, Tuning.MissileSmokeSize * FMath::FRandRange(0.8f, 1.2f), Direction, bRing);
 		}
 	}
 }
