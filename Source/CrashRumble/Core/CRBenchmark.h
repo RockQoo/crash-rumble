@@ -56,6 +56,19 @@ private:
 	TArray<FSample> Samples;
 	FString PreviousMap;
 	FString MapName;
+	/** 시작할 때 고정한 조건 (측정 중 옵션을 바꿔도 이 값으로 잰다). */
+	float RunWarmup = 0.f;
+	float RunDuration = 0.f;
+	bool bRunTrace = false;
+	bool bRunLegacyBlocks = false;
+	FString RunConditions;
+	int32 SpawnedAtMeasure = 0;
+	/** 시작 후 튜닝 값이 바뀌면 true → 결과에 경고 (전투 수치는 실시간 튜닝을 읽으므로). */
+	bool bConditionsChanged = false;
+	FDelegateHandle TuningChangedHandle;
+
+	void WriteMetadata() const;
+	void UnbindTuning();
 	FString FileBase;
 	FString ResultText;
 	bool bTracing = false;
