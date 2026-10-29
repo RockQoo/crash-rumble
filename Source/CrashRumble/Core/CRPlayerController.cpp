@@ -49,6 +49,7 @@ namespace
 	constexpr float EditTraceDistance = 20000.f;
 	constexpr int32 SteppedFps = 12;
 	constexpr float OverviewZoomStep = 1.15f;
+	constexpr float PreviewBarrelFuse = 1.f;
 	constexpr float OverviewMinArm = 500.f;
 	constexpr float OverviewMaxArm = 15000.f;
 }
@@ -397,11 +398,23 @@ void ACRPlayerController::CRPreview(const FString& Category)
 	}
 	else if (Category == TEXT("훈련장"))
 	{
-		// 앞에 드럼통을 하나 놓아 둔다 (쏘면 터짐)
+		// 앞에 드럼통을 놓고 잠시 뒤 터뜨린다 (폭발·연기 수치 비교용)
 		FActorSpawnParameters Params;
 		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-		GetWorld()->SpawnActor<ACRExplosiveBarrel>(Ground + FVector(0.f, 0.f, 46.f), FRotator::ZeroRotator, Params);
-		ShowToast(TEXT("앞에 드럼통을 놓았음 (쏘면 터짐)"));
+		if (ACRExplosiveBarrel* Barrel = GetWorld()->SpawnActor<ACRExplosiveBarrel>(Ground + FVector(0.f, 0.f, 46.f), FRotator::ZeroRotator, Params))
+		{
+			TWeakObjectPtr<ACRExplosiveBarrel> WeakBarrel(Barrel);
+			TWeakObjectPtr<ACRCharacter> WeakShooter(Snowman);
+			FTimerHandle Fuse;
+			GetWorldTimerManager().SetTimer(Fuse, FTimerDelegate::CreateWeakLambda(this, [WeakBarrel, WeakShooter]()
+			{
+				if (WeakBarrel.IsValid())
+				{
+					WeakBarrel->ApplyHit(1000, WeakShooter.Get());
+				}
+			}), PreviewBarrelFuse, false);
+		}
+		ShowToast(TEXT("앞에 드럼통을 놓았음 (1초 뒤 터짐)"));
 	}
 	else
 	{

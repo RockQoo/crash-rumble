@@ -420,9 +420,20 @@ public:
 	UPROPERTY() float BarrelExplosionScale = 1.8f;
 	UPROPERTY() float BarrelCraterRadius = 170.f;
 	UPROPERTY() int32 BarrelSmokeCount = 14;
-	UPROPERTY() float BarrelSmokeSize = 1.4f;
-	UPROPERTY() float BarrelSmokeSpread = 200.f;
-	UPROPERTY() float BarrelSmokeLifetime = 2.5f;
+	UPROPERTY() float BarrelSmokeSize = 0.9f;
+	UPROPERTY() float BarrelSmokeSpread = 70.f;
+	UPROPERTY() float BarrelSmokeColumnHeight = 180.f;
+	UPROPERTY() float BarrelSmokeLifetime = 2.2f;
+	UPROPERTY() float BarrelSmokeUpSpeed = 220.f;
+	UPROPERTY() float BarrelSmokeOutSpeed = 50.f;
+	UPROPERTY() float BarrelSmokeDrag = 1.5f;
+	UPROPERTY() float BarrelSmokeRise = 90.f;
+	UPROPERTY() float BarrelSmokeEndScale = 1.3f;
+	UPROPERTY() float BarrelSmokeShrinkFrom = 0.55f;
+	UPROPERTY() float BarrelSmokeDelay = 0.12f;
+	UPROPERTY() float BarrelSmokeOrangeTime = 0.2f;
+	UPROPERTY() float BarrelSmokeRedTime = 0.5f;
+	UPROPERTY() float BarrelSmokeDarkTime = 0.5f;
 	UPROPERTY() float BarrelRespawnDelay = 5.f;
 	UPROPERTY() float DpsWindow = 3.f;
 

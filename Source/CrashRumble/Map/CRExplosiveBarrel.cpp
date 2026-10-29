@@ -117,12 +117,19 @@ void ACRExplosiveBarrel::Explode()
 		{
 			Fx->SpawnKanada(Center, BarrelKanadaSize * Scale);
 		}
-		// 피어오르는 큰 연기: 폭발 반경 안 낮은 곳에 흩어 놓으면 위로 떠오르며 부푼다 (가운데 하나는 도넛 링)
-		for (int32 i = 0; i < Tuning.BarrelSmokeCount; ++i)
+		// 연기 기둥 (레퍼런스 battle.gif): 덩이들이 서로 겹친 한 덩어리로 세로로 쌓여 솟고, 천천히 떠오른다.
+		// 위쪽 덩이일수록 빨리 솟고 오래 남아서, 사라질 땐 아래부터 하나씩 작아지며 기둥이 가늘어진다
+		const int32 SmokeCount = FMath::Max(Tuning.BarrelSmokeCount, 0);
+		for (int32 i = 0; i < SmokeCount; ++i)
 		{
-			const FVector2D Disk = FMath::RandPointInCircle(Tuning.BarrelSmokeSpread);
-			const FVector Puff(Center.X + Disk.X, Center.Y + Disk.Y, GroundZ + FMath::FRandRange(30.f, Tuning.BarrelSmokeSpread * 0.8f));
-			Fx->SpawnSmokePuff(Puff, Tuning.BarrelSmokeSize * FMath::FRandRange(0.7f, 1.3f), FVector::UpVector, i == 0, Tuning.BarrelSmokeLifetime);
+			const float Height = SmokeCount > 1 ? float(i) / (SmokeCount - 1) : 0.f;
+			const FVector2D Disk = FMath::RandPointInCircle(Tuning.BarrelSmokeSpread * FMath::Lerp(1.f, 0.6f, Height));
+			const FVector Puff(Center.X + Disk.X, Center.Y + Disk.Y, GroundZ + 40.f + Height * Tuning.BarrelSmokeColumnHeight);
+			const FVector Out = FVector(Disk.X, Disk.Y, 0.f).GetSafeNormal() * Tuning.BarrelSmokeOutSpeed * FMath::FRandRange(0.3f, 1.f);
+			const FVector Up(0.f, 0.f, Tuning.BarrelSmokeUpSpeed * FMath::Lerp(0.4f, 1.f, Height) * FMath::FRandRange(0.85f, 1.15f));
+			const float Life = Tuning.BarrelSmokeLifetime * FMath::Lerp(0.55f, 1.15f, Height);
+			Fx->SpawnBigSmoke(Puff, Tuning.BarrelSmokeSize * FMath::FRandRange(0.75f, 1.3f), Up + Out,
+				FMath::FRandRange(0.f, Tuning.BarrelSmokeDelay), Life);
 		}
 	}
 

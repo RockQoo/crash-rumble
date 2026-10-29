@@ -28,6 +28,9 @@ namespace
 	const FLinearColor SmokeGlow(2.5f, 2.5f, 2.5f);
 	const FLinearColor SmokeWhite(0.95f, 0.95f, 1.f);
 	const FLinearColor SmokeGray(0.55f, 0.55f, 0.6f);
+	constexpr float BigSmokeInflateTime = 0.15f;
+	constexpr float BigSmokeGlowTime = 0.05f;
+	const FLinearColor SmokeMaroon(0.32f, 0.08f, 0.11f);
 	const FLinearColor DustColor(0.85f, 0.78f, 0.66f);
 
 	// 번개
@@ -416,6 +419,18 @@ void UCRFxSubsystem::SpawnSmokePuff(const FVector& Location, float Size, const F
 	}
 }
 
+void UCRFxSubsystem::SpawnBigSmoke(const FVector& Location, float Size, const FVector& Velocity, float Delay, float Lifetime)
+{
+	FPiece& P = NextPiece();
+	P.Kind = EPieceKind::BigSmoke;
+	P.Shape = ECRFxShape::Sphere;
+	P.Location = Location;
+	P.Velocity = Velocity;
+	P.Size = Size;
+	P.Delay = Delay;
+	P.Lifetime = Lifetime * FMath::FRandRange(0.85f, 1.15f);
+}
+
 void UCRFxSubsystem::SpawnSmear(const FVector& From, const FVector& To, float Diameter, const FLinearColor& Color)
 {
 	const int32 Fps = UCRTuningSubsystem::GetSettings(this).FxFps;
@@ -492,6 +507,14 @@ void UCRFxSubsystem::UpdatePieces(float DeltaTime, float RealDeltaTime)
 		}
 		case EPieceKind::Smoke:
 			P.Location.Z += Tuning.MissileSmokeRise * DeltaTime;
+			break;
+		case EPieceKind::BigSmoke:
+			if (P.Age >= P.Delay)
+			{
+				// 처음엔 확 솟고 퍼지다 공기에 먹혀 느려지고, 그 뒤엔 천천히 떠오른다
+				P.Velocity *= FMath::Max(0.f, 1.f - Tuning.BarrelSmokeDrag * DeltaTime);
+				P.Location += (P.Velocity + FVector(0.f, 0.f, Tuning.BarrelSmokeRise)) * DeltaTime;
+			}
 			break;
 		case EPieceKind::DustPuff:
 			P.Velocity *= FMath::Max(0.f, 1.f - 6.f * DeltaTime);
@@ -593,6 +616,21 @@ void UCRFxSubsystem::DrawPieces()
 			const float Fade = Alpha < 0.6f ? 1.f : 1.f - (Alpha - 0.6f) / 0.4f;
 			const bool bGlow = T < Tuning.MissileSmokeGlowTime;
 			const FLinearColor Color = bGlow ? SmokeGlow : Alpha < 0.45f ? SmokeWhite : SmokeGray;
+			Emit(P.Shape, FTransform(FQuat::Identity, P.Location, FVector(P.Size * Grow * Fade)), Color, bGlow ? 1.f : 0.f);
+			break;
+		}
+		case EPieceKind::BigSmoke:
+		{
+			// 불덩이가 그대로 연기가 된다 (레퍼런스): 섬광 → 주황 → 빨강 → 어두운 적갈색.
+			// 빨리 부풀고 이후 천천히 더 부풀며, 끝에서 덩이마다 따로 작아져 사라진다 (아래쪽 덩이가 먼저)
+			const float Inflate = FMath::Lerp(0.4f, 1.f, EaseOut(T / BigSmokeInflateTime));
+			const float Grow = Inflate * FMath::Lerp(1.f, Tuning.BarrelSmokeEndScale, Alpha);
+			const float ShrinkFrom = FMath::Clamp(Tuning.BarrelSmokeShrinkFrom, 0.f, 0.99f);
+			const float Fade = Alpha < ShrinkFrom ? 1.f : 1.f - EaseOut((Alpha - ShrinkFrom) / (1.f - ShrinkFrom));
+			const bool bGlow = T < BigSmokeGlowTime;
+			const float DarkAlpha = FMath::Clamp((T - Tuning.BarrelSmokeRedTime) / FMath::Max(Tuning.BarrelSmokeDarkTime, 0.01f), 0.f, 1.f);
+			const FLinearColor Color = bGlow ? FireGlow : T < Tuning.BarrelSmokeOrangeTime ? FireOrange
+				: T < Tuning.BarrelSmokeRedTime ? FireRed : FMath::Lerp(FireRed, SmokeMaroon, DarkAlpha);
 			Emit(P.Shape, FTransform(FQuat::Identity, P.Location, FVector(P.Size * Grow * Fade)), Color, bGlow ? 1.f : 0.f);
 			break;
 		}

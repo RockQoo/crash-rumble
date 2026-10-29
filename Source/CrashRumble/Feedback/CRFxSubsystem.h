@@ -53,6 +53,8 @@ public:
 	void SpawnFlame(const FVector& GroundCenter, float Radius, float Height, float Duration);
 	/** 미사일 연기 한 덩이. bRing이면 진행 방향에 수직인 도넛 링도. */
 	void SpawnSmokePuff(const FVector& Location, float Size, const FVector& Direction, bool bRing, float Lifetime = -1.f);
+	/** 큰 폭발 연기 덩이 (드럼통): Velocity로 솟았다가 감속, 이후 천천히 떠오르며 계속 부풀고 흰색 → 회색 → 작아지며 사라짐. */
+	void SpawnBigSmoke(const FVector& Location, float Size, const FVector& Velocity, float Delay, float Lifetime);
 	/** 스미어: 지난 그림과 이번 그림 사이를 늘린 구체로 채운다 (다음 그림에서 사라짐). */
 	void SpawnSmear(const FVector& From, const FVector& To, float Diameter, const FLinearColor& Color);
 
@@ -70,6 +72,7 @@ private:
 		Flash,
 		RingCube,
 		Smoke,
+		BigSmoke,
 		SmokeRing,
 		DustPuff,
 		DustRing,

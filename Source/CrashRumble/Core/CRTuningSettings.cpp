@@ -416,8 +416,19 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("훈련장", BarrelCraterRadius, "드럼통 크레이터 반경", 0.f, 600.f, 10.f);
 		CR_TUNE("훈련장", BarrelSmokeCount, "드럼통 연기 덩이 수", 0.f, 60.f, 1.f);
 		CR_TUNE("훈련장", BarrelSmokeSize, "드럼통 연기 크기", 0.1f, 5.f, 0.05f);
-		CR_TUNE("훈련장", BarrelSmokeSpread, "드럼통 연기 퍼짐 반경", 0.f, 800.f, 10.f);
+		CR_TUNE("훈련장", BarrelSmokeSpread, "드럼통 연기 뭉침 반경 (작을수록 한 덩어리)", 0.f, 800.f, 5.f);
+		CR_TUNE("훈련장", BarrelSmokeColumnHeight, "드럼통 연기 기둥 높이 (덩이를 세로로 쌓음)", 0.f, 1000.f, 10.f);
+		CR_TUNE("훈련장", BarrelSmokeOrangeTime, "드럼통 연기 주황 → 빨강 (초)", 0.f, 2.f, 0.02f);
+		CR_TUNE("훈련장", BarrelSmokeRedTime, "드럼통 연기 빨강 → 어두워지기 시작 (초)", 0.f, 3.f, 0.02f);
+		CR_TUNE("훈련장", BarrelSmokeDarkTime, "드럼통 연기 어두운 적갈색이 되기까지 (초)", 0.01f, 3.f, 0.02f);
 		CR_TUNE("훈련장", BarrelSmokeLifetime, "드럼통 연기 수명(초)", 0.2f, 8.f, 0.1f);
+		CR_TUNE("훈련장", BarrelSmokeUpSpeed, "드럼통 연기 솟는 속도", 0.f, 2000.f, 10.f);
+		CR_TUNE("훈련장", BarrelSmokeOutSpeed, "드럼통 연기 옆으로 퍼지는 속도", 0.f, 1500.f, 10.f);
+		CR_TUNE("훈련장", BarrelSmokeDrag, "드럼통 연기 감속 (클수록 빨리 멈춤)", 0.f, 10.f, 0.1f);
+		CR_TUNE("훈련장", BarrelSmokeRise, "드럼통 연기 멈춘 뒤 떠오르는 속도", 0.f, 500.f, 5.f);
+		CR_TUNE("훈련장", BarrelSmokeEndScale, "드럼통 연기 끝 크기 배율 (계속 부푼다)", 0.5f, 5.f, 0.05f);
+		CR_TUNE("훈련장", BarrelSmokeShrinkFrom, "드럼통 연기 작아지기 시작 (수명 비율)", 0.f, 0.99f, 0.01f);
+		CR_TUNE("훈련장", BarrelSmokeDelay, "드럼통 연기 시작 흩뜨림(초)", 0.f, 1.f, 0.01f);
 		CR_TUNE("훈련장", BarrelRespawnDelay, "드럼통 다시 생김(초)", 0.5f, 60.f, 0.5f);
 		CR_TUNE("훈련장", DpsWindow, "DPS 측정 구간(초)", 0.5f, 10.f, 0.5f);
 
@@ -492,7 +503,7 @@ FText UCRTuningSettings::GetCategoryDescription(const FString& Category)
 		Descriptions.Add(TEXT("필살기"), FText::FromString(TEXT("F: 오른손을 들고 시간 정지(배경 2톤, 집중선, 줌인) → 해제 순간 미사일 일제 사격.")));
 		Descriptions.Add(TEXT("달리기"), FText::FromString(TEXT("Shift: 빨라지고 화면 가장자리에 집중선.")));
 		Descriptions.Add(TEXT("블럭 지형"), FText::FromString(TEXT("부서진 블럭이 다시 자라는 시간과 연출, 무너지는 블럭, 미사일 크레이터.")));
-		Descriptions.Add(TEXT("훈련장"), FText::FromString(TEXT("폭발 드럼통(TNT)과 DPS 허수아비. 드럼통은 구체 폭발 + 큐브 잔해 + 카나다 빛 + 피어오르는 큰 연기, 주변 드럼통 연쇄 폭발. 미리보기: 앞에 드럼통을 놓는다 (쏘면 터짐).")));
+		Descriptions.Add(TEXT("훈련장"), FText::FromString(TEXT("폭발 드럼통(TNT)과 DPS 허수아비. 드럼통은 구체 폭발 + 큐브 잔해 + 카나다 빛 + 연기 기둥(불덩이가 주황 → 빨강 → 적갈색 연기가 되어 솟고, 아래 덩이부터 작아지며 사라짐), 주변 드럼통 연쇄 폭발. 폭발 수치는 미사일과 별개. 미리보기: 앞에 드럼통을 놓고 1초 뒤 터뜨린다.")));
 		Descriptions.Add(TEXT("다수 타격 테스트"), FText::FromString(TEXT("몬스터 체력, 이동 속도, 생성 반경.")));
 		Descriptions.Add(TEXT("팀 전투"), FText::FromString(TEXT("레드 vs 블루 팀 전투 수치.")));
 	}
