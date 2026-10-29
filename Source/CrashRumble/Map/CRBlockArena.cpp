@@ -432,6 +432,11 @@ int32 ACRBlockArena::CellAt(const FVector& WorldPoint) const
 	return X + Y * SizeX + Z * SizeX * SizeY;
 }
 
+FVector2D ACRBlockArena::GetHalfSize() const
+{
+	return FVector2D(SizeX, SizeY) * BlockSize * 0.5f;
+}
+
 FVector ACRBlockArena::GetCenterTop() const
 {
 	return FVector(Origin.X + SizeX * BlockSize * 0.5f, Origin.Y + SizeY * BlockSize * 0.5f, Origin.Z + GroundLayers * BlockSize);

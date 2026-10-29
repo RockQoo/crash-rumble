@@ -28,6 +28,7 @@ namespace
 	const TCHAR* BenchMapName = TEXT("bench");
 	const TCHAR* TraceChannels = TEXT("default,cpu,gpu,frame,bookmark,counters");
 	constexpr float ShoulderRestorePitch = -10.f;
+	constexpr float MapEdgeMargin = 200.f;
 }
 
 UCRBenchmarkSubsystem* UCRBenchmarkSubsystem::Get(const UObject* WorldContext)
@@ -98,6 +99,12 @@ bool UCRBenchmarkSubsystem::Start(FString& OutMessage)
 	Setup.RowSpacing = Tuning.BenchRowSpacing;
 	Setup.EngageRange = Tuning.BenchEngageRange;
 	Setup.DamageScale = Tuning.BenchDamageScale;
+	// 맵이 작으면 (지금 맵에서 잴 때) 진형을 맵 안으로 줄인다: 진영은 ±Y, 전열은 X 방향
+	const FVector2D Half = Arena->GetHalfSize() - FVector2D(MapEdgeMargin);
+	const int32 Rows = FMath::DivideAndRoundUp(FMath::Max(Setup.PerTeam, 1), FMath::Max(Setup.PerRow, 1));
+	Setup.TeamDistance = FMath::Clamp(Setup.TeamDistance, 100.f, FMath::Max(Half.Y, 100.f));
+	Setup.RowSpacing = FMath::Min(Setup.RowSpacing, Setup.TeamDistance / FMath::Max(Rows, 1));
+	Setup.FrontWidth = FMath::Min(Setup.FrontWidth, FMath::Max(Half.X * 2.f, 100.f));
 	Spawner->StartBattle(Setup);
 
 	PerTeam = Setup.PerTeam;

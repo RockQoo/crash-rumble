@@ -48,6 +48,8 @@ public:
 	const FString& GetStatusMessage() const { return StatusMessage; }
 	/** 지면 맨 위 가운데 (월드). */
 	FVector GetCenterTop() const;
+	/** 맵 가로(X)·세로(Y) 절반 길이 (cm). */
+	FVector2D GetHalfSize() const;
 
 	virtual void Tick(float DeltaSeconds) override;
 
