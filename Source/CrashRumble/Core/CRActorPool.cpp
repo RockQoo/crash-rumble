@@ -35,6 +35,7 @@ AActor* UCRActorPoolSubsystem::Acquire(UClass* Class, const FTransform& Transfor
 	}
 
 	++ActiveCounts.FindOrAdd(Class);
+	LentActors.Add(Actor);
 	Actor->SetActorTransform(Transform, false, nullptr, ETeleportType::TeleportPhysics);
 	if (ICRPoolable* Poolable = Cast<ICRPoolable>(Actor))
 	{
@@ -47,6 +48,11 @@ void UCRActorPoolSubsystem::Release(AActor* Actor)
 {
 	if (!IsValid(Actor))
 	{
+		return;
+	}
+	if (LentActors.Remove(Actor) == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("CRActorPool: 빌려주지 않은 액터 반납 무시 (중복 반납?) %s"), *Actor->GetName());
 		return;
 	}
 	if (ICRPoolable* Poolable = Cast<ICRPoolable>(Actor))

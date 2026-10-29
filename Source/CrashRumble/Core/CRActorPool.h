@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "UObject/Interface.h"
+#include "UObject/ObjectKey.h"
 #include "CRActorPool.generated.h"
 
 UINTERFACE(MinimalAPI)
@@ -67,5 +68,7 @@ private:
 	TMap<TObjectPtr<UClass>, FCRActorPoolList> FreeActors;
 
 	TMap<UClass*, int32> ActiveCounts;
+	/** 지금 빌려준 액터. 반납은 여기 있는 것만 받는다 (중복 반납, 다른 풀/월드 액터 거부). */
+	TSet<TObjectKey<AActor>> LentActors;
 	int32 TotalSpawned = 0;
 };
