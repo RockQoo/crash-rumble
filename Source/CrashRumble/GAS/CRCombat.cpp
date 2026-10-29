@@ -9,6 +9,8 @@
 #include "GAS/CRDamageEffect.h"
 #include "GAS/CRGameplayTags.h"
 #include "Engine/OverlapResult.h"
+#include "Map/CRBlockArena.h"
+#include "Map/CRExplosiveBarrel.h"
 #include "Engine/World.h"
 
 bool CRCombat::ApplyWeaponHit(AActor* Attacker, AActor* Victim, ECRWeaponType Weapon, const FHitResult& Hit)
@@ -49,8 +51,30 @@ int32 CRCombat::ApplyRadialHit(AActor* Attacker, ECRWeaponType Weapon, const FVe
 	return Count;
 }
 
+bool CRCombat::DamageWorld(const FHitResult& Hit, int32 BlockDamage, AActor* Attacker)
+{
+	if (ACRExplosiveBarrel* Barrel = Cast<ACRExplosiveBarrel>(Hit.GetActor()))
+	{
+		Barrel->ApplyHit(1, Attacker);
+		return true;
+	}
+	if (ACRBlockArena* Arena = ACRBlockArena::FromComponent(Hit.GetComponent()))
+	{
+		Arena->DamageAt(Hit.ImpactPoint, Hit.ImpactNormal, BlockDamage);
+		return true;
+	}
+	return false;
+}
+
 bool CRCombat::ApplyWeaponHitFrom(AActor* Attacker, AActor* Victim, ECRWeaponType Weapon, const FHitResult& Hit, const FVector& Origin)
 {
+	// 드럼통: 무기에 맞으면 HP 감소 (폭발은 한 방)
+	if (ACRExplosiveBarrel* Barrel = Cast<ACRExplosiveBarrel>(Victim))
+	{
+		Barrel->ApplyHit(Weapon == ECRWeaponType::Missile ? 1000 : 1, Attacker);
+		return true;
+	}
+
 	ACRCharacter* Target = Cast<ACRCharacter>(Victim);
 	if (!Attacker || !Target || Target == Attacker || Target->IsDead())
 	{

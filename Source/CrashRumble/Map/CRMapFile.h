@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 
@@ -15,6 +15,24 @@ enum class ECRBlock : uint8
 	Count
 };
 
+/** 훈련장 오브젝트 종류. */
+enum class ECRMapObject : uint8
+{
+	Dummy,        // 허수아비: 죽으면 제자리에서 다시 일어남
+	DpsDummy,     // DPS 허수아비: 죽지 않고 머리 위에 초당/누적 데미지
+	MovingTarget, // from ↔ to 왕복하는 허수아비
+	Barrel,       // 폭발 드럼통: 맞으면 터져 주변 피해 + 크레이터, 연쇄 폭발, 다시 생김
+};
+
+/** 블럭 위에 놓는 오브젝트. 높이는 그 칸의 가장 높은 블럭 위. */
+struct FCRMapObjectSpec
+{
+	ECRMapObject Type = ECRMapObject::Dummy;
+	FIntPoint At = FIntPoint::ZeroValue;
+	FIntPoint To = FIntPoint::ZeroValue;
+	float Speed = 200.f;
+};
+
 /** 맵 파일을 펼친 결과: 칸마다 원래 블럭 종류. */
 struct FCRMapSpec
 {
@@ -24,6 +42,7 @@ struct FCRMapSpec
 	int32 GroundLayers = 4;     // 지면 층 수 (맨 위가 z = GroundLayers - 1)
 	int32 StructureLayers = 14; // 지면 위 구조물 공간
 	TArray<uint8> Cells;        // x + y * SizeX + z * SizeX * SizeY
+	TArray<FCRMapObjectSpec> Objects;
 	TArray<FString> Warnings;   // 무시한 명령 (AI가 고칠 수 있게 몇 번째 명령인지 적는다)
 
 	int32 GetSizeZ() const { return GroundLayers + StructureLayers; }

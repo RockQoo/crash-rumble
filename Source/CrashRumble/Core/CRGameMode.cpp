@@ -4,6 +4,8 @@
 #include "Core/CRActorPool.h"
 #include "Core/CRHUD.h"
 #include "Core/CRPlayerController.h"
+#include "Kismet/GameplayStatics.h"
+#include "Map/CRBlockArena.h"
 #include "Weapon/CRMissile.h"
 #include "Weapon/CRProjectile.h"
 
@@ -20,9 +22,25 @@ ACRGameMode::ACRGameMode()
 	HUDClass = ACRHUD::StaticClass();
 }
 
+void ACRGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+	Super::InitGame(MapName, Options, ErrorMessage);
+	MapFile = UGameplayStatics::ParseOption(Options, TEXT("map"));
+	if (MapFile.IsEmpty())
+	{
+		MapFile = DefaultMapFile;
+	}
+}
+
 void ACRGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (!MapFile.Equals(TEXT("none"), ESearchCase::IgnoreCase))
+	{
+		FString Message;
+		ACRBlockArena::LoadMap(GetWorld(), MapFile, Message);
+	}
 
 	// 첫 발부터 스폰 없이 쏘도록 미리 채워 둔다
 	if (UCRActorPoolSubsystem* Pool = UCRActorPoolSubsystem::Get(this))

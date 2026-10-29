@@ -281,6 +281,12 @@ public:
 	UPROPERTY() float MissileCraterRadius = 110.f;
 	UPROPERTY() int32 LightningBlockDamage = 3;
 
+	// 훈련장 (타격 체크 기본 맵)
+	UPROPERTY() int32 BarrelHealth = 3;
+	UPROPERTY() float BarrelBlastRadius = 220.f;
+	UPROPERTY() float BarrelRespawnDelay = 5.f;
+	UPROPERTY() float DpsWindow = 3.f;
+
 	// 다수 타격 테스트
 	UPROPERTY() float MonsterMaxHealth = 100.f;
 	UPROPERTY() float MonsterMoveSpeed = 100.f;

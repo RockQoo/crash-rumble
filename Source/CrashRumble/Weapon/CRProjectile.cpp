@@ -118,10 +118,7 @@ void ACRProjectile::HandleHit(UPrimitiveComponent* HitComponent, AActor* OtherAc
 	}
 
 	// 벽/바닥에 막힘 (캐릭터는 오버랩으로 처리). 블럭이면 HP 1
-	if (ACRBlockArena* Arena = ACRBlockArena::FromComponent(Hit.GetComponent()))
-	{
-		Arena->DamageAt(Hit.ImpactPoint, Hit.ImpactNormal, 1);
-	}
+	CRCombat::DamageWorld(Hit, 1, Shooter.Get());
 	if (UCRFeedbackSubsystem* Feedback = UCRFeedbackSubsystem::Get(this))
 	{
 		Feedback->SpawnImpactParticles(Hit.ImpactPoint, Hit.ImpactNormal, ProjectileColor, 0.6f);

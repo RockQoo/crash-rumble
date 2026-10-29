@@ -66,6 +66,21 @@ void ACRHUD::DrawHealthBars()
 	for (TActorIterator<ACRCharacter> It(GetWorld()); It; ++It)
 	{
 		const ACRCharacter* Snowman = *It;
+		if (Snowman->GetTrainingRole() == ECRTrainingRole::DpsDummy && !Snowman->IsHidden())
+		{
+			// DPS 허수아비: 머리 위에 초당 / 누적 데미지
+			const FVector Screen = Project(Snowman->GetActorLocation() + FVector(0.f, 0.f, HealthBarHeightAboveActor), true);
+			if (Screen.Z > 0.f && GEngine)
+			{
+				const FString Text = FString::Printf(TEXT("DPS %.0f  ·  누적 %.0f"), Snowman->GetDps(), Snowman->GetTotalDamage());
+				float Width = 0.f, Height = 0.f;
+				UFont* Font = GEngine->GetMediumFont();
+				GetTextSize(Text, Width, Height, Font, 1.2f);
+				DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.55f), Screen.X - Width * 0.5f - 6.f, Screen.Y - 4.f, Width + 12.f, Height + 8.f);
+				DrawText(Text, FLinearColor(1.f, 0.85f, 0.2f), Screen.X - Width * 0.5f, Screen.Y, Font, 1.2f);
+			}
+			continue;
+		}
 		// 수백 마리일 때를 위해 맞아서 체력이 줄어든 대상만 표시
 		if (Snowman == LocalPawn || Snowman->IsHidden() || Snowman->IsDead() || Snowman->GetMaxHealth() <= 0.f
 			|| Snowman->GetHealth() >= Snowman->GetMaxHealth())

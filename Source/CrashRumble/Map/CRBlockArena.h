@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
@@ -72,6 +72,11 @@ private:
 	};
 
 	void Rebuild(FCRMapSpec&& Spec);
+	/** 맵 파일 objects를 칸 맨 위에 세운다 (다시 불러오면 지우고 새로). */
+	void SpawnObjects(const TArray<FCRMapObjectSpec>& Objects);
+	void ClearObjects();
+	/** 그 칸 기둥에서 가장 높은 블럭 윗면 (월드 z). 블럭이 없으면 지면 높이. */
+	float GetColumnTopZ(int32 X, int32 Y) const;
 	void SetFloorsHidden(bool bHideFloors);
 	void CheckFileChanged(float DeltaSeconds);
 
@@ -108,6 +113,9 @@ private:
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UStaticMeshComponent>> HiddenFloors;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<AActor>> SpawnedObjects;
 
 	FString MapName;
 	FString MapPath;

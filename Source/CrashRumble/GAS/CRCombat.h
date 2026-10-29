@@ -22,6 +22,9 @@ namespace CRCombat
 	/** Center 반경 Radius 안의 눈사람을 모두 때린다 (Origin에서 밀어냄). 맞힌 수. */
 	CRASHRUMBLE_API int32 ApplyRadialHit(AActor* Attacker, ECRWeaponType Weapon, const FVector& Center, float Radius);
 
+	/** 눈사람이 아닌 것(블럭, 드럼통)에 맞았을 때: 블럭이면 BlockDamage, 드럼통이면 1. 처리했으면 true. */
+	CRASHRUMBLE_API bool DamageWorld(const FHitResult& Hit, int32 BlockDamage, AActor* Attacker);
+
 	/** 무기 판정에 쓰는 오브젝트 타입 (바닥/벽 + 캐릭터). */
 	CRASHRUMBLE_API FCollisionObjectQueryParams GetWeaponQueryParams();
 }

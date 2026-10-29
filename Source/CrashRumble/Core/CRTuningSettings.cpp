@@ -286,6 +286,11 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("블럭 지형", MissileCraterRadius, "미사일 크레이터 반경", 0.f, 500.f, 5.f);
 		CR_TUNE("블럭 지형", LightningBlockDamage, "번개 블럭 피해", 0.f, 10.f, 1.f);
 
+		CR_TUNE("훈련장", BarrelHealth, "드럼통 HP (맞는 횟수)", 1.f, 20.f, 1.f);
+		CR_TUNE("훈련장", BarrelBlastRadius, "드럼통 폭발 반경", 50.f, 800.f, 10.f);
+		CR_TUNE("훈련장", BarrelRespawnDelay, "드럼통 다시 생김(초)", 0.5f, 60.f, 0.5f);
+		CR_TUNE("훈련장", DpsWindow, "DPS 측정 구간(초)", 0.5f, 10.f, 0.5f);
+
 		CR_TUNE("다수 타격 테스트", MonsterMaxHealth, "몬스터 최대 체력", 1.f, 5000.f, 10.f);
 		CR_TUNE("다수 타격 테스트", MonsterMoveSpeed, "몬스터 이동 속도 (0 = 정지)", 0.f, 1000.f, 10.f);
 		CR_TUNE("다수 타격 테스트", SpawnRadius, "생성 반경", 300.f, 3800.f, 50.f);

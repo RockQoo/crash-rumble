@@ -1,0 +1,53 @@
+{
+  "name": "training",
+  "size": [120, 80],
+  "height": 14,
+  "ground": ["grass", "dirt", "dirt", "stone"],
+  "structures": [
+    { "type": "pillar", "at": [74, 34], "height": 1, "block": "stone" },
+    { "type": "pillar", "at": [74, 46], "height": 1, "block": "stone" },
+    { "type": "pillar", "at": [94, 34], "height": 1, "block": "stone" },
+    { "type": "pillar", "at": [94, 46], "height": 1, "block": "stone" },
+    { "type": "pillar", "at": [114, 34], "height": 1, "block": "stone" },
+    { "type": "pillar", "at": [114, 46], "height": 1, "block": "stone" },
+
+    { "type": "wall", "from": [66, 56], "to": [76, 56], "height": 5, "thickness": 1, "block": "brick" },
+    { "type": "wall", "from": [80, 56], "to": [90, 56], "height": 5, "thickness": 2, "block": "stone" },
+    { "type": "wall", "from": [94, 56], "to": [104, 56], "height": 5, "thickness": 1, "block": "wood" },
+    { "type": "wall", "from": [66, 64], "to": [80, 64], "height": 6, "thickness": 2, "block": "brick",
+      "gate": { "at": 7, "width": 5, "height": 3 } },
+    { "type": "wall", "from": [84, 64], "to": [104, 64], "height": 4, "thickness": 1, "block": "stone",
+      "gate": { "at": 10, "width": 9, "height": 2 } },
+
+    { "type": "wall", "from": [66, 12], "to": [92, 12], "height": 6, "thickness": 2, "block": "brick",
+      "gate": { "at": 13, "width": 5, "height": 4 }, "battlements": true },
+    { "type": "tower", "at": [104, 16], "radius": 4, "height": 12, "block": "stone" },
+    { "type": "bridge", "from": [66, 22], "to": [86, 22], "height": 4, "width": 2, "block": "wood" },
+
+    { "type": "pillar", "at": [56, 30], "height": 4, "block": "crystal" },
+    { "type": "pillar", "at": [56, 50], "height": 4, "block": "crystal" },
+    { "type": "pillar", "at": [112, 26], "height": 3, "block": "crystal" },
+    { "type": "pillar", "at": [112, 54], "height": 3, "block": "crystal" },
+
+    { "type": "hole", "from": [106, 68], "to": [110, 72], "depth": 4 }
+  ],
+  "objects": [
+    { "type": "dummy", "at": [80, 40] },
+    { "type": "dummy", "at": [100, 40] },
+    { "type": "dummy", "at": [118, 40] },
+    { "type": "dps_dummy", "at": [70, 47] },
+    { "type": "moving_target", "from": [88, 32], "to": [88, 48], "speed": 220 },
+
+    { "type": "barrel", "at": [71, 52] },
+    { "type": "barrel", "at": [73, 52] },
+    { "type": "barrel", "at": [85, 52] },
+    { "type": "barrel", "at": [99, 52] },
+
+    { "type": "dummy_grid", "from": [12, 26], "to": [40, 54], "spacing": 7 },
+    { "type": "barrel", "at": [44, 36] },
+    { "type": "barrel", "at": [44, 40] },
+    { "type": "barrel", "at": [44, 44] },
+    { "type": "barrel", "at": [46, 38] },
+    { "type": "barrel", "at": [46, 42] }
+  ]
+}

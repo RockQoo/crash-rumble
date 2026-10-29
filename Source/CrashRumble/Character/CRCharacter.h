@@ -18,6 +18,15 @@ class USpringArmComponent;
 class UStaticMeshComponent;
 struct FOnAttributeChangeData;
 
+/** 훈련장 허수아비 역할 (맵 파일 objects). */
+enum class ECRTrainingRole : uint8
+{
+	None,
+	Dummy,        // 죽으면 제자리(처음 위치)에서 다시 일어남
+	DpsDummy,     // 죽지 않고 초당/누적 데미지를 머리 위에 표시
+	MovingTarget, // 두 지점 사이를 왕복
+};
+
 /** 팀 전투용. None은 플레이어/일반 몬스터. */
 UENUM()
 enum class ECRTeam : uint8
@@ -61,6 +70,14 @@ public:
 	ECRTeam GetTeam() const { return Team; }
 	void SetAccentColor(const FLinearColor& InAccentColor);
 	const FLinearColor& GetAccentColor() const { return AccentColor; }
+
+	/** 훈련장 허수아비로 설정. MovingTarget은 PatrolA ↔ PatrolB 왕복 (Speed cm/s). */
+	void SetupTraining(ECRTrainingRole InRole, const FVector& PatrolA = FVector::ZeroVector, const FVector& PatrolB = FVector::ZeroVector,
+		float Speed = 200.f);
+	ECRTrainingRole GetTrainingRole() const { return TrainingRole; }
+	/** DPS 허수아비: 최근 구간 초당 데미지 / 마지막으로 맞기 시작한 뒤 누적 데미지. */
+	float GetDps() const;
+	float GetTotalDamage() const { return TotalDamage; }
 
 	/** 관전: 숨기고 다른 눈사람과 부딪히지 않게 한다. */
 	void SetSpectating(bool bInSpectating);
@@ -184,6 +201,15 @@ private:
 
 	void UpdateMoveSpeed();
 	void UpdatePunch(float DeltaSeconds);
+	void UpdatePatrol(float DeltaSeconds);
+
+	ECRTrainingRole TrainingRole = ECRTrainingRole::None;
+	FVector PatrolPoints[2] = { FVector::ZeroVector, FVector::ZeroVector };
+	int32 PatrolIndex = 1;
+	float PatrolSpeed = 200.f;
+	TArray<TPair<double, float>> DamageLog; // 실제 시간, 데미지
+	float TotalDamage = 0.f;
+	double LastDamageTime = 0.0;
 
 	// 펀치: 1 = 다 뻗음, 스프링으로 0에 돌아온다
 	float PunchExtend = 0.f;

@@ -1,4 +1,4 @@
-#include "Map/CRMapFile.h"
+﻿#include "Map/CRMapFile.h"
 
 #include "Dom/JsonObject.h"
 #include "Misc/FileHelper.h"
@@ -457,6 +457,80 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 			{
 				Spec.Warnings.Add(FString::Printf(TEXT("structures[%d]: 모르는 type '%s' (wall / tower / pyramid / bridge / box / pillar / fill / hole)"), i, *Type));
 			}
+		}
+	}
+
+	// 오브젝트 (훈련장 허수아비, 기믹)
+	const TArray<TSharedPtr<FJsonValue>>* Objects = nullptr;
+	if (Root->TryGetArrayField(TEXT("objects"), Objects))
+	{
+		for (int32 i = 0; i < Objects->Num(); ++i)
+		{
+			const TSharedPtr<FJsonObject> Item = (*Objects)[i]->AsObject();
+			FString Type;
+			if (!Item.IsValid() || !Item->TryGetStringField(TEXT("type"), Type))
+			{
+				Spec.Warnings.Add(FString::Printf(TEXT("objects[%d]: type 필요"), i));
+				continue;
+			}
+			Type = Type.ToLower();
+			FCRMapObjectSpec Object;
+			Object.Speed = ReadInt(Item, TEXT("speed"), 200);
+			if (Type == TEXT("dummy_grid"))
+			{
+				// 허수아비 여러 마리: from ~ to 사각형 안에 spacing 칸 간격
+				FIntPoint From, To;
+				if (!ReadInt2(Item, TEXT("from"), From) || !ReadInt2(Item, TEXT("to"), To))
+				{
+					Spec.Warnings.Add(FString::Printf(TEXT("objects[%d] (dummy_grid): from / to 필요"), i));
+					continue;
+				}
+				const int32 Spacing = FMath::Max(2, ReadInt(Item, TEXT("spacing"), 4));
+				for (int32 Y = FMath::Min(From.Y, To.Y); Y <= FMath::Max(From.Y, To.Y); Y += Spacing)
+				{
+					for (int32 X = FMath::Min(From.X, To.X); X <= FMath::Max(From.X, To.X); X += Spacing)
+					{
+						FCRMapObjectSpec& Dummy = Spec.Objects.AddDefaulted_GetRef();
+						Dummy.Type = ECRMapObject::Dummy;
+						Dummy.At = FIntPoint(X, Y);
+					}
+				}
+				continue;
+			}
+			if (Type == TEXT("dummy"))
+			{
+				Object.Type = ECRMapObject::Dummy;
+			}
+			else if (Type == TEXT("dps_dummy"))
+			{
+				Object.Type = ECRMapObject::DpsDummy;
+			}
+			else if (Type == TEXT("moving_target"))
+			{
+				Object.Type = ECRMapObject::MovingTarget;
+				if (!ReadInt2(Item, TEXT("from"), Object.At) || !ReadInt2(Item, TEXT("to"), Object.To))
+				{
+					Spec.Warnings.Add(FString::Printf(TEXT("objects[%d] (moving_target): from / to 필요"), i));
+					continue;
+				}
+				Spec.Objects.Add(Object);
+				continue;
+			}
+			else if (Type == TEXT("barrel"))
+			{
+				Object.Type = ECRMapObject::Barrel;
+			}
+			else
+			{
+				Spec.Warnings.Add(FString::Printf(TEXT("objects[%d]: 모르는 type '%s' (dummy / dummy_grid / dps_dummy / moving_target / barrel)"), i, *Type));
+				continue;
+			}
+			if (!ReadInt2(Item, TEXT("at"), Object.At))
+			{
+				Spec.Warnings.Add(FString::Printf(TEXT("objects[%d] (%s): at 필요"), i, *Type));
+				continue;
+			}
+			Spec.Objects.Add(Object);
 		}
 	}
 

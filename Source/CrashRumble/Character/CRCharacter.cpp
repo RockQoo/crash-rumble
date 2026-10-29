@@ -17,6 +17,7 @@
 #include "Feedback/CRScreenFxSubsystem.h"
 #include "Engine/OverlapResult.h"
 #include "Map/CRBlockArena.h"
+#include "Map/CRExplosiveBarrel.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GAS/CRAttributeSet.h"
@@ -224,6 +225,25 @@ float ACRCharacter::GetTunedMaxHealth() const
 
 void ACRCharacter::HandleHealthChanged(const FOnAttributeChangeData& Data)
 {
+	if (TrainingRole == ECRTrainingRole::DpsDummy)
+	{
+		// DPS 허수아비: 데미지만 기록하고 바로 체력을 채운다 (죽지 않음)
+		const float Damage = Data.OldValue - Data.NewValue;
+		if (Damage > 0.f)
+		{
+			const double Now = FPlatformTime::Seconds();
+			if (Now - LastDamageTime > UCRTuningSubsystem::GetSettings(this).DpsWindow + 2.f)
+			{
+				TotalDamage = 0.f; // 한동안 안 맞았으면 새로 측정
+				DamageLog.Reset();
+			}
+			LastDamageTime = Now;
+			TotalDamage += Damage;
+			DamageLog.Add(TPair<double, float>(Now, Damage));
+			AbilitySystem->SetNumericAttributeBase(UCRAttributeSet::GetHealthAttribute(), GetMaxHealth());
+		}
+		return;
+	}
 	if (Data.NewValue <= 0.f && !bDead)
 	{
 		Die();
@@ -274,6 +294,11 @@ void ACRCharacter::Revive()
 	else
 	{
 		Reassemble(); // 벗겨진 투구/무기를 제자리로 (몸은 천천히 일어난다)
+		if (TrainingRole != ECRTrainingRole::None)
+		{
+			// 훈련장 허수아비는 처음 자리로 돌아와 일어난다
+			Respawn();
+		}
 	}
 	RestoreFullHealth();
 	AbilitySystem->RemoveLooseGameplayTag(CRTags::State_Dead);
@@ -512,6 +537,7 @@ void ACRCharacter::Tick(float DeltaSeconds)
 	}
 
 	UpdateChase(DeltaSeconds);
+	UpdatePatrol(DeltaSeconds);
 	UpdatePunch(DeltaSeconds);
 	UpdateBreath(DeltaSeconds);
 	UpdateHands(DeltaSeconds);
@@ -1085,8 +1111,65 @@ void ACRCharacter::ApplyTuning()
 	}
 }
 
+void ACRCharacter::SetupTraining(ECRTrainingRole InRole, const FVector& PatrolA, const FVector& PatrolB, float Speed)
+{
+	TrainingRole = InRole;
+	PatrolPoints[0] = PatrolA;
+	PatrolPoints[1] = PatrolB;
+	PatrolIndex = 1;
+	PatrolSpeed = Speed;
+	HomeLocation = GetActorLocation();
+	// 역할별 모자 색: 허수아비 주황, DPS 노랑, 움직이는 표적 보라
+	const FLinearColor Color = InRole == ECRTrainingRole::DpsDummy ? FLinearColor(1.f, 0.8f, 0.1f)
+		: InRole == ECRTrainingRole::MovingTarget ? FLinearColor(0.55f, 0.25f, 1.f) : FLinearColor(1.f, 0.35f, 0.1f);
+	SetAccentColor(Color);
+	if (InRole == ECRTrainingRole::MovingTarget)
+	{
+		GetCharacterMovement()->MaxWalkSpeed = FMath::Max(Speed, 50.f);
+	}
+}
+
+float ACRCharacter::GetDps() const
+{
+	const double Now = FPlatformTime::Seconds();
+	const float Window = FMath::Max(UCRTuningSubsystem::GetSettings(this).DpsWindow, 0.1f);
+	float Sum = 0.f;
+	double First = Now;
+	for (const TPair<double, float>& Entry : DamageLog)
+	{
+		if (Now - Entry.Key <= Window)
+		{
+			Sum += Entry.Value;
+			First = FMath::Min(First, Entry.Key);
+		}
+	}
+	// 측정을 막 시작했으면 지난 시간으로 나눈다 (첫 타에 숫자가 튀지 않게 최소 0.5초)
+	return Sum / FMath::Clamp(float(Now - First), 0.5f, Window);
+}
+
+void ACRCharacter::UpdatePatrol(float DeltaSeconds)
+{
+	if (TrainingRole != ECRTrainingRole::MovingTarget || bDead)
+	{
+		return;
+	}
+	FVector ToGoal = PatrolPoints[PatrolIndex] - GetActorLocation();
+	ToGoal.Z = 0.f;
+	if (ToGoal.Size() < 30.f)
+	{
+		PatrolIndex = 1 - PatrolIndex;
+		return;
+	}
+	AddMovementInput(ToGoal.GetSafeNormal(), 1.f);
+}
+
 void ACRCharacter::UpdateMoveSpeed()
 {
+	if (TrainingRole == ECRTrainingRole::MovingTarget)
+	{
+		GetCharacterMovement()->MaxWalkSpeed = FMath::Max(PatrolSpeed, 50.f);
+		return;
+	}
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	// 몬스터는 이동 입력 크기로 속도를 줄이므로 최대 속도는 둘 중 큰 값
 	GetCharacterMovement()->MaxWalkSpeed = bMonster
@@ -1173,6 +1256,14 @@ void ACRCharacter::PerformPunch()
 		Hit.bBlockingHit = true;
 		CRCombat::ApplyWeaponHit(this, Best, ECRWeaponType::Punch, Hit);
 		return;
+	}
+	for (const FOverlapResult& Overlap : Overlaps)
+	{
+		if (ACRExplosiveBarrel* Barrel = Cast<ACRExplosiveBarrel>(Overlap.GetActor()))
+		{
+			Barrel->ApplyHit(2, this);
+			return;
+		}
 	}
 
 	// 적이 없으면 손 → 주먹 방향으로 블럭 검사 (블럭 HP 2)

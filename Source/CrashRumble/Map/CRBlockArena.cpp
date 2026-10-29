@@ -10,6 +10,8 @@
 #include "EngineUtils.h"
 #include "Feedback/CRFxSubsystem.h"
 #include "Feedback/CRScreenFxSubsystem.h"
+#include "Character/CRCharacter.h"
+#include "Map/CRExplosiveBarrel.h"
 #include "HAL/FileManager.h"
 #include "HAL/IConsoleManager.h"
 #include "TimerManager.h"
@@ -154,6 +156,7 @@ void ACRBlockArena::ClearMap(UWorld* World)
 
 void ACRBlockArena::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	ClearObjects();
 	SetFloorsHidden(false);
 	Super::EndPlay(EndPlayReason);
 }
@@ -175,9 +178,11 @@ bool ACRBlockArena::Load(const FString& InMapName, FString& OutMessage)
 	MapPath = CRMapFile::ResolvePath(InMapName);
 	MapTimestamp = IFileManager::Get().GetTimeStamp(*MapPath);
 	const int32 WarningCount = Spec.Warnings.Num();
+	const TArray<FCRMapObjectSpec> Objects = Spec.Objects;
 	Rebuild(MoveTemp(Spec));
-	OutMessage = StatusMessage = FString::Printf(TEXT("맵 '%s' 불러옴 (%s) · 블럭 %d%s"), *MapName, *FDateTime::Now().ToString(TEXT("%H:%M:%S")),
-		SolidCount, WarningCount > 0 ? *FString::Printf(TEXT(" · 경고 %d (Output Log)"), WarningCount) : TEXT(""));
+	SpawnObjects(Objects);
+	OutMessage = StatusMessage = FString::Printf(TEXT("맵 '%s' 불러옴 (%s) · 블럭 %d · 오브젝트 %d%s"), *MapName, *FDateTime::Now().ToString(TEXT("%H:%M:%S")),
+		SolidCount, SpawnedObjects.Num(), WarningCount > 0 ? *FString::Printf(TEXT(" · 경고 %d (Output Log)"), WarningCount) : TEXT(""));
 	UE_LOG(LogCRBlockArena, Log, TEXT("%s"), *StatusMessage);
 	return true;
 }
@@ -290,6 +295,82 @@ void ACRBlockArena::Rebuild(FCRMapSpec&& Spec)
 	}
 	FallingComponent = MakeComponent(false);
 	SetFloorsHidden(true);
+}
+
+float ACRBlockArena::GetColumnTopZ(int32 X, int32 Y) const
+{
+	X = FMath::Clamp(X, 0, SizeX - 1);
+	Y = FMath::Clamp(Y, 0, SizeY - 1);
+	for (int32 Z = SizeZ - 1; Z >= 0; --Z)
+	{
+		if (IsSolid(X + Y * SizeX + Z * SizeX * SizeY))
+		{
+			return Origin.Z + (Z + 1) * BlockSize;
+		}
+	}
+	return Origin.Z + GroundLayers * BlockSize;
+}
+
+void ACRBlockArena::ClearObjects()
+{
+	for (AActor* Actor : SpawnedObjects)
+	{
+		if (IsValid(Actor))
+		{
+			Actor->Destroy();
+		}
+	}
+	SpawnedObjects.Reset();
+}
+
+void ACRBlockArena::SpawnObjects(const TArray<FCRMapObjectSpec>& Objects)
+{
+	ClearObjects();
+	UWorld* World = GetWorld();
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+	Params.ObjectFlags |= RF_Transient;
+	auto CellTop = [this](const FIntPoint& Cell, float Height)
+	{
+		const FVector Center = Origin + FVector(Cell.X + 0.5f, Cell.Y + 0.5f, 0.f) * BlockSize;
+		return FVector(Center.X, Center.Y, GetColumnTopZ(Cell.X, Cell.Y) + Height);
+	};
+	constexpr float CharacterHalfHeight = 101.f;
+	constexpr float BarrelHalfHeight = 46.f;
+
+	for (const FCRMapObjectSpec& Object : Objects)
+	{
+		if (Object.Type == ECRMapObject::Barrel)
+		{
+			if (ACRExplosiveBarrel* Barrel = World->SpawnActor<ACRExplosiveBarrel>(CellTop(Object.At, BarrelHalfHeight), FRotator::ZeroRotator, Params))
+			{
+				SpawnedObjects.Add(Barrel);
+			}
+			continue;
+		}
+		// 허수아비는 맵 가운데(플레이어)를 바라본다
+		const FVector Location = CellTop(Object.At, CharacterHalfHeight);
+		const FVector ToCenter = GetCenterTop() - Location;
+		const FRotator Facing(0.f, ToCenter.SizeSquared2D() > 1.f ? ToCenter.Rotation().Yaw : 180.f, 0.f);
+		ACRCharacter* Dummy = World->SpawnActor<ACRCharacter>(Location, Facing, Params);
+		if (!Dummy)
+		{
+			continue;
+		}
+		switch (Object.Type)
+		{
+		case ECRMapObject::DpsDummy:
+			Dummy->SetupTraining(ECRTrainingRole::DpsDummy);
+			break;
+		case ECRMapObject::MovingTarget:
+			Dummy->SetupTraining(ECRTrainingRole::MovingTarget, Location, CellTop(Object.To, CharacterHalfHeight), Object.Speed);
+			break;
+		default:
+			Dummy->SetupTraining(ECRTrainingRole::Dummy);
+			break;
+		}
+		SpawnedObjects.Add(Dummy);
+	}
 }
 
 void ACRBlockArena::SetFloorsHidden(bool bHideFloors)
