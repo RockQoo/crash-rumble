@@ -21,7 +21,7 @@ UE 5.8.4 + C++ + Gameplay Ability System(GAS)으로 만드는 배틀 프로토�
 - MCP: 에디터 실행 시 Unreal MCP 서버 자동 시작 (`http://127.0.0.1:8000/mcp`, 설정은 `Config/DefaultEditorPerProjectUserSettings.ini`), Claude Code 연결은 `.mcp.json`
 - 에디터 연동: Epic 공식 MCP 플러그인(Unreal MCP, Terminal, Editor Tool Set)으로 Claude Code가 에디터 작업 수행
 - OS: Windows, 셸은 PowerShell / Git Bash
-- 저장소: https://github.com/RockQoo/snow-battle.git (로컬 폴더 `snow-battle`, UE 프로젝트/모듈명 `SnowBattle`)
+- 저장소: https://github.com/RockQoo/crash-rumble.git (2026-10-29 snow-battle에서 이름 변경, 프로젝트 이름 CrashRumble로 변경 예정. 지금 로컬 폴더 `snow-battle`, UE 프로젝트/모듈명 `SnowBattle`)
 
 ## 작업 원칙
 

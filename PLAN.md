@@ -15,7 +15,7 @@
 - Unreal Engine **5.8.4**
 - **C++ + Gameplay Ability System (GAS)**
 - Epic 공식 **MCP 플러그인**으로 Claude Code와 에디터 연동
-- Git + **Git LFS** → GitHub: https://github.com/RockQoo/snow-battle.git
+- Git + **Git LFS** → GitHub: https://github.com/RockQoo/crash-rumble.git (2026-10-29 snow-battle에서 이름 변경)
 
 ## 확정 스펙 (1차)
 
