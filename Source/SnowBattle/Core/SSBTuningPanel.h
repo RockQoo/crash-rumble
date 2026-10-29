@@ -29,6 +29,10 @@ public:
 	virtual FReply OnPreviewKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
 private:
+	TSharedRef<SWidget> MakeItemRow(const struct FSBTuningItem& Item, const FSlateFontInfo& Font);
+	TSharedRef<SWidget> MakeSpawnPage(const FArguments& InArgs, const FSlateFontInfo& HeaderFont, const FSlateFontInfo& Font);
+	void ResetCategory(const FString& Category);
+
 	TWeakObjectPtr<USBTuningSubsystem> Subsystem;
 	FSimpleDelegate OnCloseRequested;
 	FSBOnSpawnTargets OnSpawnTargets;

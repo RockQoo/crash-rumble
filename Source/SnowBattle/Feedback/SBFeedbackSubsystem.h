@@ -63,12 +63,20 @@ private:
 		bool bStatic = false; // 섬광: 제자리에서 줄어들기만 함
 		bool bGravity = true;
 		bool bAlive = false;
+
+		// 색종이: 납작한 큐브가 돌며 팔랑팔랑 떨어진다
+		bool bConfetti = false;
+		FQuat Rotation = FQuat::Identity;
+		FVector SpinAxis = FVector::UpVector;
+		float SpinSpeed = 0.f;
+		float FlutterPhase = 0.f;
 	};
 
-	/** 색 하나당 인스턴스 메시 하나. 인스턴스는 미리 만들어 두고 재사용. */
+	/** 색 + 모양 하나당 인스턴스 메시 하나. 인스턴스는 미리 만들어 두고 재사용. */
 	struct FParticleBatch
 	{
 		FLinearColor Color;
+		bool bCube = false;
 		int32 ComponentIndex = INDEX_NONE;
 		TArray<FParticle> Particles;
 		int32 Next = 0;
@@ -79,7 +87,9 @@ private:
 	void StartHitStop(AActor* Attacker, AActor* Victim, float Duration);
 	void UpdateHitStop();
 	void AddDamageNumber(const FVector& Location, float Value, ESBWeaponType Weapon);
-	FParticleBatch* GetParticleBatch(const FLinearColor& Color);
+	FParticleBatch* GetParticleBatch(const FLinearColor& Color, bool bCube = false);
+	/** 처치 시 색종이. */
+	void EmitConfetti(const FVector& Location, const FVector& Direction, float GroundZ);
 	FParticle& NextParticle(FParticleBatch& Batch);
 	void EmitParticles(const FLinearColor& Color, const FVector& Location, const FVector& Direction, int32 Count, float SpeedScale,
 		float SizeScale = 1.f, float GroundZ = -UE_BIG_NUMBER);

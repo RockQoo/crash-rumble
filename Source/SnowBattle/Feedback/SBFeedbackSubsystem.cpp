@@ -23,8 +23,19 @@ namespace
 	constexpr float RingLifetime = 0.3f;
 	constexpr float VictimHalfHeight = 100.f;
 	constexpr float ParticleGlowIntensity = 6.f;
+	constexpr float SolidParticleIntensity = 1.1f;
 
 	const FLinearColor SnowColor(0.9f, 0.95f, 1.f);
+
+	// 색종이 팔레트 (참고 그림의 노랑/하늘/주황/분홍/연두)
+	const FLinearColor ConfettiColors[] = {
+		FLinearColor(1.f, 0.82f, 0.1f),
+		FLinearColor(0.1f, 0.75f, 1.f),
+		FLinearColor(1.f, 0.45f, 0.1f),
+		FLinearColor(1.f, 0.3f, 0.65f),
+		FLinearColor(0.45f, 0.95f, 0.3f),
+	};
+	constexpr float ConfettiFlutterFrequency = 9.f;
 
 	FLinearColor GetWeaponColor(ESBWeaponType Weapon)
 	{
@@ -124,6 +135,11 @@ void USBFeedbackSubsystem::OnHit(AActor* Attacker, ASBSnowmanCharacter* Victim, 
 		EmitRing(WeaponColor, HitLocation, 1.f);
 	}
 
+	if (bKill && Tuning.bConfetti)
+	{
+		EmitConfetti(Victim->GetActorLocation() + FVector(0.f, 0.f, 40.f), Direction, GroundZ);
+	}
+
 	if (bKill && Tuning.bKillExplosion)
 	{
 		// 처치 확정: 눈 폭발 (몸 중심에서 사방으로)
@@ -163,6 +179,36 @@ void USBFeedbackSubsystem::EmitBurst(const FLinearColor& Color, const FVector& L
 	P.Lifetime = Tuning.HitBurstDuration;
 	P.Size = Tuning.HitBurstSize * SizeScale;
 	P.bStatic = true;
+}
+
+void USBFeedbackSubsystem::EmitConfetti(const FVector& Location, const FVector& Direction, float GroundZ)
+{
+	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
+	const float Spin = FMath::DegreesToRadians(Tuning.ConfettiSpin);
+	for (int32 i = 0; i < Tuning.ConfettiCount; ++i)
+	{
+		FParticleBatch* Batch = GetParticleBatch(ConfettiColors[FMath::RandHelper(UE_ARRAY_COUNT(ConfettiColors))], true);
+		if (!Batch)
+		{
+			return;
+		}
+		FParticle& P = NextParticle(*Batch);
+		// 위쪽 반구로 펑 터진다 (맞은 방향으로 살짝 쏠림)
+		FVector Dir = FMath::VRand();
+		Dir.Z = FMath::Abs(Dir.Z) + 0.6f;
+		Dir = (Dir.GetSafeNormal() + Direction * 0.3f).GetSafeNormal();
+		P.Location = Location;
+		P.Velocity = Dir * Tuning.ConfettiSpeed * FMath::FRandRange(0.5f, 1.2f);
+		P.Lifetime = Tuning.ConfettiLifetime * FMath::FRandRange(0.7f, 1.2f);
+		P.Size = Tuning.ConfettiSize * FMath::FRandRange(0.7f, 1.3f);
+		P.Drag = Tuning.ConfettiDrag;
+		P.GroundZ = GroundZ;
+		P.bConfetti = true;
+		P.Rotation = FMath::VRand().ToOrientationQuat();
+		P.SpinAxis = FMath::VRand();
+		P.SpinSpeed = Spin * FMath::FRandRange(0.5f, 1.5f);
+		P.FlutterPhase = FMath::FRandRange(0.f, UE_TWO_PI);
+	}
 }
 
 void USBFeedbackSubsystem::EmitRing(const FLinearColor& Color, const FVector& Location, float SizeScale)
@@ -278,11 +324,11 @@ void USBFeedbackSubsystem::AddDamageNumber(const FVector& Location, float Value,
 	}
 }
 
-USBFeedbackSubsystem::FParticleBatch* USBFeedbackSubsystem::GetParticleBatch(const FLinearColor& Color)
+USBFeedbackSubsystem::FParticleBatch* USBFeedbackSubsystem::GetParticleBatch(const FLinearColor& Color, bool bCube)
 {
 	for (FParticleBatch& Batch : ParticleBatches)
 	{
-		if (Batch.Color.Equals(Color, 0.01f))
+		if (Batch.bCube == bCube && Batch.Color.Equals(Color, 0.01f))
 		{
 			return &Batch;
 		}
@@ -305,7 +351,8 @@ USBFeedbackSubsystem::FParticleBatch* USBFeedbackSubsystem::GetParticleBatch(con
 	}
 
 	UInstancedStaticMeshComponent* Component = NewObject<UInstancedStaticMeshComponent>(ParticleActor);
-	Component->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere")));
+	Component->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,
+		bCube ? TEXT("/Engine/BasicShapes/Cube.Cube") : TEXT("/Engine/BasicShapes/Sphere.Sphere")));
 	Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	Component->SetCastShadow(false);
 	Component->SetCanEverAffectNavigation(false);
@@ -317,7 +364,8 @@ USBFeedbackSubsystem::FParticleBatch* USBFeedbackSubsystem::GetParticleBatch(con
 	{
 		UMaterialInstanceDynamic* Material = UMaterialInstanceDynamic::Create(ParticleMaterial, Component);
 		Material->SetVectorParameterValue(TEXT("Color"), Color);
-		Material->SetScalarParameterValue(TEXT("Intensity"), ParticleGlowIntensity);
+		// 큐브(색종이, 잔해)는 빛나면 색이 하얗게 날아가므로 거의 원색으로
+		Material->SetScalarParameterValue(TEXT("Intensity"), bCube ? SolidParticleIntensity : ParticleGlowIntensity);
 		Component->SetMaterial(0, Material);
 	}
 
@@ -327,6 +375,7 @@ USBFeedbackSubsystem::FParticleBatch* USBFeedbackSubsystem::GetParticleBatch(con
 
 	FParticleBatch& Batch = ParticleBatches.AddDefaulted_GetRef();
 	Batch.Color = Color;
+	Batch.bCube = bCube;
 	Batch.ComponentIndex = ParticleComponents.Add(Component);
 	Batch.Particles.SetNum(ParticlesPerBatch);
 	return &Batch;
@@ -395,10 +444,18 @@ void USBFeedbackSubsystem::UpdateParticles(float DeltaTime)
 				{
 					if (P.bGravity)
 					{
-						P.Velocity.Z -= ParticleGravity * DeltaTime;
+						P.Velocity.Z -= (P.bConfetti ? Tuning.ConfettiGravity : ParticleGravity) * DeltaTime;
 					}
 					P.Velocity *= FMath::Max(0.f, 1.f - P.Drag * DeltaTime);
 					P.Location += P.Velocity * DeltaTime;
+					if (P.bConfetti)
+					{
+						// 좌우로 팔랑이며 돈다
+						const float Wave = FMath::Sin(P.Age * ConfettiFlutterFrequency + P.FlutterPhase);
+						P.Location += FVector(Wave, FMath::Cos(P.Age * ConfettiFlutterFrequency * 0.7f + P.FlutterPhase), 0.f)
+							* Tuning.ConfettiFlutter * DeltaTime;
+						P.Rotation = FQuat(P.SpinAxis, P.SpinSpeed * DeltaTime) * P.Rotation;
+					}
 
 					const float Radius = P.Size * 50.f; // 구 메시 반지름 100 * 0.5
 					if (Tuning.bParticleBounce && P.Location.Z - Radius < P.GroundZ && P.Velocity.Z < 0.f)
@@ -412,7 +469,14 @@ void USBFeedbackSubsystem::UpdateParticles(float DeltaTime)
 
 				const float Shrink = P.Size * (1.f - P.Age / P.Lifetime);
 				Transform.SetLocation(P.Location);
-				if (Tuning.bParticleStretch && !P.bStatic)
+				if (P.bConfetti)
+				{
+					// 납작한 종이. 수명 마지막 30%에만 작아진다
+					const float Fade = FMath::Clamp((1.f - P.Age / P.Lifetime) / 0.3f, 0.f, 1.f);
+					Transform.SetRotation(P.Rotation);
+					Transform.SetScale3D(FVector(P.Size, P.Size * 0.6f, P.Size * 0.06f) * Fade);
+				}
+				else if (Tuning.bParticleStretch && !P.bStatic)
 				{
 					// 속도 방향으로 길쭉한 불똥
 					const float Speed = P.Velocity.Size();

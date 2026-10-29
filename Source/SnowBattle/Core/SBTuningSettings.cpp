@@ -1,4 +1,4 @@
-#include "Core/SBTuningSettings.h"
+﻿#include "Core/SBTuningSettings.h"
 
 float FSBTuningItem::GetValue(const void* Container) const
 {
@@ -108,64 +108,83 @@ const TArray<FSBTuningItem>& USBTuningSettings::GetItems()
 		SB_TUNE("투사체총", ProjectileHitStop, "히트스톱(초)", 0.f, 0.5f, 0.005f);
 		SB_TUNE("투사체총", ProjectileShake, "카메라 흔들림 배율", 0.f, 5.f, 0.05f);
 
-		SB_TUNE_BOOL("타격감", bHitFlash, "피격 번쩍임");
-		SB_TUNE("타격감", HitFlashDuration, "번쩍임 시간(초)", 0.01f, 1.f, 0.01f);
-		SB_TUNE("타격감", HitFlashIntensity, "번쩍임 밝기", 0.f, 50.f, 0.5f);
-		SB_TUNE_BOOL("타격감", bDamageNumbers, "데미지 숫자");
-		SB_TUNE("타격감", DamageNumberDuration, "숫자 표시 시간(초)", 0.1f, 3.f, 0.05f);
-		SB_TUNE("타격감", DamageNumberRise, "숫자 떠오르는 높이", 0.f, 300.f, 5.f);
-		SB_TUNE("타격감", DamageNumberScale, "숫자 크기", 0.3f, 5.f, 0.1f);
-		SB_TUNE_BOOL("타격감", bHitStop, "히트스톱");
-		SB_TUNE_BOOL("타격감", bHitStopGlobal, "히트스톱 화면 전체 정지");
-		SB_TUNE("타격감", HitStopTimeScale, "히트스톱 중 시간 배율", 0.f, 1.f, 0.01f);
-		SB_TUNE_BOOL("타격감", bKnockback, "넉백");
-		SB_TUNE("타격감", KnockbackUpRatio, "넉백 위쪽 비율", 0.f, 2.f, 0.05f);
-		SB_TUNE_BOOL("타격감", bCameraShake, "카메라 흔들림");
-		SB_TUNE("타격감", CameraShakeIntensity, "흔들림 세기(도)", 0.f, 10.f, 0.1f);
-		SB_TUNE("타격감", CameraShakeDuration, "흔들림 시간(초)", 0.02f, 1.f, 0.01f);
-		SB_TUNE("타격감", CameraShakeFrequency, "흔들림 빈도", 1.f, 80.f, 1.f);
-		SB_TUNE_BOOL("타격감", bHitParticles, "피격 파티클");
-		SB_TUNE("타격감", HitParticleCount, "파티클 개수", 0.f, 64.f, 1.f);
-		SB_TUNE("타격감", HitParticleSpeed, "파티클 속도", 0.f, 3000.f, 10.f);
-		SB_TUNE("타격감", HitParticleLifetime, "파티클 수명(초)", 0.05f, 2.f, 0.01f);
-		SB_TUNE("타격감", HitParticleSize, "파티클 크기", 0.01f, 2.f, 0.01f);
-		SB_TUNE_BOOL("타격감", bParticleStretch, "파티클 속도 방향 늘이기");
-		SB_TUNE("타격감", ParticleStretch, "늘이기 정도", 0.f, 0.02f, 0.0005f);
-		SB_TUNE_BOOL("타격감", bParticleBounce, "파티클 바닥 튕김");
-		SB_TUNE("타격감", ParticleBounce, "튕김 탄성", 0.f, 1.f, 0.05f);
-		SB_TUNE_BOOL("타격감", bHitBurst, "피격 섬광");
-		SB_TUNE("타격감", HitBurstSize, "섬광 크기", 0.05f, 5.f, 0.05f);
-		SB_TUNE("타격감", HitBurstDuration, "섬광 시간(초)", 0.01f, 0.5f, 0.01f);
-		SB_TUNE_BOOL("타격감", bShockwave, "충격파 링");
-		SB_TUNE("타격감", ShockwaveCount, "링 조각 수", 4.f, 64.f, 1.f);
-		SB_TUNE("타격감", ShockwaveSpeed, "링 퍼지는 속도", 100.f, 4000.f, 50.f);
-		SB_TUNE("타격감", ShockwaveSize, "링 조각 크기", 0.02f, 1.f, 0.01f);
-		SB_TUNE_BOOL("타격감", bKillExplosion, "처치 폭발");
-		SB_TUNE("타격감", KillExplosionCount, "폭발 파편 수", 0.f, 200.f, 1.f);
-		SB_TUNE("타격감", KillExplosionSpeed, "폭발 속도 배율", 0.2f, 5.f, 0.1f);
-		SB_TUNE("타격감", KillExplosionSize, "폭발 크기 배율", 0.2f, 5.f, 0.1f);
+		SB_TUNE_BOOL("피격 번쩍임", bHitFlash, "켜기");
+		SB_TUNE("피격 번쩍임", HitFlashDuration, "번쩍임 시간(초)", 0.01f, 1.f, 0.01f);
+		SB_TUNE("피격 번쩍임", HitFlashIntensity, "번쩍임 밝기", 0.f, 50.f, 0.5f);
 
-		SB_TUNE_BOOL("사망 연출", bDeathDismember, "머리/몸통/손 분리 (끄면 뒤로 넘어짐)");
-		SB_TUNE("사망 연출", DeathKnockbackScale, "사망 넉백 배율", 0.f, 10.f, 0.1f);
-		SB_TUNE("사망 연출", DeathMinLaunchSpeed, "최소 날아가는 속도", 0.f, 3000.f, 50.f);
-		SB_TUNE("사망 연출", DeathHeadPop, "머리 튀어오르는 세기", 0.f, 3000.f, 50.f);
-		SB_TUNE("사망 연출", DeathHandScatter, "손 흩어지는 세기", 0.f, 3000.f, 50.f);
+		SB_TUNE_BOOL("데미지 숫자", bDamageNumbers, "켜기");
+		SB_TUNE("데미지 숫자", DamageNumberDuration, "표시 시간(초)", 0.1f, 3.f, 0.05f);
+		SB_TUNE("데미지 숫자", DamageNumberRise, "떠오르는 높이", 0.f, 300.f, 5.f);
+		SB_TUNE("데미지 숫자", DamageNumberScale, "크기", 0.3f, 5.f, 0.1f);
+
+		SB_TUNE_BOOL("히트스톱", bHitStop, "켜기");
+		SB_TUNE_BOOL("히트스톱", bHitStopGlobal, "화면 전체 정지 (끄면 때린 쪽/맞은 쪽만)");
+		SB_TUNE("히트스톱", HitStopTimeScale, "정지 중 시간 배율", 0.f, 1.f, 0.01f);
+
+		SB_TUNE_BOOL("넉백", bKnockback, "켜기");
+		SB_TUNE("넉백", KnockbackUpRatio, "위쪽 비율", 0.f, 2.f, 0.05f);
+
+		SB_TUNE_BOOL("카메라 흔들림", bCameraShake, "켜기");
+		SB_TUNE("카메라 흔들림", CameraShakeIntensity, "세기(도)", 0.f, 10.f, 0.1f);
+		SB_TUNE("카메라 흔들림", CameraShakeDuration, "시간(초)", 0.02f, 1.f, 0.01f);
+		SB_TUNE("카메라 흔들림", CameraShakeFrequency, "빈도", 1.f, 80.f, 1.f);
+
+		SB_TUNE_BOOL("피격 파티클", bHitParticles, "켜기");
+		SB_TUNE("피격 파티클", HitParticleCount, "개수", 0.f, 64.f, 1.f);
+		SB_TUNE("피격 파티클", HitParticleSpeed, "속도", 0.f, 3000.f, 10.f);
+		SB_TUNE("피격 파티클", HitParticleLifetime, "수명(초)", 0.05f, 2.f, 0.01f);
+		SB_TUNE("피격 파티클", HitParticleSize, "크기", 0.01f, 2.f, 0.01f);
+		SB_TUNE_BOOL("피격 파티클", bParticleStretch, "속도 방향으로 늘이기");
+		SB_TUNE("피격 파티클", ParticleStretch, "늘이기 정도", 0.f, 0.02f, 0.0005f);
+		SB_TUNE_BOOL("피격 파티클", bParticleBounce, "바닥 튕김");
+		SB_TUNE("피격 파티클", ParticleBounce, "튕김 탄성", 0.f, 1.f, 0.05f);
+
+		SB_TUNE_BOOL("피격 섬광", bHitBurst, "켜기");
+		SB_TUNE("피격 섬광", HitBurstSize, "크기", 0.05f, 5.f, 0.05f);
+		SB_TUNE("피격 섬광", HitBurstDuration, "시간(초)", 0.01f, 0.5f, 0.01f);
+
+		SB_TUNE_BOOL("충격파 링", bShockwave, "켜기");
+		SB_TUNE("충격파 링", ShockwaveCount, "조각 수", 4.f, 64.f, 1.f);
+		SB_TUNE("충격파 링", ShockwaveSpeed, "퍼지는 속도", 100.f, 4000.f, 50.f);
+		SB_TUNE("충격파 링", ShockwaveSize, "조각 크기", 0.02f, 1.f, 0.01f);
+
+		SB_TUNE_BOOL("처치 폭발", bKillExplosion, "켜기");
+		SB_TUNE("처치 폭발", KillExplosionCount, "파편 수", 0.f, 200.f, 1.f);
+		SB_TUNE("처치 폭발", KillExplosionSpeed, "속도 배율", 0.2f, 5.f, 0.1f);
+		SB_TUNE("처치 폭발", KillExplosionSize, "크기 배율", 0.2f, 5.f, 0.1f);
+
+		SB_TUNE("사망 연출", DeathKnockbackScale, "몸 넉백 배율", 0.f, 10.f, 0.1f);
+		SB_TUNE_BOOL("사망 연출", bDeathPopOff, "투구(모자)/무기 벗겨짐");
+		SB_TUNE("사망 연출", DeathPopSpeed, "튀어나가는 세기", 0.f, 3000.f, 50.f);
+		SB_TUNE("사망 연출", DeathPopUp, "위로 튀는 세기", 0.f, 3000.f, 50.f);
 		SB_TUNE("사망 연출", DeathSpin, "회전 속도(도/초)", 0.f, 3000.f, 30.f);
 		SB_TUNE("사망 연출", DeathGravity, "중력", 100.f, 6000.f, 100.f);
 		SB_TUNE("사망 연출", DeathBounce, "바닥 튕김 탄성", 0.f, 1.f, 0.05f);
 
-		SB_TUNE_BOOL("사격 반동", bWeaponRecoil, "총 반동 (킥백)");
-		SB_TUNE("사격 반동", RecoilKickback, "킥백 거리", 0.f, 60.f, 0.5f);
-		SB_TUNE("사격 반동", RecoilPitch, "총구 들림(도)", 0.f, 60.f, 0.5f);
-		SB_TUNE("사격 반동", RecoilStiffness, "복귀 스프링 강도", 10.f, 2000.f, 10.f);
-		SB_TUNE("사격 반동", RecoilDamping, "복귀 감쇠", 0.f, 100.f, 0.5f);
-		SB_TUNE("사격 반동", RecoilJitter, "연사 떨림", 0.f, 10.f, 0.1f);
-		SB_TUNE_BOOL("사격 반동", bCameraRecoil, "카메라 반동");
-		SB_TUNE("사격 반동", CameraRecoilPitch, "카메라 반동(도/발)", 0.f, 5.f, 0.05f);
-		SB_TUNE("사격 반동", CameraRecoilRecover, "카메라 반동 복귀 속도", 0.5f, 40.f, 0.5f);
-		SB_TUNE_BOOL("사격 반동", bMuzzleFlash, "총구 화염");
-		SB_TUNE("사격 반동", MuzzleFlashDuration, "화염 시간(초)", 0.01f, 0.3f, 0.005f);
-		SB_TUNE("사격 반동", MuzzleLightIntensity, "화염 빛 세기", 0.f, 50000.f, 500.f);
+		SB_TUNE_BOOL("색종이", bConfetti, "켜기 (처치 시)");
+		SB_TUNE("색종이", ConfettiCount, "개수", 0.f, 200.f, 1.f);
+		SB_TUNE("색종이", ConfettiSize, "크기", 0.02f, 1.f, 0.01f);
+		SB_TUNE("색종이", ConfettiSpeed, "터지는 속도", 0.f, 3000.f, 25.f);
+		SB_TUNE("색종이", ConfettiLifetime, "수명(초)", 0.2f, 5.f, 0.1f);
+		SB_TUNE("색종이", ConfettiGravity, "중력", 0.f, 3000.f, 25.f);
+		SB_TUNE("색종이", ConfettiDrag, "공기 저항", 0.f, 10.f, 0.1f);
+		SB_TUNE("색종이", ConfettiFlutter, "팔랑임 세기", 0.f, 1000.f, 10.f);
+		SB_TUNE("색종이", ConfettiSpin, "회전 속도(도/초)", 0.f, 3000.f, 30.f);
+
+		SB_TUNE_BOOL("총 반동", bWeaponRecoil, "켜기 (킥백)");
+		SB_TUNE("총 반동", RecoilKickback, "킥백 거리", 0.f, 60.f, 0.5f);
+		SB_TUNE("총 반동", RecoilPitch, "총구 들림(도)", 0.f, 60.f, 0.5f);
+		SB_TUNE("총 반동", RecoilStiffness, "복귀 스프링 강도", 10.f, 2000.f, 10.f);
+		SB_TUNE("총 반동", RecoilDamping, "복귀 감쇠", 0.f, 100.f, 0.5f);
+		SB_TUNE("총 반동", RecoilJitter, "연사 떨림", 0.f, 10.f, 0.1f);
+
+		SB_TUNE_BOOL("카메라 반동", bCameraRecoil, "켜기");
+		SB_TUNE("카메라 반동", CameraRecoilPitch, "반동(도/발)", 0.f, 5.f, 0.05f);
+		SB_TUNE("카메라 반동", CameraRecoilRecover, "복귀 속도", 0.5f, 40.f, 0.5f);
+
+		SB_TUNE_BOOL("총구 화염", bMuzzleFlash, "켜기");
+		SB_TUNE("총구 화염", MuzzleFlashDuration, "화염 시간(초)", 0.01f, 0.3f, 0.005f);
+		SB_TUNE("총구 화염", MuzzleLightIntensity, "빛 세기", 0.f, 50000.f, 500.f);
 
 		SB_TUNE("다수 타격 테스트", MonsterMaxHealth, "몬스터 최대 체력", 1.f, 5000.f, 10.f);
 		SB_TUNE("다수 타격 테스트", MonsterMoveSpeed, "몬스터 이동 속도 (0 = 정지)", 0.f, 1000.f, 10.f);

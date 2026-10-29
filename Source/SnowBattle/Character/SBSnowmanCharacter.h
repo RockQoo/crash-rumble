@@ -131,9 +131,9 @@ private:
 	float GetTunedMaxHealth() const;
 	void UpdatePawnBlocking();
 
-	// 사망 분리: 머리 묶음 / 몸통 / 양손이 따로 날아가 튕긴다 (물리 엔진 없이 직접 계산)
-	void StartDismember(const FVector& HitVelocity);
-	void UpdateDismember(float DeltaSeconds);
+	// 사망 연출: 몸은 맞은 방향으로 넘어지고, 투구(모자)와 무기가 벗겨져 튕긴다 (물리 엔진 없이 직접 계산)
+	void StartDeathFx(const FVector& HitVelocity, bool bLaunchBody);
+	void UpdatePopOff(float DeltaSeconds);
 	void Reassemble();
 
 	void UpdateHands(float DeltaSeconds);
@@ -148,8 +148,9 @@ private:
 
 	struct FDeathChunk
 	{
-		TArray<int32> PartIndices;       // PartComponents 인덱스
-		TArray<FTransform> PartOffsets;  // 조각 기준 상대 트랜스폼
+		TArray<TWeakObjectPtr<USceneComponent>> Components;
+		TArray<FTransform> Offsets;        // 조각 기준 상대 트랜스폼
+		TArray<FTransform> RestTransforms; // 재조립 시 되돌릴 상대 트랜스폼
 		FVector Location = FVector::ZeroVector;
 		FVector Velocity = FVector::ZeroVector;
 		FQuat Rotation = FQuat::Identity;
@@ -159,8 +160,8 @@ private:
 		bool bResting = false;
 	};
 	TArray<FDeathChunk> DeathChunks;
-	bool bDismembered = false;
-	bool bPendingDismember = false;
+	bool bPoppedOff = false;
+	bool bPendingDeathFx = false;
 	bool bSpectating = false;
 	float DeathGroundZ = 0.f;
 	ESBWeaponType BattleWeapon = ESBWeaponType::Sword;

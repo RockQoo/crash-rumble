@@ -1,4 +1,4 @@
-#include "Character/SBSnowmanCharacter.h"
+﻿#include "Character/SBSnowmanCharacter.h"
 
 #include "AbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
@@ -44,14 +44,11 @@ namespace
 	constexpr float FallOutDistance = 3000.f;
 	constexpr float MonsterStopDistance = 110.f;
 
-	// 사망 분리: 머리 묶음에 들어가는 파츠 (나머지는 몸통, 손은 각각 따로)
-	const FName HeadId(TEXT("Head"));
-	const FName BodyId(TEXT("Body"));
-	bool IsHeadGroupPart(FName Id)
+	// 사망 시 벗겨지는 투구(모자) 파츠
+	bool IsHelmetPart(FName Id)
 	{
 		const FString Name = Id.ToString();
-		return Id == HeadId || Name.StartsWith(TEXT("Hat")) || Name.StartsWith(TEXT("Eye"))
-			|| Name.StartsWith(TEXT("Nose")) || Name.StartsWith(TEXT("Mouth"));
+		return Name.StartsWith(TEXT("Hat")) || Name.StartsWith(TEXT("Helmet"));
 	}
 	constexpr float ChunkRestSpeed = 40.f;
 	constexpr float ChunkGroundFriction = 3.f;
@@ -205,8 +202,8 @@ void ASBSnowmanCharacter::Die()
 	TargetEnemy.Reset();
 	UpdatePawnBlocking(); // 시체가 길을 막지 않게
 
-	// 분리는 곧이어 들어오는 넉백(ApplyKnockback) 방향으로 시작한다
-	bPendingDismember = USBTuningSubsystem::GetSettings(this).bDeathDismember;
+	// 사망 연출은 곧이어 들어오는 넉백(ApplyKnockback) 방향으로 시작한다
+	bPendingDeathFx = true;
 
 	if (Team != ESBTeam::None)
 	{
@@ -237,9 +234,9 @@ void ASBSnowmanCharacter::Revive()
 		Respawn();
 		ResetPose();
 	}
-	else if (bDismembered)
+	else
 	{
-		ResetPose(); // 흩어진 조각을 제자리로
+		Reassemble(); // 벗겨진 투구/무기를 제자리로 (몸은 천천히 일어난다)
 	}
 	RestoreFullHealth();
 	AbilitySystem->RemoveLooseGameplayTag(SBTags::State_Dead);
@@ -253,106 +250,111 @@ void ASBSnowmanCharacter::UpdatePawnBlocking()
 	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_Pawn, bBlock ? ECR_Block : ECR_Ignore);
 }
 
-void ASBSnowmanCharacter::StartDismember(const FVector& HitVelocity)
+void ASBSnowmanCharacter::StartDeathFx(const FVector& HitVelocity, bool bLaunchBody)
 {
-	bPendingDismember = false;
-	if (bDismembered || PartComponents.Num() != PartRestTransforms.Num())
-	{
-		return;
-	}
+	bPendingDeathFx = false;
 	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
 
-	// 바닥 높이 (공중에서 죽었을 수도 있으니 한 번 쏴서 찾는다)
-	DeathGroundZ = GetActorLocation().Z - CapsuleHalfHeight;
-	FHitResult GroundHit;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(SBDeathGround), false, this);
-	if (GetWorld()->LineTraceSingleByObjectType(GroundHit, GetActorLocation(), GetActorLocation() - FVector(0, 0, 3000.f),
-		FCollisionObjectQueryParams(ECC_WorldStatic), Params))
-	{
-		DeathGroundZ = GroundHit.ImpactPoint.Z;
-	}
-
+	// 몸: 맞은 방향으로 더 세게 밀려나며 그쪽으로 넘어진다
 	FVector Dir = HitVelocity.GetSafeNormal2D();
 	if (Dir.IsNearlyZero())
 	{
 		Dir = -GetActorForwardVector();
 	}
-	const float Speed = FMath::Max(HitVelocity.Size2D() * Tuning.DeathKnockbackScale, Tuning.DeathMinLaunchSpeed);
-	const float Spin = FMath::DegreesToRadians(Tuning.DeathSpin);
-	const FVector TumbleAxis = FVector::CrossProduct(FVector::UpVector, Dir).GetSafeNormal(); // 앞으로 구르는 축
-
-	// 파츠를 조각별로 묶는다: 0 머리, 1 몸통, 2 왼손, 3 오른손
-	DeathChunks.Reset();
-	DeathChunks.SetNum(4);
-	int32 Primary[4] = { INDEX_NONE, INDEX_NONE, INDEX_NONE, INDEX_NONE };
-	for (int32 i = 0; i < PartComponents.Num(); ++i)
+	if (bLaunchBody)
 	{
-		const UStaticMeshComponent* Part = PartComponents[i];
-		const FName Id = Part && Part->ComponentTags.Num() > 0 ? Part->ComponentTags[0] : NAME_None;
-		const int32 Chunk = Id == HandLId ? 2 : Id == HandRId ? 3 : IsHeadGroupPart(Id) ? 0 : 1;
-		DeathChunks[Chunk].PartIndices.Add(i);
-		if (Id == HeadId || Id == BodyId || Id == HandLId || Id == HandRId || Primary[Chunk] == INDEX_NONE)
-		{
-			Primary[Chunk] = i;
-		}
+		LaunchCharacter(HitVelocity * Tuning.DeathKnockbackScale, false, true);
 	}
+	const FVector LocalFall = GetActorTransform().InverseTransformVectorNoScale(Dir);
+	FallAxis = FVector::CrossProduct(FVector::UpVector, LocalFall).GetSafeNormal();
 
-	for (int32 c = 0; c < DeathChunks.Num(); ++c)
-	{
-		FDeathChunk& Chunk = DeathChunks[c];
-		if (Chunk.PartIndices.Num() == 0 || Primary[c] == INDEX_NONE)
-		{
-			continue;
-		}
-		const UStaticMeshComponent* PrimaryPart = PartComponents[Primary[c]];
-		const FTransform Origin(GetActorQuat(), PrimaryPart->GetComponentLocation());
-		Chunk.Location = Origin.GetLocation();
-		Chunk.Rotation = Origin.GetRotation();
-		Chunk.Radius = FMath::Max(PrimaryPart->Bounds.BoxExtent.GetMin(), 5.f);
-		for (const int32 Index : Chunk.PartIndices)
-		{
-			Chunk.PartOffsets.Add(PartComponents[Index]->GetComponentTransform().GetRelativeTransform(Origin));
-		}
-
-		const FVector Jitter = FMath::VRand() * 0.15f;
-		switch (c)
-		{
-		case 0: // 머리: 더 높이, 더 빨리 돈다
-			Chunk.Velocity = (Dir + Jitter) * Speed * 1.1f + FVector::UpVector * Tuning.DeathHeadPop;
-			Chunk.SpinAxis = (TumbleAxis + FMath::VRand() * 0.6f).GetSafeNormal();
-			Chunk.SpinSpeed = Spin * FMath::FRandRange(1.2f, 1.8f);
-			break;
-		case 1: // 몸통: 맞은 방향으로 크게 밀려 구른다
-			Chunk.Velocity = (Dir + Jitter) * Speed + FVector::UpVector * Speed * 0.35f;
-			Chunk.SpinAxis = (TumbleAxis + FMath::VRand() * 0.25f).GetSafeNormal();
-			Chunk.SpinSpeed = Spin * FMath::FRandRange(0.6f, 1.f);
-			break;
-		default: // 손: 사방으로 흩어진다
-			Chunk.Velocity = Dir * Speed * 0.6f + FMath::VRand() * Tuning.DeathHandScatter + FVector::UpVector * Tuning.DeathHandScatter * 0.7f;
-			Chunk.SpinAxis = FMath::VRand();
-			Chunk.SpinSpeed = Spin * FMath::FRandRange(1.f, 2.f);
-			break;
-		}
-	}
-
-	bDismembered = true;
-	GetCharacterMovement()->StopMovementImmediately();
-	VisualRoot->SetRelativeLocationAndRotation(FVector::ZeroVector, FQuat::Identity);
-}
-
-void ASBSnowmanCharacter::UpdateDismember(float DeltaSeconds)
-{
-	if (!bDismembered)
+	if (!Tuning.bDeathPopOff || bPoppedOff)
 	{
 		return;
 	}
+
+	// 바닥 높이 (공중에서 죽었을 수도 있으니 한 번 쏴서 찾는다. 바닥이 WorldDynamic일 수 있음)
+	DeathGroundZ = GetActorLocation().Z - CapsuleHalfHeight;
+	FCollisionObjectQueryParams GroundTypes;
+	GroundTypes.AddObjectTypesToQuery(ECC_WorldStatic);
+	GroundTypes.AddObjectTypesToQuery(ECC_WorldDynamic);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(SBDeathGround), false, this);
+	FHitResult GroundHit;
+	if (GetWorld()->LineTraceSingleByObjectType(GroundHit, GetActorLocation(), GetActorLocation() - FVector(0, 0, 3000.f), GroundTypes, Params))
+	{
+		DeathGroundZ = GroundHit.ImpactPoint.Z;
+	}
+
+	DeathChunks.Reset();
+
+	// 투구(모자): 위로 튀어 오르며 돈다
+	FDeathChunk Helmet;
+	for (int32 i = 0; i < PartComponents.Num() && i < PartRestTransforms.Num(); ++i)
+	{
+		UStaticMeshComponent* Part = PartComponents[i];
+		if (Part && Part->ComponentTags.Num() > 0 && IsHelmetPart(Part->ComponentTags[0]))
+		{
+			Helmet.Components.Add(Part);
+			Helmet.RestTransforms.Add(PartRestTransforms[i]);
+		}
+	}
+	if (Helmet.Components.Num() > 0)
+	{
+		const FVector Side = FMath::VRand().GetSafeNormal2D();
+		Helmet.Velocity = (Dir * 0.6f + Side * 0.4f) * Tuning.DeathPopSpeed + FVector::UpVector * Tuning.DeathPopUp;
+		DeathChunks.Add(MoveTemp(Helmet));
+	}
+
+	// 무기: 손에서 빠져 옆으로 날아간다
+	USceneComponent* WeaponRoot = WeaponComponent->GetWeaponRoot();
+	if (WeaponRoot && WeaponComponent->GetEquipped() != ESBWeaponType::None)
+	{
+		FDeathChunk Weapon;
+		Weapon.Components.Add(WeaponRoot);
+		Weapon.RestTransforms.Add(FTransform::Identity);
+		const FVector Throw = Dir.RotateAngleAxis(FMath::FRandRange(-70.f, 70.f), FVector::UpVector);
+		Weapon.Velocity = Throw * Tuning.DeathPopSpeed + FVector::UpVector * Tuning.DeathPopUp * 0.8f;
+		DeathChunks.Add(MoveTemp(Weapon));
+	}
+
+	const float Spin = FMath::DegreesToRadians(Tuning.DeathSpin);
+	for (FDeathChunk& Chunk : DeathChunks)
+	{
+		// 조각 기준점 = 보이는 메시들의 경계 상자 중심
+		FBox Box(ForceInit);
+		for (const TWeakObjectPtr<USceneComponent>& Component : Chunk.Components)
+		{
+			TArray<USceneComponent*> Attached;
+			Component->GetChildrenComponents(true, Attached);
+			Attached.Add(Component.Get());
+			for (const USceneComponent* Child : Attached)
+			{
+				const UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Child);
+				if (Primitive && Primitive->IsVisible())
+				{
+					Box += Primitive->Bounds.GetBox();
+				}
+			}
+		}
+		const FTransform Origin(GetActorQuat(), Box.IsValid ? Box.GetCenter() : Chunk.Components[0]->GetComponentLocation());
+		Chunk.Location = Origin.GetLocation();
+		Chunk.Rotation = Origin.GetRotation();
+		Chunk.Radius = Box.IsValid ? FMath::Max(Box.GetExtent().GetMin(), 4.f) : 10.f;
+		for (const TWeakObjectPtr<USceneComponent>& Component : Chunk.Components)
+		{
+			Chunk.Offsets.Add(Component->GetComponentTransform().GetRelativeTransform(Origin));
+		}
+		Chunk.SpinAxis = FMath::VRand();
+		Chunk.SpinSpeed = Spin * FMath::FRandRange(0.7f, 1.3f);
+	}
+	bPoppedOff = DeathChunks.Num() > 0;
+}
+
+void ASBSnowmanCharacter::UpdatePopOff(float DeltaSeconds)
+{
 	const USBTuningSettings& Tuning = USBTuningSubsystem::GetSettings(this);
 	for (FDeathChunk& Chunk : DeathChunks)
 	{
-		if (Chunk.PartIndices.Num() == 0)
-		{
-			continue;
-		}
 		if (!Chunk.bResting)
 		{
 			Chunk.Velocity.Z -= Tuning.DeathGravity * DeltaSeconds;
@@ -385,11 +387,11 @@ void ASBSnowmanCharacter::UpdateDismember(float DeltaSeconds)
 		}
 
 		const FTransform ChunkTransform(Chunk.Rotation, Chunk.Location);
-		for (int32 i = 0; i < Chunk.PartIndices.Num(); ++i)
+		for (int32 i = 0; i < Chunk.Components.Num(); ++i)
 		{
-			if (UStaticMeshComponent* Part = PartComponents[Chunk.PartIndices[i]])
+			if (USceneComponent* Component = Chunk.Components[i].Get())
 			{
-				Part->SetWorldTransform(Chunk.PartOffsets[i] * ChunkTransform);
+				Component->SetWorldTransform(Chunk.Offsets[i] * ChunkTransform);
 			}
 		}
 	}
@@ -397,20 +399,23 @@ void ASBSnowmanCharacter::UpdateDismember(float DeltaSeconds)
 
 void ASBSnowmanCharacter::Reassemble()
 {
-	if (!bDismembered && !bPendingDismember)
+	bPendingDeathFx = false;
+	if (!bPoppedOff)
 	{
 		return;
 	}
-	bDismembered = false;
-	bPendingDismember = false;
-	DeathChunks.Reset();
-	for (int32 i = 0; i < PartComponents.Num() && i < PartRestTransforms.Num(); ++i)
+	bPoppedOff = false;
+	for (const FDeathChunk& Chunk : DeathChunks)
 	{
-		if (PartComponents[i])
+		for (int32 i = 0; i < Chunk.Components.Num(); ++i)
 		{
-			PartComponents[i]->SetRelativeTransform(PartRestTransforms[i]);
+			if (USceneComponent* Component = Chunk.Components[i].Get())
+			{
+				Component->SetRelativeTransform(Chunk.RestTransforms[i]);
+			}
 		}
 	}
+	DeathChunks.Reset();
 }
 
 void ASBSnowmanCharacter::RestoreFullHealth()
@@ -462,23 +467,20 @@ void ASBSnowmanCharacter::Tick(float DeltaSeconds)
 		Respawn();
 	}
 
-	// 넉백 없이 죽은 경우 (넉백 끔 등): 지금 속도 방향으로 분리
-	if (bPendingDismember)
+	// 넉백 없이 죽은 경우 (넉백 끔 등): 지금 속도 방향으로
+	if (bPendingDeathFx)
 	{
-		StartDismember(GetVelocity());
+		StartDeathFx(GetVelocity(), false);
 	}
 
 	UpdateChase(DeltaSeconds);
+	UpdateHands(DeltaSeconds);
 	UpdateFacing(DeltaSeconds);
 	UpdateFlash(DeltaSeconds);
-	if (bDismembered)
+	UpdateFall(DeltaSeconds);
+	if (bPoppedOff)
 	{
-		UpdateDismember(DeltaSeconds);
-	}
-	else
-	{
-		UpdateHands(DeltaSeconds);
-		UpdateFall(DeltaSeconds);
+		UpdatePopOff(DeltaSeconds); // 몸 기울기 뒤에 월드 좌표로 덮어쓴다
 	}
 }
 
@@ -787,9 +789,9 @@ void ASBSnowmanCharacter::PlayHitFlash(float Duration, float Intensity)
 
 void ASBSnowmanCharacter::ApplyKnockback(const FVector& Velocity)
 {
-	if (bPendingDismember)
+	if (bPendingDeathFx)
 	{
-		StartDismember(Velocity); // 죽는 타격: 몸 대신 조각이 날아간다
+		StartDeathFx(Velocity, true); // 죽는 타격: 더 세게 밀리고 투구/무기가 벗겨진다
 		return;
 	}
 	LaunchCharacter(Velocity, false, true);

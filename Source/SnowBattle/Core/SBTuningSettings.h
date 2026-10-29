@@ -138,15 +138,25 @@ public:
 	UPROPERTY() float KillExplosionSpeed = 1.3f;
 	UPROPERTY() float KillExplosionSize = 0.9f;
 
-	// 사망 연출
-	UPROPERTY() bool bDeathDismember = true;
-	UPROPERTY() float DeathKnockbackScale = 0.8f;
-	UPROPERTY() float DeathMinLaunchSpeed = 450.f;
-	UPROPERTY() float DeathHeadPop = 900.f;
-	UPROPERTY() float DeathHandScatter = 400.f;
-	UPROPERTY() float DeathSpin = 720.f;
+	// 사망 연출: 몸은 뒤로 넘어지고, 투구(모자)와 무기가 벗겨져 튀어 나간다
+	UPROPERTY() float DeathKnockbackScale = 1.5f;
+	UPROPERTY() bool bDeathPopOff = true;
+	UPROPERTY() float DeathPopSpeed = 450.f;
+	UPROPERTY() float DeathPopUp = 750.f;
+	UPROPERTY() float DeathSpin = 900.f;
 	UPROPERTY() float DeathGravity = 2200.f;
 	UPROPERTY() float DeathBounce = 0.4f;
+
+	// 색종이 (처치 시)
+	UPROPERTY() bool bConfetti = true;
+	UPROPERTY() int32 ConfettiCount = 40;
+	UPROPERTY() float ConfettiSize = 0.16f;
+	UPROPERTY() float ConfettiSpeed = 650.f;
+	UPROPERTY() float ConfettiLifetime = 1.6f;
+	UPROPERTY() float ConfettiGravity = 350.f;
+	UPROPERTY() float ConfettiDrag = 2.5f;
+	UPROPERTY() float ConfettiFlutter = 120.f;
+	UPROPERTY() float ConfettiSpin = 720.f;
 
 	// 타격감 - 사격 반동
 	UPROPERTY() bool bWeaponRecoil = true;

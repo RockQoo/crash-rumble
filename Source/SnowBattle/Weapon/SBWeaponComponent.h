@@ -43,6 +43,9 @@ public:
 	void Equip(ESBWeaponType Type);
 	ESBWeaponType GetEquipped() const { return Equipped; }
 
+	/** 무기 메시들의 부모 (손에 붙어 있음). 사망 시 통째로 떼어 날린다. */
+	USceneComponent* GetWeaponRoot() const { return WeaponRoot; }
+
 	void SetTriggerHeld(bool bHeld) { bTriggerHeld = bHeld; }
 
 	// 어빌리티에서 호출
