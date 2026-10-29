@@ -62,6 +62,7 @@ public:
 
 	/** 전장 전체를 내려다보는 관전 카메라 (벤치마크): 숄더뷰 팔 길이를 덮어쓴다. 0 = 끔. */
 	void SetOverviewArmLength(float Length) { OverviewArmLength = Length; }
+	float GetOverviewArmLength() const { return OverviewArmLength; }
 
 	FCROnViewModeChanged OnViewModeChanged;
 

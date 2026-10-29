@@ -48,6 +48,9 @@ namespace
 	constexpr float PreviewTargetRange = 2000.f;
 	constexpr float EditTraceDistance = 20000.f;
 	constexpr int32 SteppedFps = 12;
+	constexpr float OverviewZoomStep = 1.15f;
+	constexpr float OverviewMinArm = 500.f;
+	constexpr float OverviewMaxArm = 15000.f;
 }
 
 FText ACRPlayerController::GetStatsText()
@@ -82,6 +85,7 @@ FText ACRPlayerController::GetStatsText()
 	if (const UCRBenchmarkSubsystem* Bench = UCRBenchmarkSubsystem::Get(this); Bench && Bench->IsActive())
 	{
 		Text += TEXT("\n\n") + Bench->GetStatusText().ToString();
+		Text += TEXT("\n휠: 줌 · WASD(+Shift): 이동 · 마우스: 둘러보기");
 	}
 	return FText::FromString(Text);
 }
@@ -497,6 +501,7 @@ void ACRPlayerController::CreateInputAssets()
 	ProjectileAction = MakeAction(TEXT("IA_Weapon3"), EInputActionValueType::Boolean);
 	BackAction = MakeAction(TEXT("IA_Back"), EInputActionValueType::Boolean, true);
 	FlyAction = MakeAction(TEXT("IA_Fly"), EInputActionValueType::Axis1D);
+	ZoomAction = MakeAction(TEXT("IA_Zoom"), EInputActionValueType::Axis1D);
 	FastAction = MakeAction(TEXT("IA_Fast"), EInputActionValueType::Boolean);
 	LightningAction = MakeAction(TEXT("IA_Weapon4"), EInputActionValueType::Boolean);
 	MissileAction = MakeAction(TEXT("IA_Weapon5"), EInputActionValueType::Boolean);
@@ -549,6 +554,7 @@ void ACRPlayerController::CreateInputAssets()
 	MappingContext->MapKey(FxStepAction, EKeys::T);
 	MappingContext->MapKey(CharStepAction, EKeys::Y);
 	MappingContext->MapKey(ImpactAction, EKeys::I);
+	MappingContext->MapKey(ZoomAction, EKeys::MouseWheelAxis);
 }
 
 void ACRPlayerController::SetupInputComponent()
@@ -571,6 +577,7 @@ void ACRPlayerController::SetupInputComponent()
 		Input->BindAction(ProjectileAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSelectProjectile);
 		Input->BindAction(BackAction, ETriggerEvent::Started, this, &ACRPlayerController::OnBack);
 		Input->BindAction(FlyAction, ETriggerEvent::Triggered, this, &ACRPlayerController::OnFly);
+		Input->BindAction(ZoomAction, ETriggerEvent::Triggered, this, &ACRPlayerController::OnZoom);
 		Input->BindAction(FastAction, ETriggerEvent::Started, this, &ACRPlayerController::OnFastPressed);
 		Input->BindAction(FastAction, ETriggerEvent::Completed, this, &ACRPlayerController::OnFastReleased);
 		Input->BindAction(LightningAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSelectLightning);
@@ -682,6 +689,19 @@ void ACRPlayerController::OnMove(const FInputActionValue& Value)
 		FreeCamera->AddMovementInput(View.GetUnitAxis(EAxis::X), Axis.Y);
 		FreeCamera->AddMovementInput(View.GetUnitAxis(EAxis::Y), Axis.X);
 	}
+}
+
+void ACRPlayerController::OnZoom(const FInputActionValue& Value)
+{
+	// 관전 카메라(벤치마크)일 때만: 휠 한 칸에 15%씩 당기고 민다. WASD로 이동, 마우스로 둘러보기
+	const ACRCharacter* Snowman = GetPawn<ACRCharacter>();
+	UCRViewComponent* View = Snowman ? Snowman->GetViewComponent() : nullptr;
+	if (!View || View->GetOverviewArmLength() <= 0.f)
+	{
+		return;
+	}
+	const float Wheel = Value.Get<float>();
+	View->SetOverviewArmLength(FMath::Clamp(View->GetOverviewArmLength() * FMath::Pow(OverviewZoomStep, -Wheel), OverviewMinArm, OverviewMaxArm));
 }
 
 void ACRPlayerController::OnLook(const FInputActionValue& Value)

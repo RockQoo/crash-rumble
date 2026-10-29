@@ -107,6 +107,8 @@ private:
 
 	// 맵 제작 모드 자유 카메라 (폰이 캐릭터가 아닐 때)
 	void OnFly(const FInputActionValue& Value);
+	/** 마우스 휠: 벤치마크 관전 카메라 줌. */
+	void OnZoom(const FInputActionValue& Value);
 	void OnFastPressed();
 	void OnFastReleased();
 	FText GetHelpText() const;
@@ -160,6 +162,9 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> FlyAction;
+
+	UPROPERTY()
+	TObjectPtr<UInputAction> ZoomAction;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> FastAction;
