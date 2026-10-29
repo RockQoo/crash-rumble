@@ -10,6 +10,7 @@
 #include "Feedback/CRFeedbackSubsystem.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "GAS/CRCombat.h"
+#include "Map/CRBlockArena.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -116,7 +117,11 @@ void ACRProjectile::HandleHit(UPrimitiveComponent* HitComponent, AActor* OtherAc
 		return;
 	}
 
-	// 벽/바닥에 막힘 (캐릭터는 오버랩으로 처리)
+	// 벽/바닥에 막힘 (캐릭터는 오버랩으로 처리). 블럭이면 HP 1
+	if (ACRBlockArena* Arena = ACRBlockArena::FromComponent(Hit.GetComponent()))
+	{
+		Arena->DamageAt(Hit.ImpactPoint, Hit.ImpactNormal, 1);
+	}
 	if (UCRFeedbackSubsystem* Feedback = UCRFeedbackSubsystem::Get(this))
 	{
 		Feedback->SpawnImpactParticles(Hit.ImpactPoint, Hit.ImpactNormal, ProjectileColor, 0.6f);

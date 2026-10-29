@@ -106,6 +106,8 @@ private:
 	void OnToggleCharStep();
 	void OnToggleImpact();
 	void ShowToast(const FString& Message);
+	/** 맵 제작 모드: 화면 가운데 블럭에 피해 (bCrater면 반경 지우기). */
+	void EditBlocks(bool bCrater);
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> LightningAction;

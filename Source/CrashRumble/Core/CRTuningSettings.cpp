@@ -276,6 +276,16 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 
 		CR_TUNE("달리기", SprintMultiplier, "달리기 배율 (Shift)", 1.f, 4.f, 0.05f);
 
+		CR_TUNE_BOOL("블럭 지형", bBlockRegen, "부서진 블럭 다시 자람");
+		CR_TUNE("블럭 지형", BlockRegenDelay, "재생 기본 대기(초)", 0.5f, 60.f, 0.5f);
+		CR_TUNE("블럭 지형", BlockRegenRandom, "재생 랜덤 추가(초)", 0.f, 10.f, 0.1f);
+		CR_TUNE("블럭 지형", BlockRegenPerLayer, "층마다 추가 대기(초)", 0.f, 2.f, 0.01f);
+		CR_TUNE("블럭 지형", BlockRegenPerFrame, "한 프레임 최대 재생 수", 1.f, 500.f, 1.f);
+		CR_TUNE("블럭 지형", BlockFallGravity, "무너지는 블럭 중력", 100.f, 5000.f, 50.f);
+		CR_TUNE("블럭 지형", BlockCollapseImpact, "임팩트 프레임 붕괴 블럭 수", 1.f, 200.f, 1.f);
+		CR_TUNE("블럭 지형", MissileCraterRadius, "미사일 크레이터 반경", 0.f, 500.f, 5.f);
+		CR_TUNE("블럭 지형", LightningBlockDamage, "번개 블럭 피해", 0.f, 10.f, 1.f);
+
 		CR_TUNE("다수 타격 테스트", MonsterMaxHealth, "몬스터 최대 체력", 1.f, 5000.f, 10.f);
 		CR_TUNE("다수 타격 테스트", MonsterMoveSpeed, "몬스터 이동 속도 (0 = 정지)", 0.f, 1000.f, 10.f);
 		CR_TUNE("다수 타격 테스트", SpawnRadius, "생성 반경", 300.f, 3800.f, 50.f);

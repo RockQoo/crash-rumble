@@ -11,7 +11,7 @@ class UWorld;
 
 /**
  * 에셋 참조 모음 (프로젝트 설정 > Game > Crash Rumble).
- * 머티리얼 커스텀 프리미티브 데이터 규약: [0..2] Color(RGB), [3] Flat(1 = 명암 없는 단색, 발광용), [4] Flash/Intensity, [5] 바닥 체크무늬.
+ * 머티리얼 커스텀 프리미티브 데이터 규약: [0..2] Color(RGB), [3] Flat(1 = 명암 없는 단색, 발광용), [4] Flash/Intensity, [5] 바닥 체크무늬, [6] 림 끄기.
  * 인스턴스 메시는 같은 번호의 Per Instance Custom Data를 쓴다 (툰 머티리얼이 둘 다 읽음).
  */
 UCLASS(config = Game, defaultconfig, meta = (DisplayName = "Crash Rumble"))
@@ -91,6 +91,7 @@ namespace CRMaterialData
 	constexpr int32 FlatIndex = 3;
 	constexpr int32 FlashIndex = 4;
 	constexpr int32 CheckerIndex = 5;
+	constexpr int32 NoRimIndex = 6; // 1 = 림(실루엣 어둡게) 끔: 바닥/블럭 윗면이 멀리서 원처럼 어두워지지 않게
 
 	/** 인스턴스 메시 커스텀 데이터 개수 (RGB + Flat). */
 	constexpr int32 InstanceFloats = 4;

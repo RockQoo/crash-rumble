@@ -19,6 +19,7 @@
 #include "Misc/App.h"
 #include "Core/CRTargetSpawner.h"
 #include "Engine/OverlapResult.h"
+#include "Map/CRBlockArena.h"
 #include "Weapon/CRMissile.h"
 #include "Weapon/CRProjectile.h"
 
@@ -567,8 +568,12 @@ int32 UCRWeaponComponent::FireLaser(TArray<FHitResult>& OutTargetHits)
 		}
 		if (!Cast<ACRCharacter>(Hit.GetActor()))
 		{
-			// 벽/바닥: 빔이 여기서 끝나고 작은 불꽃
+			// 벽/바닥: 빔이 여기서 끝나고 작은 불꽃 (블럭이면 HP 1)
 			BeamEnd = Hit.ImpactPoint;
+			if (ACRBlockArena* Arena = ACRBlockArena::FromComponent(Hit.GetComponent()))
+			{
+				Arena->DamageAt(Hit.ImpactPoint, Hit.ImpactNormal, 1);
+			}
 			if (UCRFeedbackSubsystem* Feedback = UCRFeedbackSubsystem::Get(this))
 			{
 				Feedback->SpawnImpactParticles(Hit.ImpactPoint, Hit.ImpactNormal, LaserColor, 0.5f);
@@ -653,6 +658,10 @@ void UCRWeaponComponent::FireLightning(TArray<FHitResult>& OutTargetHits)
 		}
 		else if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
 		{
+			if (ACRBlockArena* Arena = ACRBlockArena::FromComponent(Hit.GetComponent()))
+			{
+				Arena->DamageAt(Hit.ImpactPoint, Hit.ImpactNormal, Tuning.LightningBlockDamage);
+			}
 			// 바닥에 맞으면 큐브 잔해 8개
 			if (Tuning.bCubeDebris)
 			{

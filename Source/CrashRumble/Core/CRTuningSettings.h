@@ -270,6 +270,17 @@ public:
 	// 달리기 (Shift)
 	UPROPERTY() float SprintMultiplier = 1.6f;
 
+	// 블럭 지형 (11단계)
+	UPROPERTY() bool bBlockRegen = true;
+	UPROPERTY() float BlockRegenDelay = 6.f;
+	UPROPERTY() float BlockRegenRandom = 1.5f;
+	UPROPERTY() float BlockRegenPerLayer = 0.15f;
+	UPROPERTY() int32 BlockRegenPerFrame = 48;
+	UPROPERTY() float BlockFallGravity = 1400.f;
+	UPROPERTY() int32 BlockCollapseImpact = 8;
+	UPROPERTY() float MissileCraterRadius = 110.f;
+	UPROPERTY() int32 LightningBlockDamage = 3;
+
 	// 다수 타격 테스트
 	UPROPERTY() float MonsterMaxHealth = 100.f;
 	UPROPERTY() float MonsterMoveSpeed = 100.f;

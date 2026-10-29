@@ -1,4 +1,4 @@
-#include "Weapon/CRMissile.h"
+﻿#include "Weapon/CRMissile.h"
 
 #include "Camera/CRViewComponent.h"
 #include "Character/CRCharacter.h"
@@ -11,6 +11,7 @@
 #include "Feedback/CRFxSubsystem.h"
 #include "Feedback/CRScreenFxSubsystem.h"
 #include "GAS/CRCombat.h"
+#include "Map/CRBlockArena.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -221,6 +222,12 @@ void ACRMissile::Explode(const FVector& Location, const FVector& Normal, bool bG
 		{
 			Fx->SpawnKanada(Location, 150.f);
 		}
+	}
+
+	// 크레이터: 반경 안 블럭을 전부 지운다
+	if (ACRBlockArena* Arena = ACRBlockArena::Find(this))
+	{
+		Arena->DestroySphere(Location, Tuning.MissileCraterRadius);
 	}
 
 	if (ShooterActor)

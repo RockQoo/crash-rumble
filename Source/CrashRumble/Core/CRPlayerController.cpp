@@ -16,6 +16,7 @@
 #include "Styling/CoreStyle.h"
 #include "Weapon/CRWeaponComponent.h"
 #include "Core/CRActorPool.h"
+#include "Map/CRBlockArena.h"
 #include "Core/CRInGameGameMode.h"
 #include "Core/CRModes.h"
 #include "Core/CRTargetSpawner.h"
@@ -34,6 +35,7 @@ namespace
 	constexpr int32 HelpZOrder = 10;
 	constexpr float FreeCameraLookScale = 0.15f;
 	constexpr float ToastSeconds = 1.5f;
+	constexpr float EditTraceDistance = 20000.f;
 	constexpr int32 SteppedFps = 12;
 }
 
@@ -56,6 +58,10 @@ FText ACRPlayerController::GetStatsText()
 	FString Text = FString::Printf(
 		TEXT("FPS %.0f (%.1f ms)\n몬스터 %d\n총알 비행 중 %d / 풀 대기 %d\n풀이 생성한 액터 누적 %d"),
 		SmoothedFrameMs > 0.f ? 1000.f / SmoothedFrameMs : 0.f, SmoothedFrameMs, Monsters, Bullets, BulletsIdle, Spawned);
+	if (const ACRBlockArena* Arena = ACRBlockArena::Find(this))
+	{
+		Text += FString::Printf(TEXT("\n블럭 %d · 무너지는 블럭 %d\n%s"), Arena->GetBlockCount(), Arena->GetFallingCount(), *Arena->GetStatusMessage());
+	}
 	if (Spawner && Spawner->IsBattleActive())
 	{
 		Text += FString::Printf(TEXT("\n\n레드  생존 %d · 처치 %d\n블루  생존 %d · 처치 %d"),
@@ -399,7 +405,38 @@ void ACRPlayerController::SetTriggerHeld(bool bHeld)
 
 void ACRPlayerController::OnFirePressed()
 {
+	if (!GetPawn<ACRCharacter>())
+	{
+		// 맵 제작 모드: 화면 가운데 블럭 부수기 (HP 2)
+		EditBlocks(false);
+		return;
+	}
 	SetTriggerHeld(true);
+}
+
+void ACRPlayerController::EditBlocks(bool bCrater)
+{
+	ACRBlockArena* Arena = ACRBlockArena::Find(this);
+	if (!Arena || !PlayerCameraManager)
+	{
+		return;
+	}
+	const FVector Start = PlayerCameraManager->GetCameraLocation();
+	const FVector End = Start + PlayerCameraManager->GetCameraRotation().Vector() * EditTraceDistance;
+	FHitResult Hit;
+	FCollisionObjectQueryParams Statics;
+	Statics.AddObjectTypesToQuery(ECC_WorldStatic);
+	if (GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, Statics, FCollisionQueryParams(SCENE_QUERY_STAT(CREditBlocks), false, GetPawn())))
+	{
+		if (bCrater)
+		{
+			Arena->DestroySphere(Hit.ImpactPoint, UCRTuningSubsystem::GetSettings(this).MissileCraterRadius);
+		}
+		else
+		{
+			Arena->DamageAt(Hit.ImpactPoint, Hit.ImpactNormal, 2);
+		}
+	}
 }
 
 void ACRPlayerController::OnFireReleased()
@@ -535,6 +572,11 @@ void ACRPlayerController::OnPunch()
 	{
 		Snowman->TryPunch();
 	}
+	else
+	{
+		// 맵 제작 모드: 크레이터 (미사일 반경)
+		EditBlocks(true);
+	}
 }
 
 void ACRPlayerController::OnSuper()
@@ -607,7 +649,7 @@ FText ACRPlayerController::GetHelpText() const
 	switch (CRModes::GetCurrent(this))
 	{
 	case ECRMode::MapEdit:
-		return FText::FromString(TEXT("[맵 제작] WASD 이동 · E / Q 위 / 아래 · Shift 빠르게 · 마우스 시점 · Tab 옵션 · Esc 타이틀    (맵 파일 불러오기 / 블럭 부수기는 11단계)"));
+		return FText::FromString(TEXT("[맵 제작] WASD 이동 · E / Q 위 / 아래 · Shift 빠르게 · 마우스 시점 · 좌클릭 블럭 부수기 · 우클릭 크레이터 · Tab 옵션 · Esc 타이틀 · 맵 파일(Content/MapData/*.json)을 고치면 바로 다시 불러옴"));
 	case ECRMode::InGame:
 	{
 		const ACRInGameGameMode* GameMode = GetWorld()->GetAuthGameMode<ACRInGameGameMode>();

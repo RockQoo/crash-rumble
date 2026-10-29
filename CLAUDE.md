@@ -1,4 +1,4 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 This file provides guidance to Claude Code when working in this repository.
 
@@ -21,7 +21,7 @@ UE 5.8.4 + C++ + Gameplay Ability System(GAS)으로 만드는 배틀 프로토�
 - MCP: 에디터 실행 시 Unreal MCP 서버 자동 시작 (`http://127.0.0.1:8000/mcp`, 설정은 `Config/DefaultEditorPerProjectUserSettings.ini`), Claude Code 연결은 `.mcp.json`
 - 에디터 연동: Epic 공식 MCP 플러그인(Unreal MCP, Terminal, Editor Tool Set)으로 Claude Code가 에디터 작업 수행
 - OS: Windows, 셸은 PowerShell / Git Bash
-- 녹화(자가 확인/GIF용): `.\Tools\record.ps1 -Name <이름> -Cmds "CRToggleView, CRSpawn 30, CRDemo 5" -Seconds 30` → `Recordings/` (git 제외). 콘솔 명령: `CRSpawn` `CRClear` `CRBattle` `CRDemo` `CRToggleView` `CRAutoFire` `cr.Tune`
+- 녹화(자가 확인/GIF용): `.\Tools\record.ps1 -Name <이름> -Cmds "CRToggleView, CRSpawn 30, CRDemo 5" -Seconds 30` → `Recordings/` (git 제외). `-Mode Title|HitCheck|MapEdit|InGame`. 콘솔 명령: `CRMode` `CRSpawn` `CRClear` `CRBattle` `CRDemo` `CRToggleView` `CRAutoFire` `CRPunch` `CRSuper` `CRMapLoad` `CRMapClear` `CRMapBlast` `cr.Tune`
 - 저장소: https://github.com/RockQoo/crash-rumble.git (로컬 폴더 `crash-rumble`, UE 프로젝트/모듈명 `CrashRumble`. 2026-10-29 snow-battle / SnowBattle에서 이름 변경, 옛 클래스는 DefaultEngine.ini [CoreRedirects]로 연결)
 
 ## 작업 원칙
@@ -48,7 +48,8 @@ Source/CrashRumble/
   Camera/      숄더뷰/탑다운 전환
   GAS/         AttributeSet, GameplayAbility(칼/레이저/투사체), GameplayEffect
   Weapon/      무기 데이터, 투사체
-  Feedback/    타격감 (히트스톱, 넉백, 플래시, 데미지 숫자, 카메라 셰이크)
+  Feedback/    타격감 (히트스톱, 넉백, 플래시, 데미지 숫자, 카메라 셰이크), 도형 애니 이펙트(CRFxSubsystem), 화면 연출(CRScreenFxSubsystem)
+  Map/         블럭 지형 아레나, 맵 파일(JSON) 파서 — 형식은 docs/맵-파일-형식.md
 ```
 
 클래스 접두사는 `CR` (`ACRCharacter`, `UCRTuningSettings`, `SCRTuningPanel` 등).

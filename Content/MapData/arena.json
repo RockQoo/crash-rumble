@@ -1,0 +1,23 @@
+{
+  "name": "arena",
+  "size": [64, 64],
+  "height": 14,
+  "ground": ["grass", "dirt", "dirt", "stone"],
+  "structures": [
+    { "type": "wall", "from": [8, 8], "to": [56, 8], "height": 6, "thickness": 2, "block": "brick",
+      "gate": { "at": 24, "width": 5, "height": 4 }, "battlements": true },
+    { "type": "tower", "at": [52, 48], "radius": 4, "height": 12, "block": "stone" },
+    { "type": "pyramid", "at": [13, 48], "base": 11, "block": "stone" },
+    { "type": "bridge", "from": [24, 57], "to": [40, 57], "height": 4, "width": 2, "block": "wood" },
+    { "type": "box", "at": [40, 22], "size": [2, 2, 2], "block": "wood" },
+    { "type": "box", "at": [44, 22], "size": [2, 2, 2], "block": "wood" },
+    { "type": "box", "at": [42, 22], "size": [2, 2, 2], "z": 2, "block": "wood" },
+    { "type": "box", "at": [18, 28], "size": [2, 2, 2], "block": "wood" },
+    { "type": "box", "at": [20, 34], "size": [3, 2, 1], "block": "wood" },
+    { "type": "pillar", "at": [26, 14], "height": 4, "block": "crystal" },
+    { "type": "pillar", "at": [38, 14], "height": 4, "block": "crystal" },
+    { "type": "pillar", "at": [28, 46], "height": 3, "block": "crystal" },
+    { "type": "pillar", "at": [36, 46], "height": 3, "block": "crystal" },
+    { "type": "hole", "from": [46, 34], "to": [48, 36], "depth": 4 }
+  ]
+}

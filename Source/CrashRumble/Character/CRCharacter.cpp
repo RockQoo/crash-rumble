@@ -16,6 +16,7 @@
 #include "Feedback/CRFxSubsystem.h"
 #include "Feedback/CRScreenFxSubsystem.h"
 #include "Engine/OverlapResult.h"
+#include "Map/CRBlockArena.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GAS/CRAttributeSet.h"
@@ -104,6 +105,7 @@ ACRCharacter::ACRCharacter()
 	Movement->bUseControllerDesiredRotation = false;
 	Movement->bRunPhysicsWithNoController = true; // 허수아비도 넉백/중력 처리
 	Movement->BrakingDecelerationWalking = 4096.f;
+	Movement->MaxStepHeight = 55.f; // 블럭 1칸(50cm)은 걸어서 오르내린다
 
 	VisualRoot = CreateDefaultSubobject<USceneComponent>(TEXT("VisualRoot"));
 	VisualRoot->SetupAttachment(RootComponent);
@@ -1170,6 +1172,29 @@ void ACRCharacter::PerformPunch()
 		FHitResult Hit(Best, Best->GetCapsuleComponent(), Fist, -GetActorForwardVector());
 		Hit.bBlockingHit = true;
 		CRCombat::ApplyWeaponHit(this, Best, ECRWeaponType::Punch, Hit);
+		return;
+	}
+
+	// 적이 없으면 손 → 주먹 방향으로 블럭 검사 (블럭 HP 2)
+	const FVector HandStart = GetActorTransform().TransformPosition(Rest ? *Rest : FVector::ZeroVector);
+	FHitResult BlockHit;
+	FCollisionObjectQueryParams Statics;
+	Statics.AddObjectTypesToQuery(ECC_WorldStatic);
+	if (GetWorld()->SweepSingleByObjectType(BlockHit, HandStart, Fist + GetActorForwardVector() * Tuning.PunchRadius, FQuat::Identity, Statics,
+		FCollisionShape::MakeSphere(10.f), FCollisionQueryParams(SCENE_QUERY_STAT(CRPunchBlock), false, this)))
+	{
+		if (ACRBlockArena* Arena = ACRBlockArena::FromComponent(BlockHit.GetComponent()))
+		{
+			Arena->DamageAt(BlockHit.ImpactPoint, BlockHit.ImpactNormal, 2);
+			if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+			{
+				const UCRTuningSettings& Feel = UCRTuningSubsystem::GetSettings(this);
+				if (Feel.bHitStar)
+				{
+					Fx->SpawnHitStar(BlockHit.ImpactPoint, 45.f, FLinearColor(1.f, 0.9f, 0.4f));
+				}
+			}
+		}
 	}
 }
 
