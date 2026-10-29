@@ -38,6 +38,14 @@ public:
 	UFUNCTION(Exec)
 	void CRBattle(int32 PerTeam);
 
+	/** 벤치마크 시작 (옵션창 "벤치마크" 탭 수치로). */
+	UFUNCTION(Exec)
+	void CRBench();
+
+	/** 벤치마크 중지, 원래 맵으로. */
+	UFUNCTION(Exec)
+	void CRBenchStop();
+
 	/** V 키와 같음 (녹화/자동 테스트용). */
 	UFUNCTION(Exec)
 	void CRToggleView();

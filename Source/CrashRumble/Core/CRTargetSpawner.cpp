@@ -1,4 +1,5 @@
 ﻿#include "Core/CRTargetSpawner.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 #include "Character/CRCharacter.h"
 #include "Core/CRActorPool.h"
@@ -66,9 +67,30 @@ bool UCRTargetSpawnerSubsystem::FindRespawnLocation(ECRTeam Team, float Height, 
 	{
 		return FindSpawnLocation(Height, OutLocation);
 	}
-	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	const float Side = Team == ECRTeam::Red ? -1.f : 1.f;
-	return FindGroundAround(BattleCenter + BattleAxis * Side * Tuning.BattleTeamDistance, 0.f, Tuning.BattleSpread, Height, OutLocation);
+	const FVector Base = BattleCenter + BattleAxis * Side * BattleSetup.TeamDistance;
+	if (BattleSetup.bLineFormation)
+	{
+		// 자기 진영 뒷줄 아무 데서나 (전열 폭 안, 줄 깊이 안)
+		const FVector Across = FVector::CrossProduct(FVector::UpVector, BattleAxis);
+		const int32 Rows = FMath::DivideAndRoundUp(FMath::Max(BattleSetup.PerTeam, 1), FMath::Max(BattleSetup.PerRow, 1));
+		const FVector Point = Base + Across * FMath::FRandRange(-0.5f, 0.5f) * BattleSetup.FrontWidth
+			- BattleAxis * Side * FMath::FRandRange(0.f, Rows * BattleSetup.RowSpacing);
+		return FindGroundAround(Point, 0.f, BattleSetup.RowSpacing * 0.5f, Height, OutLocation);
+	}
+	return FindGroundAround(Base, 0.f, BattleSetup.Spread, Height, OutLocation);
+}
+
+FVector UCRTargetSpawnerSubsystem::GetTeamForward(ECRTeam Team) const
+{
+	return Team == ECRTeam::Red ? BattleAxis : -BattleAxis;
+}
+
+float UCRTargetSpawnerSubsystem::GetAdvance(ECRTeam Team, const FVector& Location) const
+{
+	const float Side = Team == ECRTeam::Red ? -1.f : 1.f;
+	const FVector Start = BattleCenter + BattleAxis * Side * BattleSetup.TeamDistance;
+	return FVector::DotProduct(Location - Start, GetTeamForward(Team));
 }
 
 void UCRTargetSpawnerSubsystem::SpawnTargets(int32 Count)
@@ -97,9 +119,31 @@ void UCRTargetSpawnerSubsystem::SpawnTargets(int32 Count)
 	}
 }
 
+FCRBattleSetup FCRBattleSetup::FromTuning(const UCRTuningSettings& Tuning, int32 InPerTeam)
+{
+	FCRBattleSetup Setup;
+	Setup.PerTeam = InPerTeam;
+	Setup.SwordWeight = Tuning.BattleSwordRatio;
+	Setup.LaserWeight = Tuning.BattleLaserRatio;
+	Setup.ProjectileWeight = Tuning.BattleProjectileRatio;
+	Setup.MissileWeight = Tuning.BattleMissileRatio;
+	Setup.TeamDistance = Tuning.BattleTeamDistance;
+	Setup.Spread = Tuning.BattleSpread;
+	Setup.Strafe = Tuning.BattleStrafe;
+	Setup.bSpectate = Tuning.bBattleSpectate;
+	return Setup;
+}
+
 void UCRTargetSpawnerSubsystem::StartBattle(int32 PerTeam)
 {
+	StartBattle(FCRBattleSetup::FromTuning(UCRTuningSubsystem::GetSettings(this), PerTeam));
+}
+
+void UCRTargetSpawnerSubsystem::StartBattle(const FCRBattleSetup& Setup)
+{
 	ClearTargets();
+	BattleSetup = Setup;
+	const int32 PerTeam = Setup.PerTeam;
 
 	UCRActorPoolSubsystem* Pool = UCRActorPoolSubsystem::Get(this);
 	const APawn* Player = UGameplayStatics::GetPlayerPawn(this, 0);
@@ -116,24 +160,41 @@ void UCRTargetSpawnerSubsystem::StartBattle(int32 PerTeam)
 	RedKills = 0;
 	BlueKills = 0;
 
-	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	for (const ECRTeam Team : { ECRTeam::Red, ECRTeam::Blue })
 	{
 		const float Side = Team == ECRTeam::Red ? -1.f : 1.f;
-		const FVector Base = BattleCenter + BattleAxis * Side * Tuning.BattleTeamDistance;
+		const FVector Base = BattleCenter + BattleAxis * Side * Setup.TeamDistance;
 		const FRotator Facing(0.f, (-BattleAxis * Side).Rotation().Yaw, 0.f);
-		const int32 SwordWeight = FMath::Max(Tuning.BattleSwordRatio, 0);
-		const int32 LaserWeight = FMath::Max(Tuning.BattleLaserRatio, 0);
-		const int32 TotalWeight = FMath::Max(SwordWeight + LaserWeight + FMath::Max(Tuning.BattleProjectileRatio, 0), 1);
+		const int32 SwordWeight = FMath::Max(Setup.SwordWeight, 0);
+		const int32 LaserWeight = FMath::Max(Setup.LaserWeight, 0);
+		const int32 ProjectileWeight = FMath::Max(Setup.ProjectileWeight, 0);
+		const int32 TotalWeight = FMath::Max(SwordWeight + LaserWeight + ProjectileWeight + FMath::Max(Setup.MissileWeight, 0), 1);
 		for (int32 i = 0; i < PerTeam; ++i)
 		{
 			// 비율대로 고르게 섞는다 (예: 4:3:3 → 10명 중 칼 4, 레이저 3, 투사체 3)
 			const int32 Slot = FMath::FloorToInt((i + 0.5f) * TotalWeight / FMath::Max(PerTeam, 1)) % TotalWeight;
 			const ECRWeaponType Weapon = Slot < SwordWeight ? ECRWeaponType::Sword
 				: Slot < SwordWeight + LaserWeight ? ECRWeaponType::Laser
-				: ECRWeaponType::Projectile;
+				: Slot < SwordWeight + LaserWeight + ProjectileWeight ? ECRWeaponType::Projectile
+				: ECRWeaponType::Missile;
 			FVector Location;
-			if (!FindGroundAround(Base, 0.f, Tuning.BattleSpread, 0.f, Location))
+			bool bFound = false;
+			if (Setup.bLineFormation)
+			{
+				// 가로줄: 맨 뒷줄(맵 끝)부터 PerRow명씩, 줄은 가운데 쪽으로 RowSpacing씩
+				const int32 PerRow = FMath::Max(Setup.PerRow, 1);
+				const int32 Row = i / PerRow;
+				const int32 Column = i % PerRow;
+				const FVector Across = FVector::CrossProduct(FVector::UpVector, BattleAxis);
+				const float Lateral = ((Column + 0.5f) / PerRow - 0.5f) * Setup.FrontWidth;
+				const FVector Point = Base + Across * Lateral - BattleAxis * Side * Row * Setup.RowSpacing;
+				bFound = FindGroundAround(Point, 0.f, 20.f, 0.f, Location);
+			}
+			else
+			{
+				bFound = FindGroundAround(Base, 0.f, Setup.Spread, 0.f, Location);
+			}
+			if (!bFound)
 			{
 				continue;
 			}
@@ -145,7 +206,7 @@ void UCRTargetSpawnerSubsystem::StartBattle(int32 PerTeam)
 		}
 	}
 
-	SetPlayerSpectating(Tuning.bBattleSpectate);
+	SetPlayerSpectating(Setup.bSpectate);
 }
 
 void UCRTargetSpawnerSubsystem::ClearTargets()
@@ -177,6 +238,7 @@ void UCRTargetSpawnerSubsystem::SetPlayerSpectating(bool bSpectating)
 
 ACRCharacter* UCRTargetSpawnerSubsystem::FindNearestEnemy(const ACRCharacter* Self) const
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_FindNearestEnemy);
 	if (!Self || Self->GetTeam() == ECRTeam::None)
 	{
 		return nullptr;

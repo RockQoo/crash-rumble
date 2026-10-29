@@ -1,0 +1,7 @@
+{
+  "name": "bench",
+  "size": [160, 160],
+  "height": 1,
+  "ground": ["grass", "dirt", "dirt", "stone", "stone"],
+  "structures": []
+}

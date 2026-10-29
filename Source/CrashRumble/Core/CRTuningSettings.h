@@ -42,6 +42,29 @@ public:
 	// 옵션창
 	UPROPERTY() bool bPauseOnOptions = false;
 
+	// 벤치마크 (큰 평지 N vs N 자동 측정)
+	UPROPERTY() int32 BenchPerTeam = 100;
+	UPROPERTY() float BenchDuration = 20.f;
+	UPROPERTY() float BenchWarmup = 3.f;
+	UPROPERTY() int32 BenchLaserRatio = 1;
+	UPROPERTY() int32 BenchProjectileRatio = 1;
+	UPROPERTY() int32 BenchMissileRatio = 1;
+	UPROPERTY() float BenchCraterRadius = 200.f;
+	UPROPERTY() float BenchGunCraterRadius = 50.f;
+	UPROPERTY() float BenchTeamDistance = 3400.f;
+	UPROPERTY() float BenchSpread = 900.f;
+	UPROPERTY() float BenchFrontWidth = 6000.f;
+	UPROPERTY() int32 BenchPerRow = 25;
+	UPROPERTY() float BenchRowSpacing = 250.f;
+	UPROPERTY() float BenchEngageRange = 1300.f;
+	UPROPERTY() float BenchDamageScale = 0.5f;
+	UPROPERTY() float BenchStrafe = 0.6f;
+	UPROPERTY() float BenchCameraDistance = 7500.f;
+	UPROPERTY() float BenchCameraPitch = 60.f;
+	UPROPERTY() bool bBenchTrace = true;
+	UPROPERTY() bool bBenchCurrentMap = false;
+	UPROPERTY() bool bBenchLegacyBlocks = false;
+
 	// 툰 / 화면 (10단계)
 	UPROPERTY() bool bToonShading = true;
 	UPROPERTY() bool bAnimePostProcess = true;
@@ -375,6 +398,7 @@ public:
 	UPROPERTY() float BlockFallGravity = 1400.f;
 	UPROPERTY() int32 BlockCollapseImpact = 8;
 	UPROPERTY() float MissileCraterRadius = 110.f;
+	UPROPERTY() float GunCraterRadius = 0.f;
 	UPROPERTY() int32 LightningBlockDamage = 3;
 	UPROPERTY() float BlockRegrowDuration = 0.3f;
 	UPROPERTY() float BlockRegrowStartScale = 0.05f;
@@ -398,6 +422,8 @@ public:
 	UPROPERTY() int32 BattleSwordRatio = 4;
 	UPROPERTY() int32 BattleLaserRatio = 3;
 	UPROPERTY() int32 BattleProjectileRatio = 3;
+	UPROPERTY() int32 BattleMissileRatio = 0;
+	UPROPERTY() float BattleStrafe = 0.f;
 	UPROPERTY() float BattleTeamDistance = 700.f;
 	UPROPERTY() float BattleSpread = 350.f;
 	UPROPERTY() bool bBattleSpectate = true;

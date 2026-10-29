@@ -16,6 +16,7 @@
 #include "Styling/CoreStyle.h"
 #include "Weapon/CRWeaponComponent.h"
 #include "Core/CRActorPool.h"
+#include "Core/CRBenchmark.h"
 #include "Map/CRBlockArena.h"
 #include "Feedback/CRFxSubsystem.h"
 #include "Feedback/CRFeedbackSubsystem.h"
@@ -78,7 +79,40 @@ FText ACRPlayerController::GetStatsText()
 			Spawner->GetAliveCount(ECRTeam::Red), Spawner->GetKills(ECRTeam::Red),
 			Spawner->GetAliveCount(ECRTeam::Blue), Spawner->GetKills(ECRTeam::Blue));
 	}
+	if (const UCRBenchmarkSubsystem* Bench = UCRBenchmarkSubsystem::Get(this); Bench && Bench->IsActive())
+	{
+		Text += TEXT("\n\n") + Bench->GetStatusText().ToString();
+	}
 	return FText::FromString(Text);
+}
+
+void ACRPlayerController::CRBench()
+{
+	if (!GetPawn())
+	{
+		FTimerHandle Retry;
+		GetWorldTimerManager().SetTimer(Retry, FTimerDelegate::CreateWeakLambda(this, [this]() { CRBench(); }), 0.5f, false);
+		return;
+	}
+	// 옵션창도 프레임을 먹으므로 닫고 잰다
+	if (OptionsPanel.IsValid())
+	{
+		ToggleOptions();
+	}
+	if (UCRBenchmarkSubsystem* Bench = UCRBenchmarkSubsystem::Get(this))
+	{
+		FString Message;
+		Bench->Start(Message);
+		ShowToast(Message);
+	}
+}
+
+void ACRPlayerController::CRBenchStop()
+{
+	if (UCRBenchmarkSubsystem* Bench = UCRBenchmarkSubsystem::Get(this))
+	{
+		Bench->Stop();
+	}
 }
 
 void ACRPlayerController::CRBattle(int32 PerTeam)
@@ -860,6 +894,13 @@ void ACRPlayerController::ToggleOptions()
 			.OnSpawnTargets(FCROnSpawnTargets::CreateUObject(this, &ACRPlayerController::CRSpawn))
 			.OnClearTargets(FSimpleDelegate::CreateUObject(this, &ACRPlayerController::CRClear))
 			.OnStartBattle(FCROnSpawnTargets::CreateUObject(this, &ACRPlayerController::CRBattle))
+			.OnStartBenchmark(FSimpleDelegate::CreateUObject(this, &ACRPlayerController::CRBench))
+			.OnStopBenchmark(FSimpleDelegate::CreateUObject(this, &ACRPlayerController::CRBenchStop))
+			.BenchmarkText_Lambda([WeakThis]()
+			{
+				const UCRBenchmarkSubsystem* Bench = WeakThis.IsValid() ? UCRBenchmarkSubsystem::Get(WeakThis.Get()) : nullptr;
+				return Bench ? Bench->GetStatusText() : FText::GetEmpty();
+			})
 			.StatusText_Lambda([WeakThis]() { return WeakThis.IsValid() ? WeakThis->GetStatsText() : FText::GetEmpty(); });
 		GEngine->GameViewport->AddViewportWidgetContent(OptionsPanel.ToSharedRef(), OptionsZOrder);
 		// 기본은 게임이 계속 진행 → 바꾼 값이 바로 보인다

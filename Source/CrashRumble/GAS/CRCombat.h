@@ -25,6 +25,14 @@ namespace CRCombat
 	/** 눈사람이 아닌 것(블럭, 드럼통)에 맞았을 때: 블럭이면 BlockDamage, 드럼통이면 1. 처리했으면 true. */
 	CRASHRUMBLE_API bool DamageWorld(const FHitResult& Hit, int32 BlockDamage, AActor* Attacker);
 
+	/** 총알·레이저가 땅에 맞았을 때: 크레이터 반경이 있으면 구멍, 없으면 블럭 1칸 피해. */
+	CRASHRUMBLE_API bool DamageWorldByGun(const FHitResult& Hit, AActor* Attacker);
+
+	/** 미사일·드럼통 폭발 크레이터 반경 (벤치마크 중이면 벤치마크 값). */
+	CRASHRUMBLE_API float GetCraterRadius(const UObject* WorldContext);
+	/** 총알·레이저 크레이터 반경 (0 = 블럭 1칸 피해). */
+	CRASHRUMBLE_API float GetGunCraterRadius(const UObject* WorldContext);
+
 	/** 무기 판정에 쓰는 오브젝트 타입 (바닥/벽 + 캐릭터). */
 	CRASHRUMBLE_API FCollisionObjectQueryParams GetWeaponQueryParams();
 }

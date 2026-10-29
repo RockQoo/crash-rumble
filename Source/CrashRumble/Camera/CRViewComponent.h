@@ -60,6 +60,9 @@ public:
 	/** FOV 배율 (필살기 줌인). 실제 시간으로 부드럽게 따라간다. */
 	void SetFovScale(float Scale) { TargetFovScale = Scale; }
 
+	/** 전장 전체를 내려다보는 관전 카메라 (벤치마크): 숄더뷰 팔 길이를 덮어쓴다. 0 = 끔. */
+	void SetOverviewArmLength(float Length) { OverviewArmLength = Length; }
+
 	FCROnViewModeChanged OnViewModeChanged;
 
 private:
@@ -74,6 +77,7 @@ private:
 	float RecoilPitchOffset = 0.f;
 	float FovScale = 1.f;
 	float TargetFovScale = 1.f;
+	float OverviewArmLength = 0.f;
 
 	UPROPERTY()
 	TObjectPtr<USpringArmComponent> SpringArm;

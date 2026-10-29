@@ -28,6 +28,10 @@ public:
 		SLATE_EVENT(FCROnSpawnTargets, OnSpawnTargets)
 		SLATE_EVENT(FSimpleDelegate, OnClearTargets)
 		SLATE_EVENT(FCROnSpawnTargets, OnStartBattle)
+		/** "벤치마크" 탭의 시작 / 중지 버튼과 결과 글. */
+		SLATE_EVENT(FSimpleDelegate, OnStartBenchmark)
+		SLATE_EVENT(FSimpleDelegate, OnStopBenchmark)
+		SLATE_ATTRIBUTE(FText, BenchmarkText)
 		SLATE_ATTRIBUTE(FText, StatusText)
 	SLATE_END_ARGS()
 
@@ -42,6 +46,7 @@ public:
 private:
 	TSharedRef<SWidget> MakeItemRow(const struct FCRTuningItem& Item, const FSlateFontInfo& Font);
 	TSharedRef<SWidget> MakeSpawnPage(const FArguments& InArgs, const FSlateFontInfo& HeaderFont, const FSlateFontInfo& Font);
+	TSharedRef<SWidget> MakeBenchmarkControls(const FArguments& InArgs, const FSlateFontInfo& Font);
 	void ResetCategory(const FString& Category);
 
 	TWeakObjectPtr<UCRTuningSubsystem> Subsystem;
@@ -51,4 +56,6 @@ private:
 	FCROnSpawnTargets OnSpawnTargets;
 	FSimpleDelegate OnClearTargets;
 	FCROnSpawnTargets OnStartBattle;
+	FSimpleDelegate OnStartBenchmark;
+	FSimpleDelegate OnStopBenchmark;
 };

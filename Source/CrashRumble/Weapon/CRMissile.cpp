@@ -1,4 +1,5 @@
 ﻿#include "Weapon/CRMissile.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 #include "Camera/CRViewComponent.h"
 #include "Character/CRCharacter.h"
@@ -106,6 +107,7 @@ FVector ACRMissile::GetTargetLocation_Missile() const
 
 void ACRMissile::Tick(float DeltaSeconds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_MissileTick);
 	Super::Tick(DeltaSeconds);
 	if (!bActive)
 	{
@@ -227,7 +229,7 @@ void ACRMissile::Explode(const FVector& Location, const FVector& Normal, bool bG
 	// 크레이터: 반경 안 블럭을 전부 지운다
 	if (ACRBlockArena* Arena = ACRBlockArena::Find(this))
 	{
-		Arena->DestroySphere(Location, Tuning.MissileCraterRadius);
+		Arena->DestroySphere(Location, CRCombat::GetCraterRadius(this));
 	}
 
 	if (ShooterActor)

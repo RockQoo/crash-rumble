@@ -270,6 +270,8 @@ private:
 	ECRTeam Team = ECRTeam::None;
 	TWeakObjectPtr<ACRCharacter> TargetEnemy;
 	float RetargetTimeLeft = 0.f;
+	float StrafeTimeLeft = 0.f;
+	float StrafeSign = 1.f;
 
 	// 쓰러짐: 0 = 서 있음, 1 = 완전히 누움
 	bool bDead = false;

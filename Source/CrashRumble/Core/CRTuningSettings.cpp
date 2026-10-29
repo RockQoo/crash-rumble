@@ -56,6 +56,27 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 	{
 		CR_TUNE_BOOL("옵션창", bPauseOnOptions, "옵션창 열면 일시정지");
 
+		CR_TUNE("벤치마크", BenchPerTeam, "팀당 유닛 수", 10.f, 300.f, 10.f);
+		CR_TUNE("벤치마크", BenchDuration, "측정 시간(초)", 5.f, 120.f, 5.f);
+		CR_TUNE("벤치마크", BenchWarmup, "측정 전 준비 시간(초)", 0.f, 20.f, 1.f);
+		CR_TUNE("벤치마크", BenchLaserRatio, "무기 비율: 레이저", 0.f, 10.f, 1.f);
+		CR_TUNE("벤치마크", BenchProjectileRatio, "무기 비율: 투사체", 0.f, 10.f, 1.f);
+		CR_TUNE("벤치마크", BenchMissileRatio, "무기 비율: 미사일", 0.f, 10.f, 1.f);
+		CR_TUNE("벤치마크", BenchCraterRadius, "미사일 크레이터 반경", 0.f, 600.f, 10.f);
+		CR_TUNE("벤치마크", BenchGunCraterRadius, "총알·레이저 크레이터 반경 (0 = 블럭 1칸 피해)", 0.f, 300.f, 5.f);
+		CR_TUNE("벤치마크", BenchDamageScale, "피해 배율 (1 = 원래 무기 피해)", 0.05f, 2.f, 0.05f);
+		CR_TUNE("벤치마크", BenchTeamDistance, "진영 간 거리(절반, 맵 끝까지 약 3800)", 300.f, 3800.f, 50.f);
+		CR_TUNE("벤치마크", BenchFrontWidth, "전열 폭 (가로로 서는 길이)", 500.f, 7800.f, 100.f);
+		CR_TUNE("벤치마크", BenchPerRow, "한 줄에 서는 수", 1.f, 100.f, 1.f);
+		CR_TUNE("벤치마크", BenchRowSpacing, "줄 간격", 100.f, 1000.f, 25.f);
+		CR_TUNE("벤치마크", BenchEngageRange, "교전 시작 거리 (밖이면 앞으로 전진)", 300.f, 5000.f, 50.f);
+		CR_TUNE("벤치마크", BenchStrafe, "싸우며 옆걸음 (0 = 서서 쏨)", 0.f, 1.f, 0.05f);
+		CR_TUNE("벤치마크", BenchCameraDistance, "관전 카메라 거리", 1000.f, 10000.f, 100.f);
+		CR_TUNE("벤치마크", BenchCameraPitch, "관전 카메라 내려다보는 각도", 10.f, 89.f, 1.f);
+		CR_TUNE_BOOL("벤치마크", bBenchTrace, "Unreal Insights 트레이스 저장");
+		CR_TUNE_BOOL("벤치마크", bBenchCurrentMap, "지금 맵에서 측정 (끄면 큰 평지)");
+		CR_TUNE_BOOL("벤치마크", bBenchLegacyBlocks, "블럭 갱신 옛 방식 (최적화 전 비교용)");
+
 		CR_TUNE_BOOL("툰 / 화면", bToonShading, "툰 셰이딩 (끄면 예전 조명)");
 		CR_TUNE_BOOL("툰 / 화면", bToonFloor, "바닥도 툰 (체크무늬)");
 		CR_TUNE_BOOL("툰 / 화면", bAnimePostProcess, "포스트 프로세스 (노출 고정, 비네트·모션 블러 끔)");
@@ -374,6 +395,7 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("블럭 지형", BlockFallGravity, "무너지는 블럭 중력", 100.f, 5000.f, 50.f);
 		CR_TUNE("블럭 지형", BlockCollapseImpact, "임팩트 프레임 붕괴 블럭 수", 1.f, 200.f, 1.f);
 		CR_TUNE("블럭 지형", MissileCraterRadius, "미사일 크레이터 반경", 0.f, 500.f, 5.f);
+		CR_TUNE("블럭 지형", GunCraterRadius, "총알·레이저 크레이터 반경 (0 = 블럭 1칸 피해)", 0.f, 300.f, 5.f);
 		CR_TUNE("블럭 지형", LightningBlockDamage, "번개 블럭 피해", 0.f, 10.f, 1.f);
 		CR_TUNE("블럭 지형", BlockRegrowDuration, "다시 자라는 연출 시간(초)", 0.01f, 3.f, 0.01f);
 		CR_TUNE("블럭 지형", BlockRegrowStartScale, "다시 자랄 때 시작 크기", 0.f, 1.f, 0.01f);
@@ -394,6 +416,8 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("팀 전투", BattleSwordRatio, "무기 비율: 칼", 0.f, 10.f, 1.f);
 		CR_TUNE("팀 전투", BattleLaserRatio, "무기 비율: 레이저", 0.f, 10.f, 1.f);
 		CR_TUNE("팀 전투", BattleProjectileRatio, "무기 비율: 투사체", 0.f, 10.f, 1.f);
+		CR_TUNE("팀 전투", BattleMissileRatio, "무기 비율: 미사일", 0.f, 10.f, 1.f);
+		CR_TUNE("팀 전투", BattleStrafe, "싸우며 옆걸음 (0 = 서서 쏨)", 0.f, 1.f, 0.05f);
 		CR_TUNE("팀 전투", BattleTeamDistance, "진영 간 거리(절반)", 200.f, 2000.f, 50.f);
 		CR_TUNE("팀 전투", BattleSpread, "진영 퍼짐 반경", 50.f, 1500.f, 25.f);
 		CR_TUNE_BOOL("팀 전투", bBattleSpectate, "관전 (플레이어 숨김)");
@@ -410,6 +434,7 @@ FText UCRTuningSettings::GetCategoryDescription(const FString& Category)
 	if (Descriptions.Num() == 0)
 	{
 		Descriptions.Add(TEXT("옵션창"), FText::FromString(TEXT("이 옵션창 자체의 동작.")));
+		Descriptions.Add(TEXT("벤치마크"), FText::FromString(TEXT("버튼 하나로 성능 측정: 큰 평지(80m, 블럭 약 13만 개) 양 끝에 레드/블루가 여러 줄로 서서, 레이저·투사체·미사일을 섞어 들고 앞으로 전진하다 교전 거리 안의 적과 옆걸음치며 싸운다 (전선 전체에서 흩어져 싸움). 죽으면 자기 진영 뒷줄 아무 데서나 다시 떨어지고, 땅이 크게 파인다. 준비 시간 뒤 측정 시간 동안 FPS와 게임/렌더/GPU 시간, 유닛·미사일·블럭 수를 기록해 화면과 Saved/Profiling/CRBench/에 저장 (트레이스를 켜면 Unreal Insights용 .utrace도). 시작하면 옵션창은 닫힌다 (옵션창도 프레임을 먹으므로). 측정이 끝나도 전투는 계속되고, 중지하면 원래 맵으로.")));
 		Descriptions.Add(TEXT("툰 / 화면"), FText::FromString(TEXT("애니풍 렌더링 바탕. 툰 셰이딩(2단 명암, 보라 그림자, 실루엣 어둡게), 노출 고정, 바닥 체크무늬, 캐릭터 밑 반투명 원판 그림자.")));
 		Descriptions.Add(TEXT("2코마"), FText::FromString(TEXT("이펙트/캐릭터를 초당 12장처럼 끊어서 그린다 (애니 2코마). 계산은 매 프레임. T: 이펙트, Y: 캐릭터 토글.")));
 		Descriptions.Add(TEXT("숨쉬기"), FText::FromString(TEXT("가만히 있을 때 몸통이 위아래로 늘었다 줄고, 머리와 모자가 조금씩 늦게 따라온다. 걸을 때는 통통 튄다.")));

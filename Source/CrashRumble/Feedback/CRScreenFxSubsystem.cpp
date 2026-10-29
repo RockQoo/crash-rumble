@@ -1,4 +1,5 @@
-#include "Feedback/CRScreenFxSubsystem.h"
+﻿#include "Feedback/CRScreenFxSubsystem.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 #include "Components/DirectionalLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -203,6 +204,7 @@ void UCRScreenFxSubsystem::AddFocusLines(float Amount, float Duration)
 
 void UCRScreenFxSubsystem::Tick(float DeltaTime)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_ScreenFxTick);
 	Super::Tick(DeltaTime);
 
 	const float RealDelta = FApp::GetDeltaTime();

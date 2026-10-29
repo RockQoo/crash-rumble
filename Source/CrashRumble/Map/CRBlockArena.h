@@ -94,6 +94,8 @@ private:
 	void HideCell(int32 Cell);
 	/** 땅에 닿지 않은 구조물 블럭을 떨어뜨린다. 떨어진 수. */
 	int32 CollapseUnsupported();
+	/** 붕괴 검사를 이번 프레임 끝(Tick)에 한 번만 하도록 예약. */
+	void RequestCollapse();
 
 	void UpdateFalling(float DeltaSeconds);
 	void UpdateRegen(float DeltaSeconds);
@@ -140,5 +142,7 @@ private:
 	int32 FallingDrawn = 0;
 	int32 SolidCount = 0;
 	uint32 DirtyTypes = 0;
+	/** 이번 프레임에 블럭이 부서짐 → Tick에서 붕괴 검사 한 번. */
+	bool bCollapsePending = false;
 	float SparkleTimer = 0.f;
 };

@@ -133,7 +133,7 @@ void ACRExplosiveBarrel::Explode()
 	}
 	if (ACRBlockArena* Arena = ACRBlockArena::Find(this))
 	{
-		Arena->DestroySphere(Center, Tuning.MissileCraterRadius);
+		Arena->DestroySphere(Center, CRCombat::GetCraterRadius(this));
 	}
 
 	// 연쇄: 근처 드럼통이 조금 늦게 따라 터진다

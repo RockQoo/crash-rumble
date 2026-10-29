@@ -150,6 +150,12 @@ void UCRViewComponent::UpdateCamera(float DeltaTime)
 	const FQuat TopDownRotation = FRotator(-Tuning.TopDownPitch, TopDownYaw, 0.f).Quaternion();
 	SpringArm->SetWorldRotation(FQuat::Slerp(ShoulderRotation, TopDownRotation, BlendAlpha));
 
+	if (OverviewArmLength > 0.f)
+	{
+		SpringArm->TargetArmLength = OverviewArmLength;
+		SpringArm->SocketOffset = FVector::ZeroVector;
+		return;
+	}
 	SpringArm->TargetArmLength = FMath::Lerp(Tuning.ShoulderArmLength, Tuning.TopDownArmLength, BlendAlpha);
 	const FVector ShoulderOffset(0.f, Tuning.ShoulderOffsetY, Tuning.ShoulderOffsetZ);
 	SpringArm->SocketOffset = FMath::Lerp(ShoulderOffset, FVector::ZeroVector, BlendAlpha);

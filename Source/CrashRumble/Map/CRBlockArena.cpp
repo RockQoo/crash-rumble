@@ -1,5 +1,6 @@
 ﻿#include "Map/CRBlockArena.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Core/CRGameSettings.h"
 #include "Core/CRTuningSettings.h"
@@ -501,6 +502,13 @@ void ACRBlockArena::FlushDirty()
 	{
 		return;
 	}
+	// UE 5.8 인스턴스 메시는 바뀐 인스턴스만 알아서 GPU로 보낸다.
+	// MarkRenderStateDirty는 종류 전체(수만 개)를 다시 만들므로 옛 방식(비교용)에서만 부른다
+	if (!UCRTuningSubsystem::GetSettings(this).bBenchLegacyBlocks)
+	{
+		DirtyTypes = 0;
+		return;
+	}
 	for (int32 Type = 1; Type < TypeComponents.Num(); ++Type)
 	{
 		if ((DirtyTypes & (1 << Type)) && TypeComponents[Type])
@@ -548,6 +556,7 @@ void ACRBlockArena::RemoveCell(int32 Cell, bool bDebris, const FVector& Normal)
 
 int32 ACRBlockArena::DamageAt(const FVector& Point, const FVector& Normal, int32 Damage)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_BlockDamageAt);
 	if (Damage <= 0)
 	{
 		return 0;
@@ -571,13 +580,13 @@ int32 ACRBlockArena::DamageAt(const FVector& Point, const FVector& Normal, int32
 		return 0;
 	}
 	RemoveCell(Cell, true, N);
-	CollapseUnsupported();
-	FlushDirty();
+	RequestCollapse();
 	return 1;
 }
 
 int32 ACRBlockArena::DestroySphere(const FVector& Center, float Radius)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_BlockDestroySphere);
 	if (Radius <= 0.f || Cells.Num() == 0)
 	{
 		return 0;
@@ -613,8 +622,7 @@ int32 ACRBlockArena::DestroySphere(const FVector& Center, float Radius)
 			const FLinearColor Color = CRMapFile::GetBlockColor(FirstType);
 			Fx->SpawnDebris(Center, FVector::UpVector, 16, Color, Color * 0.65f, 1.5f, Center.Z - Radius);
 		}
-		CollapseUnsupported();
-		FlushDirty();
+		RequestCollapse();
 	}
 	return Count;
 }
@@ -625,8 +633,21 @@ int32 ACRBlockArena::DestroyCellSphere(const FIntVector& StructureCell, float Ra
 	return DestroySphere(Center, Radius);
 }
 
+void ACRBlockArena::RequestCollapse()
+{
+	// 옛 방식(비교용): 부서질 때마다 바로 검사하고 렌더 갱신
+	if (UCRTuningSubsystem::GetSettings(this).bBenchLegacyBlocks)
+	{
+		CollapseUnsupported();
+		FlushDirty();
+		return;
+	}
+	bCollapsePending = true;
+}
+
 int32 ACRBlockArena::CollapseUnsupported()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_BlockCollapse);
 	if (SizeZ <= GroundLayers)
 	{
 		return 0;
@@ -891,7 +912,13 @@ void ACRBlockArena::CheckFileChanged(float DeltaSeconds)
 
 void ACRBlockArena::Tick(float DeltaSeconds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_ArenaTick);
 	Super::Tick(DeltaSeconds);
+	if (bCollapsePending)
+	{
+		bCollapsePending = false;
+		CollapseUnsupported();
+	}
 	CheckFileChanged(DeltaSeconds);
 	UpdateFalling(DeltaSeconds);
 	UpdateRegen(DeltaSeconds);

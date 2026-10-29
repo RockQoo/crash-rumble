@@ -1,5 +1,6 @@
 ﻿#include "Character/CRCharacter.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "AbilitySystemComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Camera/CRViewComponent.h"
@@ -517,6 +518,7 @@ void ACRCharacter::FellOutOfWorld(const UDamageType& DamageType)
 
 void ACRCharacter::Tick(float DeltaSeconds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_CharacterTick);
 	RestoreCharStepping();
 	Super::Tick(DeltaSeconds);
 	if (bInPool)
@@ -828,17 +830,30 @@ void ACRCharacter::UpdateChase(float DeltaSeconds)
 
 void ACRCharacter::UpdateBattle(float DeltaSeconds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_UpdateBattle);
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	const UCRTargetSpawnerSubsystem* Spawner = UCRTargetSpawnerSubsystem::Get(this);
 
 	// 가장 가까운 적은 가끔만 다시 찾는다 (다 같이 같은 프레임에 찾지 않도록 간격을 흩뜨림)
 	RetargetTimeLeft -= DeltaSeconds;
 	ACRCharacter* Enemy = TargetEnemy.Get();
 	if (RetargetTimeLeft <= 0.f || !Enemy || Enemy->IsDead() || Enemy->IsInPool())
 	{
-		const UCRTargetSpawnerSubsystem* Spawner = UCRTargetSpawnerSubsystem::Get(this);
 		Enemy = Spawner ? Spawner->FindNearestEnemy(this) : nullptr;
 		TargetEnemy = Enemy;
 		RetargetTimeLeft = FMath::FRandRange(0.2f, 0.4f);
+	}
+	// 줄 서기 전투: 교전 거리 안에 적이 없으면 자기 줄을 지키며 앞으로 전진 (상대 출발선을 넘으면 그냥 가장 가까운 적에게)
+	const FCRBattleSetup* Setup = Spawner ? &Spawner->GetBattleSetup() : nullptr;
+	if (Setup && Setup->bLineFormation
+		&& (!Enemy || FVector::DistSquared2D(Enemy->GetActorLocation(), GetActorLocation()) > FMath::Square(Setup->EngageRange))
+		&& Spawner->GetAdvance(Team, GetActorLocation()) < Setup->TeamDistance * 2.f)
+	{
+		WeaponComponent->SetTriggerHeld(false);
+		const FVector Forward = Spawner->GetTeamForward(Team);
+		SetActorRotation(FMath::RInterpTo(GetActorRotation(), FRotator(0.f, Forward.Rotation().Yaw, 0.f), DeltaSeconds, 10.f));
+		AddMovementInput(Forward, FMath::Clamp(Tuning.BattleMoveSpeed / GetCharacterMovement()->MaxWalkSpeed, 0.f, 1.f));
+		return;
 	}
 	if (!Enemy)
 	{
@@ -858,9 +873,21 @@ void ACRCharacter::UpdateBattle(float DeltaSeconds)
 	const float Range = bGun ? Tuning.BattleGunRange : Tuning.BattleAttackRange;
 	const bool bFacing = FVector::DotProduct(GetActorForwardVector(), Direction) > 0.9f;
 	WeaponComponent->SetTriggerHeld(Distance <= Range && (!bGun || bFacing));
+	const float MoveScale = FMath::Clamp(Tuning.BattleMoveSpeed / GetCharacterMovement()->MaxWalkSpeed, 0.f, 1.f);
 	if (Distance > Range * 0.8f)
 	{
-		AddMovementInput(Direction, FMath::Clamp(Tuning.BattleMoveSpeed / GetCharacterMovement()->MaxWalkSpeed, 0.f, 1.f));
+		AddMovementInput(Direction, MoveScale);
+	}
+	else if (const float Strafe = Spawner ? Spawner->GetBattleSetup().Strafe : 0.f; Strafe > 0.f)
+	{
+		// 사거리 안: 적을 본 채로 좌우로 옆걸음 (가끔 방향을 바꾼다)
+		StrafeTimeLeft -= DeltaSeconds;
+		if (StrafeTimeLeft <= 0.f)
+		{
+			StrafeSign = FMath::RandBool() ? 1.f : -1.f;
+			StrafeTimeLeft = FMath::FRandRange(0.8f, 2.f);
+		}
+		AddMovementInput(FVector::CrossProduct(FVector::UpVector, Direction) * StrafeSign, MoveScale * Strafe);
 	}
 }
 

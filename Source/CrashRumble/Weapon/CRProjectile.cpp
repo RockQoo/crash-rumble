@@ -1,4 +1,5 @@
 ﻿#include "Weapon/CRProjectile.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 #include "Character/CRCharacter.h"
 #include "Components/SphereComponent.h"
@@ -98,6 +99,7 @@ void ACRProjectile::Launch(AActor* InShooter, const FVector& Direction)
 
 void ACRProjectile::Tick(float DeltaSeconds)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_ProjectileTick);
 	Super::Tick(DeltaSeconds);
 
 	if (bActive)
@@ -118,7 +120,7 @@ void ACRProjectile::HandleHit(UPrimitiveComponent* HitComponent, AActor* OtherAc
 	}
 
 	// 벽/바닥에 막힘 (캐릭터는 오버랩으로 처리). 블럭이면 HP 1
-	CRCombat::DamageWorld(Hit, 1, Shooter.Get());
+	CRCombat::DamageWorldByGun(Hit, Shooter.Get());
 	if (UCRFeedbackSubsystem* Feedback = UCRFeedbackSubsystem::Get(this))
 	{
 		Feedback->SpawnImpactParticles(Hit.ImpactPoint, Hit.ImpactNormal, ProjectileColor, 0.6f);

@@ -3,6 +3,8 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemGlobals.h"
 #include "Character/CRCharacter.h"
+#include "Core/CRBenchmark.h"
+#include "Core/CRTargetSpawner.h"
 #include "Core/CRTuningSettings.h"
 #include "Core/CRTuningSubsystem.h"
 #include "Feedback/CRFeedbackSubsystem.h"
@@ -66,6 +68,34 @@ bool CRCombat::DamageWorld(const FHitResult& Hit, int32 BlockDamage, AActor* Att
 	return false;
 }
 
+float CRCombat::GetCraterRadius(const UObject* WorldContext)
+{
+	const UCRBenchmarkSubsystem* Bench = UCRBenchmarkSubsystem::Get(WorldContext);
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(WorldContext);
+	return Bench && Bench->IsActive() ? Tuning.BenchCraterRadius : Tuning.MissileCraterRadius;
+}
+
+float CRCombat::GetGunCraterRadius(const UObject* WorldContext)
+{
+	const UCRBenchmarkSubsystem* Bench = UCRBenchmarkSubsystem::Get(WorldContext);
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(WorldContext);
+	return Bench && Bench->IsActive() ? Tuning.BenchGunCraterRadius : Tuning.GunCraterRadius;
+}
+
+bool CRCombat::DamageWorldByGun(const FHitResult& Hit, AActor* Attacker)
+{
+	const float Radius = GetGunCraterRadius(Attacker);
+	if (Radius > 0.f)
+	{
+		if (ACRBlockArena* Arena = ACRBlockArena::FromComponent(Hit.GetComponent()))
+		{
+			Arena->DestroySphere(Hit.ImpactPoint, Radius);
+			return true;
+		}
+	}
+	return DamageWorld(Hit, 1, Attacker);
+}
+
 bool CRCombat::ApplyWeaponHitFrom(AActor* Attacker, AActor* Victim, ECRWeaponType Weapon, const FHitResult& Hit, const FVector& Origin)
 {
 	// 드럼통: 무기에 맞으면 HP 감소 (폭발은 한 방)
@@ -104,7 +134,16 @@ bool CRCombat::ApplyWeaponHitFrom(AActor* Attacker, AActor* Victim, ECRWeaponTyp
 	{
 		return false;
 	}
-	Spec.Data->SetSetByCallerMagnitude(CRTags::Data_Damage, Feel.Damage);
+	// 팀 전투원끼리는 전투 설정의 피해 배율 (벤치마크: 싸우는 걸 보기 전에 다 죽지 않게)
+	float Damage = Feel.Damage;
+	if (Source && Source->GetTeam() != ECRTeam::None)
+	{
+		if (const UCRTargetSpawnerSubsystem* Spawner = UCRTargetSpawnerSubsystem::Get(Attacker); Spawner && Spawner->IsBattleActive())
+		{
+			Damage *= Spawner->GetBattleSetup().DamageScale;
+		}
+	}
+	Spec.Data->SetSetByCallerMagnitude(CRTags::Data_Damage, Damage);
 	SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
 
 	if (UCRFeedbackSubsystem* Feedback = UCRFeedbackSubsystem::Get(Attacker))

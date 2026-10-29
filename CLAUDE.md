@@ -1,4 +1,4 @@
-﻿# CLAUDE.md
+# CLAUDE.md
 
 This file provides guidance to Claude Code when working in this repository.
 
@@ -21,7 +21,7 @@ UE 5.8.4 + C++ + Gameplay Ability System(GAS)으로 만드는 배틀 프로토�
 - MCP: 에디터 실행 시 Unreal MCP 서버 자동 시작 (`http://127.0.0.1:8000/mcp`, 설정은 `Config/DefaultEditorPerProjectUserSettings.ini`), Claude Code 연결은 `.mcp.json`
 - 에디터 연동: Epic 공식 MCP 플러그인(Unreal MCP, Terminal, Editor Tool Set)으로 Claude Code가 에디터 작업 수행
 - OS: Windows, 셸은 PowerShell / Git Bash
-- 녹화(자가 확인/GIF용): `.\Tools\record.ps1 -Name <이름> -Cmds "CRToggleView, CRSpawn 30, CRDemo 5" -Seconds 30` → `Recordings/` (git 제외). `-Mode Title|HitCheck|MapEdit|InGame`. 콘솔 명령: `CRMode` `CRSpawn` `CRClear` `CRBattle` `CRDemo` `CRToggleView` `CRAutoFire` `CRPunch` `CRSuper` `CRMapLoad` `CRMapClear` `CRMapBlast` `cr.Tune`
+- 녹화(자가 확인/GIF용): `.\Tools\record.ps1 -Name <이름> -Cmds "CRToggleView, CRSpawn 30, CRDemo 5" -Seconds 30` → `Recordings/` (git 제외). `-Mode Title|HitCheck|MapEdit|InGame`. 콘솔 명령: `CRMode` `CRSpawn` `CRClear` `CRBattle` `CRDemo` `CRToggleView` `CRAutoFire` `CRPunch` `CRSuper` `CRMapLoad` `CRMapClear` `CRMapBlast` `CRBench` `CRBenchStop` (벤치마크: 옵션창 벤치마크 탭 수치, 결과는 Saved/Profiling/CRBench/) `cr.Tune`
 - 저장소: https://github.com/RockQoo/crash-rumble.git (로컬 폴더 `crash-rumble`, UE 프로젝트/모듈명 `CrashRumble`. 2026-10-29 snow-battle / SnowBattle에서 이름 변경, 옛 클래스는 DefaultEngine.ini [CoreRedirects]로 연결)
 
 ## 작업 원칙

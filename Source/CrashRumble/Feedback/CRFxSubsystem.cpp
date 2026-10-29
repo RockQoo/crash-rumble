@@ -1,4 +1,5 @@
 ﻿#include "Feedback/CRFxSubsystem.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 #include "Camera/PlayerCameraManager.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -441,6 +442,7 @@ FQuat UCRFxSubsystem::FaceCamera(const FVector& Location, float Roll) const
 
 void UCRFxSubsystem::UpdatePieces(float DeltaTime, float RealDeltaTime)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_FxUpdatePieces);
 	if (AlivePieces == 0)
 	{
 		return;
@@ -503,6 +505,7 @@ void UCRFxSubsystem::UpdatePieces(float DeltaTime, float RealDeltaTime)
 
 void UCRFxSubsystem::UpdateProcs(float DeltaTime, float RealDeltaTime)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_FxUpdateProcs);
 	if (AliveProcs == 0)
 	{
 		return;
@@ -537,6 +540,7 @@ void UCRFxSubsystem::Emit(ECRFxShape Shape, const FTransform& Transform, const F
 
 void UCRFxSubsystem::DrawPieces()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_FxDrawPieces);
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	for (const FPiece& P : Pieces)
 	{
@@ -624,6 +628,7 @@ void UCRFxSubsystem::DrawPieces()
 
 void UCRFxSubsystem::DrawProcs()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_FxDrawProcs);
 	for (const FProc& Proc : Procs)
 	{
 		if (Proc.bAlive)
@@ -851,6 +856,7 @@ void UCRFxSubsystem::FlushBlobs()
 
 void UCRFxSubsystem::Tick(float DeltaTime)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_FxTick);
 	Super::Tick(DeltaTime);
 	if (!EnsureComponents())
 	{

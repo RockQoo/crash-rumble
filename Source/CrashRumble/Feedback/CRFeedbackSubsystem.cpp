@@ -1,4 +1,5 @@
 ﻿#include "Feedback/CRFeedbackSubsystem.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 #include "Camera/CRViewComponent.h"
 #include "Character/CRCharacter.h"
@@ -115,6 +116,7 @@ void UCRFeedbackSubsystem::Deinitialize()
 void UCRFeedbackSubsystem::OnHit(AActor* Attacker, ACRCharacter* Victim, ECRWeaponType Weapon, const FCRWeaponFeel& Feel,
 	const FVector& HitLocation, const FVector& Direction)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_FeedbackOnHit);
 	if (!Victim)
 	{
 		return;
@@ -570,6 +572,7 @@ void UCRFeedbackSubsystem::EmitParticles(const FLinearColor& Color, const FVecto
 
 void UCRFeedbackSubsystem::UpdateParticles(float DeltaTime)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_FeedbackParticles);
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	// 계산은 매 프레임, 그리기는 2코마 시계에 맞춘다
 	const bool bDraw = UCRFxSubsystem::IsFxDrawFrame(this);
@@ -667,6 +670,7 @@ void UCRFeedbackSubsystem::UpdateParticles(float DeltaTime)
 
 void UCRFeedbackSubsystem::Tick(float DeltaTime)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_FeedbackTick);
 	Super::Tick(DeltaTime);
 
 	UpdateHitStop();

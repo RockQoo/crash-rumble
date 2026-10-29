@@ -1,5 +1,6 @@
 ﻿#include "Weapon/CRWeaponComponent.h"
 
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 #include "AbilitySystemComponent.h"
 #include "Camera/CRViewComponent.h"
 #include "Character/CRCharacter.h"
@@ -284,6 +285,7 @@ TSubclassOf<UGameplayAbility> UCRWeaponComponent::GetAbilityClass(ECRWeaponType 
 
 void UCRWeaponComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(CR_WeaponTick);
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 	if (!WeaponRoot)
@@ -574,7 +576,7 @@ int32 UCRWeaponComponent::FireLaser(TArray<FHitResult>& OutTargetHits)
 		{
 			// 벽/바닥: 빔이 여기서 끝나고 작은 불꽃 (블럭이면 HP 1)
 			BeamEnd = Hit.ImpactPoint;
-			CRCombat::DamageWorld(Hit, 1, GetOwner());
+			CRCombat::DamageWorldByGun(Hit, GetOwner());
 			if (UCRFeedbackSubsystem* Feedback = UCRFeedbackSubsystem::Get(this))
 			{
 				Feedback->SpawnImpactParticles(Hit.ImpactPoint, Hit.ImpactNormal, LaserColor, 0.5f);

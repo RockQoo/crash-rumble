@@ -144,6 +144,42 @@ TSharedRef<SWidget> SCRTuningPanel::MakeSpawnPage(const FArguments& InArgs, cons
 	return Page;
 }
 
+TSharedRef<SWidget> SCRTuningPanel::MakeBenchmarkControls(const FArguments& InArgs, const FSlateFontInfo& Font)
+{
+	return SNew(SVerticalBox)
+		+ SVerticalBox::Slot().AutoHeight()
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 4.f, 0.f)
+			[
+				SNew(SButton)
+				.HAlign(HAlign_Center)
+				.ButtonColorAndOpacity(FLinearColor(0.2f, 0.8f, 0.35f))
+				.Text(FText::FromString(TEXT("▶ 벤치마크 시작")))
+				.OnClicked_Lambda([this]()
+				{
+					OnStartBenchmark.ExecuteIfBound();
+					return FReply::Handled();
+				})
+			]
+			+ SHorizontalBox::Slot().FillWidth(1.f).Padding(4.f, 0.f, 0.f, 0.f)
+			[
+				SNew(SButton)
+				.HAlign(HAlign_Center)
+				.Text(FText::FromString(TEXT("중지 · 원래 맵으로")))
+				.OnClicked_Lambda([this]()
+				{
+					OnStopBenchmark.ExecuteIfBound();
+					return FReply::Handled();
+				})
+			]
+		]
+		+ SVerticalBox::Slot().AutoHeight().Padding(0.f, 6.f, 0.f, 0.f)
+		[
+			SNew(STextBlock).Text(InArgs._BenchmarkText).Font(Font).AutoWrapText(true).ColorAndOpacity(FLinearColor(0.75f, 1.f, 0.8f))
+		];
+}
+
 void SCRTuningPanel::ResetCategory(const FString& Category)
 {
 	if (!Subsystem.IsValid())
@@ -169,6 +205,8 @@ void SCRTuningPanel::Construct(const FArguments& InArgs)
 	OnSpawnTargets = InArgs._OnSpawnTargets;
 	OnClearTargets = InArgs._OnClearTargets;
 	OnStartBattle = InArgs._OnStartBattle;
+	OnStartBenchmark = InArgs._OnStartBenchmark;
+	OnStopBenchmark = InArgs._OnStopBenchmark;
 
 	const FSlateFontInfo TitleFont = FCoreStyle::GetDefaultFontStyle("Bold", 18);
 	const FSlateFontInfo HeaderFont = FCoreStyle::GetDefaultFontStyle("Bold", 13);
@@ -234,6 +272,10 @@ void SCRTuningPanel::Construct(const FArguments& InArgs)
 						SNew(STextBlock).Text(Description).Font(RowFont).AutoWrapText(true).ColorAndOpacity(FLinearColor(0.85f, 0.88f, 0.95f))
 					]
 				];
+			}
+			if (Category == TEXT("벤치마크"))
+			{
+				CurrentRows->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f)[ MakeBenchmarkControls(InArgs, RowFont) ];
 			}
 			TabNames.Add(Category);
 			Pages.Add(CurrentRows.ToSharedRef());
