@@ -151,6 +151,12 @@ void UCRWaveSubsystem::SpawnBatch()
 	const int32 SwordWeight = FMath::Max(Tuning.WaveSwordRatio, 0);
 	const int32 GunWeight = FMath::Max(Tuning.WaveGunRatio, 0);
 	const int32 TotalWeight = FMath::Max(SwordWeight + GunWeight + FMath::Max(Tuning.WaveLauncherRatio, 0), 1);
+	// 보폭이 합과 서로소여야 모든 칸을 돈다 (합이 7의 배수일 때 보폭 7이면 한 무기만 나왔다)
+	int32 Stride = 7;
+	while (TotalWeight > 1 && FMath::GreatestCommonDivisor(Stride, TotalWeight) != 1)
+	{
+		++Stride;
+	}
 	const FVector Across = FVector::CrossProduct(FVector::UpVector, North);
 	const FCollisionObjectQueryParams GroundTypes = []()
 	{
@@ -163,7 +169,7 @@ void UCRWaveSubsystem::SpawnBatch()
 	for (int32 i = 0; i < Count; ++i)
 	{
 		// 비율대로 고르게 섞는다 (5:3:2 → 10마리 중 칼 5, 총 3, 런처 2)
-		const int32 Slot = (SpawnSerial++ * 7) % TotalWeight;
+		const int32 Slot = (SpawnSerial++ * Stride) % TotalWeight;
 		const ECRWeaponType Weapon = Slot < SwordWeight ? ECRWeaponType::Sword
 			: Slot < SwordWeight + GunWeight ? ECRWeaponType::Projectile : ECRWeaponType::Missile;
 		const FLinearColor Accent = Weapon == ECRWeaponType::Sword ? SwordAccent : Weapon == ECRWeaponType::Projectile ? GunAccent : LauncherAccent;
