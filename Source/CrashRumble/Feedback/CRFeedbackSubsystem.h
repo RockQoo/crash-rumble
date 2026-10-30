@@ -17,6 +17,7 @@ struct FCRDamageNumber
 	float Duration = 1.f;
 	FVector2D ScreenJitter = FVector2D::ZeroVector;
 	FLinearColor Color = FLinearColor::White;
+	float Scale = 1.f;
 };
 
 /**
@@ -45,6 +46,9 @@ public:
 	bool IsTimeFrozen() const { return FreezeEnd > 0.0; }
 
 	const TArray<FCRDamageNumber>& GetDamageNumbers() const { return DamageNumbers; }
+
+	/** 데미지 숫자 하나 (치명타는 빨강·크게, 화상 틱은 Scale을 작게). */
+	void AddDamageNumber(const FVector& Location, float Value, ECRWeaponType Weapon, float Scale = 1.f, bool bCritical = false);
 
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
@@ -93,7 +97,6 @@ private:
 
 	void StartHitStop(AActor* Attacker, AActor* Victim, float Duration);
 	void UpdateHitStop();
-	void AddDamageNumber(const FVector& Location, float Value, ECRWeaponType Weapon);
 	FParticleBatch* GetParticleBatch(const FLinearColor& Color, bool bCube = false);
 	/** 처치 시 색종이. */
 	void EmitConfetti(const FVector& Location, const FVector& Direction, float GroundZ);

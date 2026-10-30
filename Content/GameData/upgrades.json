@@ -1,0 +1,54 @@
+{
+  "upgrades": [
+    { "id": "sword_length", "skill": "active.sword", "name": "긴 칼", "desc": "칼 길이 +25%", "max": 3, "mods": [ { "stat": "Length", "mul": 1.25 } ] },
+    { "id": "sword_speed", "skill": "active.sword", "name": "빠른 손", "desc": "휘두르기·간격 빨라짐", "max": 3, "mods": [ { "stat": "SwingTime", "mul": 0.8 }, { "stat": "Interval", "mul": 0.85 } ] },
+    { "id": "sword_arc", "skill": "active.sword", "name": "넓게 베기", "desc": "휘두르는 각도 +70도 (3단계 = 360도 회전 베기)", "max": 3, "mods": [ { "stat": "Arc", "add": 70 } ] },
+    { "id": "sword_dual", "skill": "active.sword", "name": "쌍검", "desc": "왼손에도 칼, 좌우 동시에 벤다", "max": 1, "mods": [ { "stat": "Dual", "add": 1 } ] },
+    { "id": "sword_damage", "skill": "active.sword", "name": "날카로운 칼날", "desc": "피해 +20%", "max": 5, "mods": [ { "stat": "Damage", "mul": 1.2 } ] },
+
+    { "id": "laser_rate", "skill": "active.laser", "name": "레이저 연사", "desc": "발사 간격 -20%", "max": 3, "mods": [ { "stat": "Interval", "mul": 0.8 } ] },
+    { "id": "laser_pierce", "skill": "active.laser", "name": "관통 레이저", "desc": "관통 +1", "max": 3, "mods": [ { "stat": "Pierce", "add": 1 } ] },
+    { "id": "laser_width", "skill": "active.laser", "name": "굵은 빔", "desc": "빔 굵기 +40%, 피해 +10%", "max": 3, "mods": [ { "stat": "Size", "mul": 1.4 }, { "stat": "Damage", "mul": 1.1 } ] },
+    { "id": "laser_fan", "skill": "active.laser", "name": "부채꼴 빔", "desc": "줄기 +2 (부채꼴)", "max": 2, "mods": [ { "stat": "Count", "add": 2 } ] },
+
+    { "id": "gun_rate", "skill": "active.gun", "name": "연사 강화", "desc": "초당 발사 수 +33%", "max": 3, "mods": [ { "stat": "Interval", "mul": 0.75 } ] },
+    { "id": "gun_shotgun", "skill": "active.gun", "name": "산탄총", "desc": "한 번에 5발 부채꼴 (발당 피해 -40%, 간격 +60%)", "max": 1, "mods": [ { "stat": "Count", "add": 4 }, { "stat": "Spread", "add": 16 }, { "stat": "Interval", "mul": 1.6 }, { "stat": "Damage", "mul": 0.6 } ] },
+    { "id": "gun_pellets", "skill": "active.gun", "name": "산탄 추가", "desc": "산탄 +2발", "max": 3, "requires": "gun_shotgun", "mods": [ { "stat": "Count", "add": 2 }, { "stat": "Spread", "add": 6 } ] },
+    { "id": "gun_pierce", "skill": "active.gun", "name": "관통탄", "desc": "관통 +1", "max": 3, "mods": [ { "stat": "Pierce", "add": 1 } ] },
+    { "id": "gun_big", "skill": "active.gun", "name": "대구경", "desc": "탄 크기 +40%, 피해 +20%", "max": 3, "mods": [ { "stat": "Size", "mul": 1.4 }, { "stat": "Damage", "mul": 1.2 } ] },
+
+    { "id": "lightning_chain", "skill": "active.lightning", "name": "체인 라이트닝", "desc": "맞은 적에서 +2명에게 튕김", "max": 4, "mods": [ { "stat": "Chain", "add": 2 } ] },
+    { "id": "lightning_reach", "skill": "active.lightning", "name": "멀리 튕기기", "desc": "체인 거리 +30%", "max": 3, "requires": "lightning_chain", "mods": [ { "stat": "ChainRange", "mul": 1.3 } ] },
+    { "id": "lightning_power", "skill": "active.lightning", "name": "고전압", "desc": "피해 +25%", "max": 3, "mods": [ { "stat": "Damage", "mul": 1.25 } ] },
+
+    { "id": "launcher_count", "skill": "active.launcher", "name": "다연장", "desc": "한 번에 +1발 (조준점 주변에 흩뿌림)", "max": 2, "mods": [ { "stat": "Count", "add": 1 } ] },
+    { "id": "launcher_radius", "skill": "active.launcher", "name": "대형 폭발", "desc": "폭발 범위 +30%", "max": 3, "mods": [ { "stat": "Radius", "mul": 1.3 } ] },
+    { "id": "launcher_crater", "skill": "active.launcher", "name": "깊은 크레이터", "desc": "땅이 더 깊게 파임 (+40%)", "max": 3, "mods": [ { "stat": "Crater", "mul": 1.4 } ] },
+    { "id": "launcher_homing", "skill": "active.launcher", "name": "유도탄", "desc": "가까운 적을 쫓아간다", "max": 1, "mods": [ { "stat": "Homing", "add": 1 } ] },
+    { "id": "launcher_salvo", "skill": "active.launcher", "name": "이타노 서커스", "desc": "+3발, 크게 돌다가 모이는 일제 사격", "max": 1, "requires": "launcher_homing", "mods": [ { "stat": "Salvo", "add": 1 }, { "stat": "Count", "add": 3 } ] },
+
+    { "id": "flame_tiles", "skill": "active.flame", "name": "불길 확산", "desc": "불 장판 +1칸 (조준 방향으로 길게)", "max": 4, "mods": [ { "stat": "Count", "add": 1 } ] },
+    { "id": "flame_dot", "skill": "active.flame", "name": "화상 강화", "desc": "화상 피해 +50%, 지속 +1초", "max": 3, "mods": [ { "stat": "DotDamage", "mul": 1.5 }, { "stat": "DotTime", "add": 1 } ] },
+    { "id": "flame_radius", "skill": "active.flame", "name": "큰 불꽃", "desc": "불꽃 반경 +25%", "max": 3, "mods": [ { "stat": "Radius", "mul": 1.25 } ] },
+
+    { "id": "orbit_blades", "skill": "passive.sword", "name": "칼날 추가", "desc": "도는 칼날 +1", "max": 4, "mods": [ { "stat": "Count", "add": 1 } ] },
+    { "id": "orbit_radius", "skill": "passive.sword", "name": "궤도 확장", "desc": "회전 반경 +20%", "max": 3, "mods": [ { "stat": "Radius", "mul": 1.2 } ] },
+    { "id": "orbit_speed", "skill": "passive.sword", "name": "고속 회전", "desc": "회전 속도 +30%", "max": 3, "mods": [ { "stat": "Speed", "mul": 1.3 } ] },
+    { "id": "orbit_size", "skill": "passive.sword", "name": "큰 칼날", "desc": "칼날 크기 +30%, 피해 +15%", "max": 3, "mods": [ { "stat": "Size", "mul": 1.3 }, { "stat": "Damage", "mul": 1.15 } ] },
+
+    { "id": "plaser_rate", "skill": "passive.laser", "name": "자동 레이저 가속", "desc": "쿨다운 -20%", "max": 3, "mods": [ { "stat": "Interval", "mul": 0.8 } ] },
+    { "id": "plaser_beams", "skill": "passive.laser", "name": "자동 레이저 확산", "desc": "줄기 +2", "max": 2, "mods": [ { "stat": "Count", "add": 2 }, { "stat": "Spread", "add": 20 } ] },
+
+    { "id": "pgun_rate", "skill": "passive.gun", "name": "자동 사격 가속", "desc": "쿨다운 -25%", "max": 3, "mods": [ { "stat": "Interval", "mul": 0.75 } ] },
+    { "id": "pgun_spread", "skill": "passive.gun", "name": "자동 산탄", "desc": "+2발 부채꼴", "max": 2, "mods": [ { "stat": "Count", "add": 2 }, { "stat": "Spread", "add": 14 } ] },
+
+    { "id": "plightning_chain", "skill": "passive.lightning", "name": "낙뢰 체인", "desc": "낙뢰가 +2명에게 튕김", "max": 3, "mods": [ { "stat": "Chain", "add": 2 } ] },
+    { "id": "plightning_rate", "skill": "passive.lightning", "name": "잦은 낙뢰", "desc": "쿨다운 -20%", "max": 3, "mods": [ { "stat": "Interval", "mul": 0.8 } ] },
+
+    { "id": "plauncher_count", "skill": "passive.launcher", "name": "자동 다연장", "desc": "한 번에 +1발", "max": 3, "mods": [ { "stat": "Count", "add": 1 } ] },
+    { "id": "plauncher_rate", "skill": "passive.launcher", "name": "자동 런처 가속", "desc": "쿨다운 -20%", "max": 3, "mods": [ { "stat": "Interval", "mul": 0.8 } ] },
+
+    { "id": "pflame_radius", "skill": "passive.flame", "name": "넓은 불 발자국", "desc": "반경 +30%", "max": 3, "mods": [ { "stat": "Radius", "mul": 1.3 } ] },
+    { "id": "pflame_dot", "skill": "passive.flame", "name": "뜨거운 발자국", "desc": "화상 피해 +50%", "max": 3, "mods": [ { "stat": "DotDamage", "mul": 1.5 } ] }
+  ]
+}

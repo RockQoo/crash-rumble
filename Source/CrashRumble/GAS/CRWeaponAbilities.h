@@ -70,7 +70,7 @@ public:
 		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 };
 
-/** GA_MissileFire: 미사일 일제 사격. 판정은 미사일 폭발(범위)이 한다. */
+/** GA_MissileFire: 런처 (기본 1발 + 빨간 범위, 업그레이드로 발 수·유도·일제 사격). 판정은 미사일 폭발(범위)이 한다. */
 UCLASS()
 class CRASHRUMBLE_API UCRGA_MissileFire : public UCRGA_Weapon
 {
@@ -81,7 +81,7 @@ public:
 		const FGameplayAbilityActivationInfo ActivationInfo, const FGameplayEventData* TriggerEventData) override;
 };
 
-/** GA_FlameFire: 조준 지점 바닥에 폴리곤 불꽃, 반경 안 대상에 피해. */
+/** GA_FlameFire: 조준 지점 바닥부터 칸 수만큼 폴리곤 불꽃, 반경 안 대상에 피해 + 화상. */
 UCLASS()
 class CRASHRUMBLE_API UCRGA_FlameFire : public UCRGA_Weapon
 {

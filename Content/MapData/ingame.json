@@ -1,0 +1,8 @@
+{
+  "name": "ingame",
+  "size": [160, 160],
+  "height": 1,
+  "regen": false,
+  "ground": ["grass", "dirt", "dirt", "stone", "stone"],
+  "structures": []
+}

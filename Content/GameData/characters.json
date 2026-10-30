@@ -1,0 +1,7 @@
+{
+  "tuning": {
+    "Player": { "Attack": 0, "AttackSpeed": 0, "Defense": 0, "MoveSpeed": 0, "CritChance": 5 },
+    "Monster": { "Attack": 0, "AttackSpeed": 0, "Defense": 0, "MoveSpeedBonus": 0, "CritChance": 0 },
+    "Raw": { "MaxHealth": 1000, "MonsterMaxHealth": 100, "WaveMonsterHealth": 100, "CritMultiplier": 1.5, "DefenseConstant": 100 }
+  }
+}

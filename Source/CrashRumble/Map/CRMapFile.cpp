@@ -27,6 +27,22 @@ namespace
 	};
 	static_assert(UE_ARRAY_COUNT(Blocks) == static_cast<int32>(ECRBlock::Count), "블럭 표와 enum 개수가 같아야 함");
 
+	// GameData/blocks.json으로 덮어쓴 HP·색 (없으면 위 표 그대로)
+	FBlockInfo* GetBlockOverrides()
+	{
+		static FBlockInfo Table[UE_ARRAY_COUNT(Blocks)];
+		static bool bInit = false;
+		if (!bInit)
+		{
+			for (int32 i = 0; i < UE_ARRAY_COUNT(Blocks); ++i)
+			{
+				Table[i] = Blocks[i];
+			}
+			bInit = true;
+		}
+		return Table;
+	}
+
 	/** 명령 하나를 펼치는 동안 쓰는 도우미. 구조물 z는 지면 바로 위가 0. */
 	struct FBuilder
 	{
@@ -155,13 +171,13 @@ ECRBlock CRMapFile::FindBlock(const FString& Name)
 int32 CRMapFile::GetBlockHealth(ECRBlock Block)
 {
 	const int32 Index = static_cast<int32>(Block);
-	return Index > 0 && Index < UE_ARRAY_COUNT(Blocks) ? Blocks[Index].Health : 1;
+	return Index > 0 && Index < UE_ARRAY_COUNT(Blocks) ? GetBlockOverrides()[Index].Health : 1;
 }
 
 FLinearColor CRMapFile::GetBlockColor(ECRBlock Block)
 {
 	const int32 Index = static_cast<int32>(Block);
-	return Index >= 0 && Index < UE_ARRAY_COUNT(Blocks) ? Blocks[Index].Color : FLinearColor::White;
+	return Index >= 0 && Index < UE_ARRAY_COUNT(Blocks) ? GetBlockOverrides()[Index].Color : FLinearColor::White;
 }
 
 bool CRMapFile::IsGlowBlock(ECRBlock Block)
@@ -216,6 +232,7 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 	Spec.SizeX = FMath::Clamp(Size.X, 4, 256);
 	Spec.SizeY = FMath::Clamp(Size.Y, 4, 256);
 	Spec.StructureLayers = FMath::Clamp(ReadInt(Root, TEXT("height"), 14), 1, 64);
+	Root->TryGetBoolField(TEXT("regen"), Spec.bRegen);
 
 	// 지면: 위에서 아래 순서의 블럭 이름 (기본 잔디 / 흙 / 흙 / 돌)
 	TArray<ECRBlock> Ground = { ECRBlock::Grass, ECRBlock::Dirt, ECRBlock::Dirt, ECRBlock::Stone };
@@ -604,4 +621,22 @@ bool CRMapFile::Parse(const FString& Json, FCRMapSpec& OutSpec, FString& OutErro
 
 	OutSpec = MoveTemp(Spec);
 	return true;
+}
+
+void CRMapFile::SetBlockOverride(ECRBlock Block, int32 Health, const FLinearColor& Color)
+{
+	const int32 Index = static_cast<int32>(Block);
+	if (Index > 0 && Index < UE_ARRAY_COUNT(Blocks))
+	{
+		GetBlockOverrides()[Index].Health = FMath::Clamp(Health, 1, 255);
+		GetBlockOverrides()[Index].Color = Color;
+	}
+}
+
+void CRMapFile::ResetBlockOverrides()
+{
+	for (int32 i = 0; i < UE_ARRAY_COUNT(Blocks); ++i)
+	{
+		GetBlockOverrides()[i] = Blocks[i];
+	}
 }

@@ -29,6 +29,7 @@ void UCRTuningSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	Super::Initialize(Collection);
 
 	Settings = NewObject<UCRTuningSettings>(this);
+	Defaults = NewObject<UCRTuningSettings>(this);
 	Load();
 
 	TuneCommand = IConsoleManager::Get().RegisterConsoleCommand(
@@ -60,7 +61,7 @@ void UCRTuningSubsystem::SetValue(FName Name, float Value)
 
 void UCRTuningSubsystem::ResetToDefaults()
 {
-	const UCRTuningSettings* Defaults = GetDefault<UCRTuningSettings>();
+	SavedNames.Reset();
 	for (const FCRTuningItem& Item : UCRTuningSettings::GetItems())
 	{
 		Item.SetValue(Settings, Item.GetValue(Defaults));
@@ -71,10 +72,9 @@ void UCRTuningSubsystem::ResetToDefaults()
 
 void UCRTuningSubsystem::Save()
 {
-	// 기본값과 다른 값만 저장 → 코드 기본값을 바꾸면 손대지 않은 항목은 새 기본값을 따른다
+	// 기본값(코드 + GameData JSON)과 다른 값만 저장 → 기본값을 바꾸면 손대지 않은 항목은 새 기본값을 따른다
 	UCRTuningSave* SaveObject = NewObject<UCRTuningSave>(this);
 	SaveObject->Version = UCRTuningSave::CurrentVersion;
-	const UCRTuningSettings* Defaults = GetDefault<UCRTuningSettings>();
 	for (const FCRTuningItem& Item : UCRTuningSettings::GetItems())
 	{
 		const float Value = Item.GetValue(Settings);
@@ -101,6 +101,7 @@ void UCRTuningSubsystem::Load()
 			if (const FCRTuningItem* Item = UCRTuningSettings::FindItem(Pair.Key))
 			{
 				Item->SetValue(Settings, Pair.Value);
+				SavedNames.Add(Pair.Key);
 			}
 		}
 	}
@@ -127,4 +128,22 @@ void UCRTuningSubsystem::HandleTuneCommand(const TArray<FString>& Args)
 		SetValue(FName(*Args[0]), FCString::Atof(*Args[1]));
 		Save();
 	}
+}
+
+void UCRTuningSubsystem::ApplyJsonDefaults(const TMap<FName, float>& Values)
+{
+	const UCRTuningSettings* CodeDefaults = GetDefault<UCRTuningSettings>();
+	for (const FCRTuningItem& Item : UCRTuningSettings::GetItems())
+	{
+		const float OldDefault = Item.GetValue(Defaults);
+		const float* JsonValue = Values.Find(Item.GetName());
+		Item.SetValue(Defaults, JsonValue ? *JsonValue : Item.GetValue(CodeDefaults));
+		const float NewDefault = Item.GetValue(Defaults);
+		// 사용자가 바꾸지 않은 항목은 새 기본값을 따른다
+		if (!SavedNames.Contains(Item.GetName()) && FMath::IsNearlyEqual(Item.GetValue(Settings), OldDefault, 1e-4f))
+		{
+			Item.SetValue(Settings, NewDefault);
+		}
+	}
+	NotifyChanged();
 }

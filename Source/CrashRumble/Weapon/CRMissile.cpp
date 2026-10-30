@@ -4,6 +4,7 @@
 #include "Camera/CRViewComponent.h"
 #include "Character/CRCharacter.h"
 #include "Components/StaticMeshComponent.h"
+#include "Core/CRBenchmark.h"
 #include "Core/CRGameSettings.h"
 #include "Core/CRTuningSettings.h"
 #include "Core/CRTuningSubsystem.h"
@@ -25,6 +26,7 @@ namespace
 
 	const FLinearColor MissileBodyColor(0.85f, 0.87f, 0.92f);
 	const FLinearColor MissileExhaustColor(3.f, 1.5f, 0.3f);
+	const FLinearColor MarkerColor(2.5f, 0.12f, 0.08f);
 }
 
 ACRMissile::ACRMissile()
@@ -72,10 +74,11 @@ void ACRMissile::BeginPlay()
 	}
 }
 
-void ACRMissile::Launch(AActor* InShooter, const FVector& InDirection, AActor* InTarget, const FVector& InTargetPoint)
+void ACRMissile::Launch(AActor* InShooter, const FVector& InDirection, AActor* InTarget, const FVector& InTargetPoint, ECRSkillForm InForm)
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	Shooter = InShooter;
+	Form = InForm;
 	Target = InTarget;
 	TargetPoint = InTargetPoint;
 	Direction = InDirection.GetSafeNormal();
@@ -90,6 +93,18 @@ void ACRMissile::Launch(AActor* InShooter, const FVector& InDirection, AActor* I
 		WobbleAxis = FVector::RightVector;
 	}
 	SetActorRotation(Direction.Rotation());
+
+	// 지점 사격: 떨어질 자리에 빨간 범위 (거리로 대략 도착 시간을 잡고, 터지면 바로 지운다)
+	MarkerId = INDEX_NONE;
+	if (!InTarget)
+	{
+		if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+		{
+			const float Radius = CRSkill::GetStats(InShooter, ECRWeaponType::Missile, Form).Get(ECRStat::Radius);
+			const float Eta = FVector::Dist(GetActorLocation(), InTargetPoint) / FMath::Max(Tuning.MissileMaxSpeed * 0.6f, 100.f) + 0.4f;
+			MarkerId = Fx->SpawnGroundMarker(InTargetPoint, Radius, FMath::Min(Eta, MaxLifetime), MarkerColor);
+		}
+	}
 }
 
 FVector ACRMissile::GetTargetLocation_Missile() const
@@ -149,6 +164,7 @@ void ACRMissile::Tick(float DeltaSeconds)
 	const FVector End = Start + Direction * Speed * DeltaSeconds;
 
 	// 지형이나 캐릭터에 닿으면 터진다
+	const AActor* ShooterActorForHit = Shooter.Get();
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(CRMissile), false, this);
 	if (AActor* ShooterActor = Shooter.Get())
 	{
@@ -159,7 +175,8 @@ void ACRMissile::Tick(float DeltaSeconds)
 		FCollisionShape::MakeSphere(8.f), Params))
 	{
 		const ACRCharacter* HitSnowman = Cast<ACRCharacter>(Hit.GetActor());
-		if (!HitSnowman || !HitSnowman->IsDead())
+		// 쓰러진 눈사람과 아군(같은 팀, 도플갱어)은 지나간다
+		if (!HitSnowman || (!HitSnowman->IsDead() && CRCombat::IsHostile(ShooterActorForHit, HitSnowman)))
 		{
 			Explode(Hit.ImpactPoint, Hit.ImpactNormal, !HitSnowman);
 			return;
@@ -193,6 +210,15 @@ void ACRMissile::Explode(const FVector& Location, const FVector& Normal, bool bG
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	AActor* ShooterActor = Shooter.Get();
+	const FCRSkillStats Stats = CRSkill::GetStats(ShooterActor, ECRWeaponType::Missile, Form);
+	if (MarkerId != INDEX_NONE)
+	{
+		if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+		{
+			Fx->EndGroundMarker(MarkerId);
+		}
+		MarkerId = INDEX_NONE;
+	}
 
 	// 바닥 근처면 잔해를 바닥에서 위로
 	float GroundZ = Location.Z - GroundNearDistance;
@@ -229,12 +255,14 @@ void ACRMissile::Explode(const FVector& Location, const FVector& Normal, bool bG
 	// 크레이터: 반경 안 블럭을 전부 지운다
 	if (ACRBlockArena* Arena = ACRBlockArena::Find(this))
 	{
-		Arena->DestroySphere(Location, CRCombat::GetCraterRadius(this));
+		// 벤치마크 중이면 벤치마크 크레이터, 아니면 런처 스탯 (업그레이드로 더 깊게)
+		const UCRBenchmarkSubsystem* Bench = UCRBenchmarkSubsystem::Get(this);
+		Arena->DestroySphere(Location, Bench && Bench->IsActive() ? CRCombat::GetCraterRadius(this) : Stats.Get(ECRStat::Crater));
 	}
 
 	if (ShooterActor)
 	{
-		CRCombat::ApplyRadialHit(ShooterActor, ECRWeaponType::Missile, Location, Tuning.MissileRadius);
+		CRCombat::ApplyRadialHit(ShooterActor, ECRWeaponType::Missile, Location, Stats.Get(ECRStat::Radius), -1.f, Form);
 
 		const ACRCharacter* ShooterSnowman = Cast<ACRCharacter>(ShooterActor);
 		if (ShooterSnowman && ShooterSnowman->IsPlayerControlled())

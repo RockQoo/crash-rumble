@@ -76,12 +76,7 @@ void UCRGA_LaserFire::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 		return;
 	}
 
-	TArray<FHitResult> Hits;
-	Weapon->FireLaser(Hits);
-	for (const FHitResult& Hit : Hits)
-	{
-		CRCombat::ApplyWeaponHit(GetAvatarActorFromActorInfo(), Hit.GetActor(), ECRWeaponType::Laser, Hit);
-	}
+	Weapon->FireLaser();
 	FinishAbility();
 }
 
@@ -107,12 +102,7 @@ void UCRGA_LightningFire::ActivateAbility(const FGameplayAbilitySpecHandle Handl
 		FinishAbility(true);
 		return;
 	}
-	TArray<FHitResult> Hits;
-	Weapon->FireLightning(Hits);
-	for (const FHitResult& Hit : Hits)
-	{
-		CRCombat::ApplyWeaponHit(GetAvatarActorFromActorInfo(), Hit.GetActor(), ECRWeaponType::Lightning, Hit);
-	}
+	Weapon->FireLightning();
 	FinishAbility();
 }
 
@@ -125,7 +115,7 @@ void UCRGA_MissileFire::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		FinishAbility(true);
 		return;
 	}
-	Weapon->FireMissiles(UCRTuningSubsystem::GetSettings(Weapon).MissileCount);
+	Weapon->FireMissiles();
 	FinishAbility();
 }
 
@@ -138,11 +128,8 @@ void UCRGA_FlameFire::ActivateAbility(const FGameplayAbilitySpecHandle Handle, c
 		FinishAbility(true);
 		return;
 	}
-	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(Weapon);
-	const FVector Ground = Weapon->FireFlame();
-	// 불꽃 기둥 가운데 높이에서 반경 판정
-	CRCombat::ApplyRadialHit(GetAvatarActorFromActorInfo(), ECRWeaponType::Flame, Ground + FVector(0.f, 0.f, Tuning.FlameHeight * 0.35f),
-		Tuning.FlameRadius + 40.f);
+	// 칸 수만큼 불꽃 + 반경 피해 + 화상 (판정은 무기 쪽)
+	Weapon->FireFlame();
 	FinishAbility();
 }
 

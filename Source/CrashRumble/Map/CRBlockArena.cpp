@@ -187,6 +187,7 @@ bool ACRBlockArena::Load(const FString& InMapName, FString& OutMessage)
 
 void ACRBlockArena::Rebuild(FCRMapSpec&& Spec)
 {
+	bMapRegen = Spec.bRegen;
 	for (UInstancedStaticMeshComponent* Component : TypeComponents)
 	{
 		if (Component)
@@ -528,7 +529,8 @@ void ACRBlockArena::FlushDirty()
 void ACRBlockArena::ScheduleRegen(int32 Cell)
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
-	if (!Tuning.bBlockRegen)
+	// 맵 파일 "regen": false (인게임)면 부서진 지형이 그대로 남는다
+	if (!Tuning.bBlockRegen || !bMapRegen)
 	{
 		return;
 	}

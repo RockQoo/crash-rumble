@@ -41,6 +41,7 @@ struct FCRMapSpec
 	int32 SizeY = 64;
 	int32 GroundLayers = 4;     // 지면 층 수 (맨 위가 z = GroundLayers - 1)
 	int32 StructureLayers = 14; // 지면 위 구조물 공간
+	bool bRegen = true;          // "regen": false면 부서진 블럭이 다시 자라지 않음 (인게임)
 	TArray<uint8> Cells;        // x + y * SizeX + z * SizeX * SizeY
 	TArray<FCRMapObjectSpec> Objects;
 	TArray<FString> Warnings;   // 무시한 명령 (AI가 고칠 수 있게 몇 번째 명령인지 적는다)
@@ -70,4 +71,7 @@ namespace CRMapFile
 	CRASHRUMBLE_API FLinearColor GetBlockColor(ECRBlock Block);
 	/** 발광 블럭(크리스탈)은 명암 없이 밝게. */
 	CRASHRUMBLE_API bool IsGlowBlock(ECRBlock Block);
+	/** GameData/blocks.json: 블럭 HP(1~255)·색 덮어쓰기. 새로 불러오는 맵부터 적용. */
+	CRASHRUMBLE_API void SetBlockOverride(ECRBlock Block, int32 Health, const FLinearColor& Color);
+	CRASHRUMBLE_API void ResetBlockOverrides();
 }

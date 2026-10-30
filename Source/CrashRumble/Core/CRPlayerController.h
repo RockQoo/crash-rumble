@@ -83,6 +83,37 @@ public:
 	UFUNCTION(Exec)
 	void CRPreview(const FString& Category);
 
+	/** 플레이어 업그레이드 단계 설정 (Level 생략 = +1). 예: CRUpgrade gun_shotgun 2 */
+	UFUNCTION(Exec)
+	void CRUpgrade(const FString& Id, int32 Level = -1);
+
+	UFUNCTION(Exec)
+	void CRUpgradeReset();
+
+	/** 웨이브: start | stop (훈련장에서 인게임 몬스터 시험). */
+	UFUNCTION(Exec)
+	void CRWave(const FString& Command);
+
+	/** 골드 더하기 (시험용). */
+	UFUNCTION(Exec)
+	void CRGold(int32 Amount);
+
+	/** G 키와 같음. */
+	UFUNCTION(Exec)
+	void CRDoppel();
+
+	/** I 키와 같음. */
+	UFUNCTION(Exec)
+	void CRInventory();
+
+	/** 장착 (녹화/자동 시험용): CREquip active 0 gun, CREquip passive 1 sword, CREquip helmet 0 helmet.knight */
+	UFUNCTION(Exec)
+	void CREquip(const FString& Kind, int32 Slot, const FString& Item);
+
+	void ToggleInventory();
+	bool IsInventoryOpen() const { return InventoryOverlay.IsValid(); }
+	void ShowToast(const FString& Message);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -127,7 +158,13 @@ private:
 	void OnToggleFxStep();
 	void OnToggleCharStep();
 	void OnToggleImpact();
-	void ShowToast(const FString& Message);
+	void OnToggleInventory();
+	void OnDoppel();
+	void OnSwapPreset();
+	void OnRestart();
+	void OnPunchReleased();
+	/** 인게임 판: 숫자키 무기 전환·시점 전환을 막는다. */
+	bool IsInGameMode() const;
 	/** 맵 제작 모드: 화면 가운데 블럭에 피해 (bCrater면 반경 지우기). */
 	void EditBlocks(bool bCrater);
 
@@ -154,6 +191,18 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UInputAction> ImpactAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> InventoryAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> DoppelAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> PresetAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UInputAction> RestartAction;
 
 	FText ToastText;
 	double ToastEnd = 0.0;
@@ -199,6 +248,7 @@ private:
 
 	TSharedPtr<SCRTuningPanel> OptionsPanel;
 	TSharedPtr<SWidget> HelpOverlay;
+	TSharedPtr<SWidget> InventoryOverlay;
 	FTimerHandle AutoFireTimer;
 	float DemoWeaponSeconds = 0.f;
 	float DemoTime = 0.f;

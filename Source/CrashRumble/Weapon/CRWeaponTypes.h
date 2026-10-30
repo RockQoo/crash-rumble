@@ -24,6 +24,8 @@ struct FCRWeaponFeel
 	float Knockback = 0.f;
 	float HitStop = 0.f;
 	float Shake = 0.f;
+	/** 치명타: 데미지 숫자 강조 + 히트스톱 조금 더. */
+	bool bCritical = false;
 };
 
 class UCRTuningSettings;

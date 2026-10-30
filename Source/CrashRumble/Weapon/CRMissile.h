@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/CRActorPool.h"
+#include "Weapon/CRSkill.h"
 #include "GameFramework/Actor.h"
 #include "CRMissile.generated.h"
 
@@ -20,8 +21,12 @@ class CRASHRUMBLE_API ACRMissile : public AActor, public ICRPoolable
 public:
 	ACRMissile();
 
-	/** Target이 있으면 쫓고, 없으면 TargetPoint로 간다. */
-	void Launch(AActor* InShooter, const FVector& Direction, AActor* InTarget, const FVector& InTargetPoint);
+	/**
+	 * Target이 있으면 쫓고, 없으면 TargetPoint로 간다 (이때 바닥에 빨간 범위 예고).
+	 * 폭발 피해·반경·크레이터는 쏜 캐릭터의 런처 스탯 (Form = 액티브 / 패시브).
+	 */
+	void Launch(AActor* InShooter, const FVector& Direction, AActor* InTarget, const FVector& InTargetPoint,
+		ECRSkillForm InForm = ECRSkillForm::Active);
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void OnPoolAcquired() override;
@@ -54,5 +59,7 @@ private:
 	float Age = 0.f;
 	float SmokeDistance = 0.f;
 	int32 SmokeCount = 0;
+	int32 MarkerId = INDEX_NONE;
+	ECRSkillForm Form = ECRSkillForm::Active;
 	bool bActive = false;
 };

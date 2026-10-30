@@ -7,6 +7,11 @@
 #include "Camera/CameraComponent.h"
 #include "Camera/CRViewComponent.h"
 #include "Character/CRCharacterAppearance.h"
+#include "Character/CRLoadoutComponent.h"
+#include "Core/CRActorPool.h"
+#include "Core/CRGameData.h"
+#include "Core/CRLootSubsystem.h"
+#include "Core/CRWaveSubsystem.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -126,6 +131,7 @@ ACRCharacter::ACRCharacter()
 
 	ViewComponent = CreateDefaultSubobject<UCRViewComponent>(TEXT("View"));
 	WeaponComponent = CreateDefaultSubobject<UCRWeaponComponent>(TEXT("Weapon"));
+	Loadout = CreateDefaultSubobject<UCRLoadoutComponent>(TEXT("Loadout"));
 
 	AbilitySystem = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystem"));
 	Attributes = CreateDefaultSubobject<UCRAttributeSet>(TEXT("Attributes"));
@@ -154,7 +160,8 @@ void ACRCharacter::BeginPlay()
 
 	HomeLocation = GetActorLocation();
 	ViewComponent->Setup(SpringArm, Camera);
-	WeaponComponent->Initialize(FindPart(HandRId));
+	WeaponComponent->Initialize(FindPart(HandRId), FindPart(HandLId));
+	Loadout->OnEquipmentChanged.AddUObject(this, &ACRCharacter::HandleEquipmentChanged);
 	InitAbilitySystem();
 
 	ApplyTuning();
@@ -163,9 +170,10 @@ void ACRCharacter::BeginPlay()
 		TuningChangedHandle = Tuning->OnChanged.AddUObject(this, &ACRCharacter::ApplyTuning);
 	}
 
-	if (IsPlayerControlled())
+	if (IsPlayerControlled() && !bStarterGiven)
 	{
-		WeaponComponent->Equip(ECRWeaponType::Sword);
+		bStarterGiven = true;
+		Loadout->GiveStarterItems();
 	}
 	RefreshStencil();
 }
@@ -174,9 +182,10 @@ void ACRCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
 
-	if (HasActorBegunPlay() && IsPlayerControlled() && WeaponComponent->GetEquipped() == ECRWeaponType::None)
+	if (HasActorBegunPlay() && IsPlayerControlled() && !bStarterGiven)
 	{
-		WeaponComponent->Equip(ECRWeaponType::Sword);
+		bStarterGiven = true;
+		Loadout->GiveStarterItems();
 	}
 	RefreshStencil();
 }
@@ -188,6 +197,7 @@ void ACRCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		Tuning->OnChanged.Remove(TuningChangedHandle);
 	}
 	GetWorldTimerManager().ClearTimer(ReviveTimer);
+	GetWorldTimerManager().ClearTimer(ReleaseTimer);
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -209,6 +219,7 @@ void ACRCharacter::InitAbilitySystem()
 	}
 
 	RestoreFullHealth();
+	ApplyStatAttributes();
 	AbilitySystem->GetGameplayAttributeValueChangeDelegate(UCRAttributeSet::GetHealthAttribute())
 		.AddUObject(this, &ACRCharacter::HandleHealthChanged);
 }
@@ -226,6 +237,14 @@ float ACRCharacter::GetMaxHealth() const
 float ACRCharacter::GetTunedMaxHealth() const
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	if (IsDoppel())
+	{
+		return FMath::Max(Tuning.MaxHealth * Tuning.DoppelHealthScale, 1.f);
+	}
+	if (Team == ECRTeam::Monster)
+	{
+		return Tuning.WaveMonsterHealth;
+	}
 	return bMonster ? Tuning.MonsterMaxHealth : Tuning.MaxHealth;
 }
 
@@ -295,7 +314,43 @@ void ACRCharacter::Die()
 	const FVector LocalFall = GetActorTransform().InverseTransformVectorNoScale(FallDirection);
 	FallAxis = FVector::CrossProduct(FVector::UpVector, LocalFall).GetSafeNormal();
 
-	const float Delay = UCRTuningSubsystem::GetSettings(this).RespawnDelay;
+	if (UCRLootSubsystem* Loot = UCRLootSubsystem::Get(this))
+	{
+		Loot->DropForDeath(this);
+	}
+	UCRWaveSubsystem* Wave = UCRWaveSubsystem::Get(this);
+	const UCRTuningSettings& DeathTuning = UCRTuningSubsystem::GetSettings(this);
+	if (Team == ECRTeam::Monster)
+	{
+		// 웨이브 몬스터: 다시 일어나지 않고 웨이브가 잠시 뒤 풀로 반납
+		if (Wave)
+		{
+			Wave->NotifyMonsterDied(this);
+		}
+		return;
+	}
+	if (ACRCharacter* DoppelOwner = Hero.Get())
+	{
+		// 도플갱어: 잠시 쓰러져 있다가 사라지고, 주인은 쿨다운 뒤 다시 부를 수 있다
+		DoppelOwner->DoppelReadyTime = FPlatformTime::Seconds() + DeathTuning.DoppelCooldown;
+		GetWorldTimerManager().SetTimer(ReleaseTimer, FTimerDelegate::CreateWeakLambda(this, [this]()
+		{
+			if (ACRCharacter* HeroNow = Hero.Get())
+			{
+				HeroNow->DismissDoppel();
+			}
+		}), FMath::Max(DeathTuning.WaveCorpseTime, 0.1f), false);
+		return;
+	}
+	if (IsPlayerControlled() && Wave && Wave->IsGameRun())
+	{
+		// 인게임 판: 게임 오버 (결과 화면 → R 재시작)
+		Wave->NotifyPlayerDied();
+		DismissDoppel();
+		return;
+	}
+
+	const float Delay = DeathTuning.RespawnDelay;
 	GetWorldTimerManager().SetTimer(ReviveTimer, this, &ACRCharacter::Revive, FMath::Max(Delay, 0.01f), false);
 }
 
@@ -850,6 +905,11 @@ void ACRCharacter::RefreshStencil()
 
 void ACRCharacter::UpdateChase(float DeltaSeconds)
 {
+	if (IsDoppel() && !bDead)
+	{
+		UpdateDoppel(DeltaSeconds);
+		return;
+	}
 	if (!bMonster || bDead || TrainingRole != ECRTrainingRole::None)
 	{
 		return;
@@ -898,7 +958,7 @@ void ACRCharacter::UpdateBattle(float DeltaSeconds)
 		RetargetTimeLeft = FMath::FRandRange(RetargetMinInterval, RetargetMaxInterval);
 	}
 	// 줄 서기 전투: 교전 거리 안에 적이 없으면 자기 줄을 지키며 앞으로 전진 (상대 출발선을 넘으면 그냥 가장 가까운 적에게)
-	const FCRBattleSetup* Setup = Spawner ? &Spawner->GetBattleSetup() : nullptr;
+	const FCRBattleSetup* Setup = Spawner && Spawner->IsBattleActive() && Team != ECRTeam::Monster ? &Spawner->GetBattleSetup() : nullptr;
 	if (Setup && Setup->bLineFormation
 		&& (!Enemy || FVector::DistSquared2D(Enemy->GetActorLocation(), GetActorLocation()) > FMath::Square(Setup->EngageRange))
 		&& Spawner->GetAdvance(Team, GetActorLocation()) < Setup->TeamDistance * 2.f)
@@ -924,15 +984,18 @@ void ACRCharacter::UpdateBattle(float DeltaSeconds)
 	// 사거리 안이면 공격(간격은 무기 쪽에서), 너무 붙지 않게 조금 앞에서 멈춘다.
 	// 총은 거의 정면을 볼 때만 쏜다 (돌아서는 중에 엉뚱한 곳으로 쏘지 않게)
 	const bool bGun = BattleWeapon != ECRWeaponType::Sword;
-	const float Range = bGun ? Tuning.BattleGunRange : Tuning.BattleAttackRange;
+	const bool bWave = Team == ECRTeam::Monster;
+	const float GunRange = !bWave ? Tuning.BattleGunRange : BattleWeapon == ECRWeaponType::Missile ? Tuning.WaveLauncherRange : Tuning.WaveGunRange;
+	const float Range = bGun ? GunRange : Tuning.BattleAttackRange;
 	const bool bFacing = FVector::DotProduct(GetActorForwardVector(), Direction) > 0.9f;
 	WeaponComponent->SetTriggerHeld(Distance <= Range && (!bGun || bFacing));
-	const float MoveScale = FMath::Clamp(Tuning.BattleMoveSpeed / GetCharacterMovement()->MaxWalkSpeed, 0.f, 1.f);
+	const float MoveSpeed = bWave ? Tuning.WaveMoveSpeed : Tuning.BattleMoveSpeed;
+	const float MoveScale = FMath::Clamp(MoveSpeed / GetCharacterMovement()->MaxWalkSpeed, 0.f, 1.f);
 	if (Distance > Range * 0.8f)
 	{
 		AddMovementInput(Direction, MoveScale);
 	}
-	else if (const float Strafe = Spawner ? Spawner->GetBattleSetup().Strafe : 0.f; Strafe > 0.f)
+	else if (const float Strafe = Setup ? Setup->Strafe : 0.f; Strafe > 0.f)
 	{
 		// 사거리 안: 적을 본 채로 좌우로 옆걸음 (가끔 방향을 바꾼다)
 		StrafeTimeLeft -= DeltaSeconds;
@@ -987,13 +1050,15 @@ void ACRCharacter::SetAccentPartsColor(const FLinearColor& Color)
 	{
 		if (Part && Part->ComponentTags.Contains(AccentTag))
 		{
+			// 투구를 쓰고 있으면 모자 파츠는 투구 색
+			const FLinearColor PartColor = bHasHelmetColor && IsHelmetPart(Part->ComponentTags[0]) ? HelmetColor : Color;
 			if (bUseCustomPrimitiveData)
 			{
-				Part->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(Color.R, Color.G, Color.B, 0.f));
+				Part->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(PartColor.R, PartColor.G, PartColor.B, 0.f));
 			}
 			else if (UMaterialInstanceDynamic* Material = Cast<UMaterialInstanceDynamic>(Part->GetMaterial(0)))
 			{
-				Material->SetVectorParameterValue(ColorParam, Color);
+				Material->SetVectorParameterValue(ColorParam, PartColor);
 			}
 		}
 	}
@@ -1026,6 +1091,20 @@ void ACRCharacter::OnPoolReleased()
 {
 	bInPool = true;
 	Team = ECRTeam::None;
+	// 도플갱어였으면 주인과의 연결을 끊고 장비/색을 되돌린다
+	if (ACRCharacter* OldHero = Hero.Get())
+	{
+		if (OldHero->Doppel.Get() == this)
+		{
+			OldHero->Doppel.Reset();
+		}
+		Hero.Reset();
+		SetBodyTint(nullptr);
+		Loadout->ClearEquipment();
+		WeaponComponent->Equip(ECRWeaponType::None);
+	}
+	bSlotHeld[0] = bSlotHeld[1] = false;
+	GetWorldTimerManager().ClearTimer(ReleaseTimer);
 	TargetEnemy.Reset();
 	WeaponComponent->SetTriggerHeld(false);
 	GetWorldTimerManager().ClearTimer(ReviveTimer);
@@ -1094,6 +1173,8 @@ void ACRCharacter::BuildParts()
 	PartComponents.Reset();
 	PartRestTransforms.Reset();
 	PartBreathGroups.Reset();
+	PartBaseColors.Reset();
+	HatDefaults.Reset();
 	HandRestLocations.Reset();
 	StepPartTransforms.Reset();
 	bHasStepSnapshot = false;
@@ -1176,12 +1257,18 @@ void ACRCharacter::BuildParts()
 		PartComponents.Add(Part);
 		PartRestTransforms.Add(Spec.Transform);
 		PartBreathGroups.Add(Group);
+		PartBaseColors.Add(Spec.Color);
+		if (IsHelmetPart(Spec.Id))
+		{
+			HatDefaults.Add(Spec.Id, TPair<TObjectPtr<UStaticMesh>, FTransform>(PartMesh, Spec.Transform));
+		}
 	}
 }
 
 void ACRCharacter::ApplyTuning()
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	ApplyStatAttributes();
 	UpdateMoveSpeed();
 	GetCharacterMovement()->MaxAcceleration = Tuning.MaxAcceleration;
 	RefreshSurfaceMaterial();
@@ -1261,9 +1348,18 @@ void ACRCharacter::UpdateMoveSpeed()
 	}
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	// 몬스터는 이동 입력 크기로 속도를 줄이므로 최대 속도는 둘 중 큰 값
+	// 이동속도 스탯(%)을 곱한다
+	const float Bonus = AbilitySystem && AbilitySystem->AbilityActorInfo.IsValid()
+		? FMath::Max(1.f + AbilitySystem->GetNumericAttribute(UCRAttributeSet::GetMoveSpeedAttribute()) / 100.f, 0.1f) : 1.f;
+	if (IsDoppel())
+	{
+		// 도플갱어는 주인을 따라잡을 수 있게 조금 더 빠르게
+		GetCharacterMovement()->MaxWalkSpeed = Tuning.MoveSpeed * Tuning.SprintMultiplier * Bonus * 1.1f;
+		return;
+	}
 	GetCharacterMovement()->MaxWalkSpeed = bMonster
-		? FMath::Max3(Tuning.MoveSpeed, Tuning.MonsterMoveSpeed, Tuning.BattleMoveSpeed)
-		: Tuning.MoveSpeed * (bSprinting ? Tuning.SprintMultiplier : 1.f);
+		? FMath::Max(FMath::Max3(Tuning.MoveSpeed, Tuning.MonsterMoveSpeed, Tuning.BattleMoveSpeed), Tuning.WaveMoveSpeed) * Bonus
+		: Tuning.MoveSpeed * (bSprinting ? Tuning.SprintMultiplier : 1.f) * Bonus;
 }
 
 void ACRCharacter::SetSprinting(bool bInSprinting)
@@ -1424,6 +1520,17 @@ void ACRCharacter::ApplyKnockback(const FVector& Velocity)
 
 bool ACRCharacter::GetWeaponAimPoint(FVector& OutPoint) const
 {
+	if (const ACRCharacter* HeroCharacter = Hero.Get())
+	{
+		// 도플갱어: 주인이 겨눈 방향과 나란히 (같은 방향으로 공격)
+		FVector HeroAim;
+		if (HeroCharacter->GetWeaponAimPoint(HeroAim))
+		{
+			OutPoint = GetActorLocation() + (HeroAim - HeroCharacter->GetActorLocation());
+			return true;
+		}
+		return false;
+	}
 	if (IsPlayerControlled() && ViewComponent)
 	{
 		OutPoint = ViewComponent->GetAimPoint();
@@ -1490,6 +1597,9 @@ void ACRCharacter::UpdateHands(float DeltaSeconds)
 	FVector WeaponHandLocation = FVector::ZeroVector;
 	FRotator WeaponHandRotation = FRotator::ZeroRotator;
 	const bool bWeaponPose = WeaponComponent && WeaponComponent->GetHandPose(WeaponHandLocation, WeaponHandRotation);
+	FVector OffHandLocation = FVector::ZeroVector;
+	FRotator OffHandRotation = FRotator::ZeroRotator;
+	const bool bOffHandPose = WeaponComponent && WeaponComponent->GetOffHandPose(OffHandLocation, OffHandRotation);
 
 	for (const TPair<FName, FVector>& Rest : HandRestLocations)
 	{
@@ -1506,6 +1616,11 @@ void ACRCharacter::UpdateHands(float DeltaSeconds)
 		if (Rest.Key == HandRId && bWeaponPose)
 		{
 			Hand->SetRelativeLocationAndRotation(WeaponHandLocation + Bob * 0.3f, WeaponHandRotation);
+		}
+		else if (Rest.Key == HandLId && bOffHandPose && PunchExtend == 0.f)
+		{
+			// 쌍검: 왼손이 오른손을 좌우로 뒤집은 자세
+			Hand->SetRelativeLocationAndRotation(OffHandLocation + Bob * 0.3f, OffHandRotation);
 		}
 		else
 		{
@@ -1535,4 +1650,245 @@ void ACRCharacter::UpdateFacing(float DeltaSeconds)
 	const FRotator Current = GetActorRotation();
 	const FRotator Target(0.f, DesiredYaw, 0.f);
 	SetActorRotation(FMath::RInterpTo(Current, Target, DeltaSeconds, Tuning.TurnSpeed));
+}
+
+void ACRCharacter::SetSlotHeld(int32 Slot, bool bHeld)
+{
+	if (Slot < 0 || Slot > 1)
+	{
+		return;
+	}
+	if (ACRCharacter* Mirror = Doppel.Get())
+	{
+		Mirror->SetSlotHeld(Slot, bHeld);
+	}
+	if (bDead)
+	{
+		bSlotHeld[0] = bSlotHeld[1] = false;
+		WeaponComponent->SetTriggerHeld(false);
+		return;
+	}
+	// 우클릭 칸이 비어 있으면 펀치 (누를 때 한 번)
+	if (Slot == 1 && Loadout->GetActiveFamily(1) == ECRWeaponType::None)
+	{
+		if (bHeld)
+		{
+			TryPunch();
+		}
+		bSlotHeld[1] = false;
+		return;
+	}
+	bSlotHeld[Slot] = bHeld;
+	if (bHeld)
+	{
+		CurrentSlot = Slot;
+		EquipSlotWeapon(Slot);
+	}
+	else if (bSlotHeld[1 - Slot])
+	{
+		CurrentSlot = 1 - Slot;
+		EquipSlotWeapon(CurrentSlot);
+	}
+	WeaponComponent->SetTriggerHeld(bSlotHeld[0] || bSlotHeld[1]);
+}
+
+void ACRCharacter::EquipSlotWeapon(int32 Slot)
+{
+	const ECRWeaponType Family = Loadout->GetActiveFamily(Slot);
+	WeaponComponent->Equip(Family != ECRWeaponType::None ? Family : Loadout->GetActiveFamily(0));
+}
+
+void ACRCharacter::HandleEquipmentChanged()
+{
+	if (bMonster)
+	{
+		return; // 몬스터 무기는 SetupAsMonster가 정한다
+	}
+	EquipSlotWeapon(CurrentSlot);
+	WeaponComponent->RefreshFromStats();
+	ApplyHelmetLook();
+	if (ACRCharacter* Mirror = Doppel.Get())
+	{
+		Mirror->Loadout->CopyEquipmentFrom(*Loadout);
+	}
+}
+
+void ACRCharacter::ApplyStatAttributes()
+{
+	if (!AbilitySystem || !AbilitySystem->AbilityActorInfo.IsValid())
+	{
+		return;
+	}
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	const bool bMonsterStats = bMonster && !IsDoppel();
+	AbilitySystem->SetNumericAttributeBase(UCRAttributeSet::GetAttackAttribute(), bMonsterStats ? Tuning.MonsterAttack : Tuning.PlayerAttack);
+	AbilitySystem->SetNumericAttributeBase(UCRAttributeSet::GetAttackSpeedAttribute(), bMonsterStats ? Tuning.MonsterAttackSpeed : Tuning.PlayerAttackSpeed);
+	AbilitySystem->SetNumericAttributeBase(UCRAttributeSet::GetDefenseAttribute(), bMonsterStats ? Tuning.MonsterDefense : Tuning.PlayerDefense);
+	AbilitySystem->SetNumericAttributeBase(UCRAttributeSet::GetMoveSpeedAttribute(), bMonsterStats ? Tuning.MonsterMoveSpeedBonus : Tuning.PlayerMoveSpeed);
+	AbilitySystem->SetNumericAttributeBase(UCRAttributeSet::GetCritChanceAttribute(), bMonsterStats ? Tuning.MonsterCritChance : Tuning.PlayerCritChance);
+}
+
+void ACRCharacter::ApplyHelmetLook()
+{
+	const UCRGameDataSubsystem* Data = UCRGameDataSubsystem::Get(this);
+	const FCRHelmetDef* Def = Data ? Data->FindHelmet(Loadout->GetHelmet()) : nullptr;
+	const FName Shape = Def ? Def->Shape : FName(TEXT("cap"));
+	bHasHelmetColor = Def != nullptr;
+	HelmetColor = Def ? Def->Color : FLinearColor::Black;
+	UStaticMesh* SphereMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+
+	for (int32 i = 0; i < PartComponents.Num() && i < PartRestTransforms.Num(); ++i)
+	{
+		UStaticMeshComponent* Part = PartComponents[i];
+		const TPair<TObjectPtr<UStaticMesh>, FTransform>* Default = Part && Part->ComponentTags.Num() > 0 ? HatDefaults.Find(Part->ComponentTags[0]) : nullptr;
+		if (!Default)
+		{
+			continue;
+		}
+		const bool bCrown = Part->ComponentTags[0] == TEXT("HatCrown");
+		UStaticMesh* HatMesh = Default->Key;
+		FTransform Transform = Default->Value;
+		if (Shape == TEXT("knight"))
+		{
+			// 둥근 투구: 머리를 덮는 납작한 반구 + 이마 테
+			HatMesh = bCrown ? SphereMesh : HatMesh;
+			Transform = bCrown ? FTransform(FRotator::ZeroRotator, FVector(0.f, 0.f, 52.f), FVector(0.74f, 0.74f, 0.5f))
+				: FTransform(FRotator::ZeroRotator, FVector(0.f, 0.f, 48.f), FVector(0.76f, 0.76f, 0.04f));
+		}
+		else if (Shape == TEXT("crown"))
+		{
+			// 왕관: 낮고 넓은 원통
+			Transform = bCrown ? FTransform(FRotator::ZeroRotator, FVector(0.f, 0.f, 66.f), FVector(0.42f, 0.42f, 0.16f))
+				: FTransform(FRotator::ZeroRotator, FVector(0.f, 0.f, 58.f), FVector(0.46f, 0.46f, 0.03f));
+		}
+		if (HatMesh && Part->GetStaticMesh() != HatMesh)
+		{
+			Part->SetStaticMesh(HatMesh);
+		}
+		PartRestTransforms[i] = Transform; // 숨쉬기가 이 자세를 기준으로 움직인다
+		Part->SetRelativeTransform(Transform);
+	}
+	SetAccentPartsColor(AccentColor);
+}
+
+void ACRCharacter::SetBodyTint(const FLinearColor* Tint)
+{
+	if (!bUseCustomPrimitiveData)
+	{
+		return;
+	}
+	for (int32 i = 0; i < PartComponents.Num() && i < PartBaseColors.Num(); ++i)
+	{
+		UStaticMeshComponent* Part = PartComponents[i];
+		if (!Part || Part->ComponentTags.Contains(AccentTag))
+		{
+			continue;
+		}
+		const FLinearColor Color = Tint ? FMath::Lerp(PartBaseColors[i], *Tint, 0.55f) : PartBaseColors[i];
+		Part->SetCustomPrimitiveDataVector4(CRMaterialData::ColorIndex, FVector4(Color.R, Color.G, Color.B, 0.f));
+	}
+}
+
+float ACRCharacter::GetDoppelCooldownLeft() const
+{
+	return FMath::Max(0.f, float(DoppelReadyTime - FPlatformTime::Seconds()));
+}
+
+FString ACRCharacter::ToggleDoppel()
+{
+	if (Doppel.IsValid())
+	{
+		DismissDoppel();
+		return TEXT("도플갱어 돌려보냄");
+	}
+	if (bDead)
+	{
+		return FString();
+	}
+	if (const float Left = GetDoppelCooldownLeft(); Left > 0.f)
+	{
+		return FString::Printf(TEXT("도플갱어 쿨다운 %.1f초"), Left);
+	}
+	UCRActorPoolSubsystem* Pool = UCRActorPoolSubsystem::Get(this);
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	const FVector Location = GetActorLocation() + GetActorRightVector() * Tuning.DoppelOffset + FVector(0.f, 0.f, 30.f);
+	ACRCharacter* Spawned = Pool ? Pool->Acquire<ACRCharacter>(FTransform(GetActorRotation(), Location)) : nullptr;
+	if (!Spawned)
+	{
+		return TEXT("도플갱어를 만들 수 없음");
+	}
+	Spawned->SetupAsDoppel(this);
+	Doppel = Spawned;
+	if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+	{
+		Fx->SpawnSparkle(Location + FVector(0.f, 0.f, 40.f), Tuning.SparkleSize * 2.f);
+		Fx->SpawnDustRing(Location - FVector(0.f, 0.f, 130.f), 1.f);
+	}
+	return TEXT("도플갱어 소환 (G로 돌려보냄)");
+}
+
+void ACRCharacter::DismissDoppel()
+{
+	ACRCharacter* Mirror = Doppel.Get();
+	Doppel.Reset();
+	if (Mirror && !Mirror->IsInPool())
+	{
+		if (UCRActorPoolSubsystem* Pool = UCRActorPoolSubsystem::Get(this))
+		{
+			Pool->Release(Mirror);
+		}
+	}
+}
+
+void ACRCharacter::SetupAsDoppel(ACRCharacter* InHero)
+{
+	bMonster = false;
+	Team = ECRTeam::None;
+	TrainingRole = ECRTrainingRole::None;
+	Hero = InHero;
+	TargetEnemy.Reset();
+	bSlotHeld[0] = bSlotHeld[1] = false;
+	CurrentSlot = 0;
+
+	SpringArm->SetComponentTickEnabled(false);
+	ViewComponent->SetComponentTickEnabled(false);
+	WeaponComponent->SetComponentTickEnabled(true);
+	WeaponComponent->SetTriggerHeld(false);
+
+	const FLinearColor Purple(0.55f, 0.2f, 1.f);
+	SetAccentColor(Purple);
+	SetBodyTint(&Purple);
+	if (InHero && InHero->GetLoadout())
+	{
+		Loadout->CopyEquipmentFrom(*InHero->GetLoadout());
+	}
+	ApplyTuning();
+	RestoreFullHealth();
+}
+
+void ACRCharacter::UpdateDoppel(float DeltaSeconds)
+{
+	ACRCharacter* HeroCharacter = Hero.Get();
+	if (!HeroCharacter || HeroCharacter->IsInPool())
+	{
+		if (UCRActorPoolSubsystem* Pool = UCRActorPoolSubsystem::Get(this))
+		{
+			Pool->Release(this);
+		}
+		return;
+	}
+	// 주인 오른쪽 옆자리로 따라가고, 주인과 같은 쪽을 본다
+	const FVector Goal = HeroCharacter->GetActorLocation() + HeroCharacter->GetActorRightVector() * UCRTuningSubsystem::GetSettings(this).DoppelOffset;
+	FVector ToGoal = Goal - GetActorLocation();
+	ToGoal.Z = 0.f;
+	const float Distance = ToGoal.Size();
+	if (Distance > 1500.f)
+	{
+		SetActorLocation(Goal + FVector(0.f, 0.f, 50.f), false, nullptr, ETeleportType::TeleportPhysics);
+	}
+	else if (Distance > 40.f)
+	{
+		AddMovementInput(ToGoal / Distance, FMath::Clamp(Distance / 250.f, 0.25f, 1.f));
+	}
+	SetActorRotation(FRotator(0.f, HeroCharacter->GetActorRotation().Yaw, 0.f));
 }

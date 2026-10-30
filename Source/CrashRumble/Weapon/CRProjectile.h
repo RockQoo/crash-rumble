@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/CRActorPool.h"
+#include "Weapon/CRSkill.h"
 #include "GameFramework/Actor.h"
 #include "CRProjectile.generated.h"
 
@@ -18,7 +19,8 @@ class CRASHRUMBLE_API ACRProjectile : public AActor, public ICRPoolable
 public:
 	ACRProjectile();
 
-	void Launch(AActor* InShooter, const FVector& Direction);
+	/** 크기·관통·속도·피해는 쏜 캐릭터의 스킬 스탯 (Form = 액티브 / 패시브). */
+	void Launch(AActor* InShooter, const FVector& Direction, ECRSkillForm InForm = ECRSkillForm::Active);
 
 	virtual void Tick(float DeltaSeconds) override;
 	virtual void OnPoolAcquired() override;
@@ -48,6 +50,7 @@ private:
 	TWeakObjectPtr<AActor> Shooter;
 	float LifeLeft = 0.f;
 	int32 PierceLeft = 0;
+	ECRSkillForm Form = ECRSkillForm::Active;
 	TSet<TWeakObjectPtr<AActor>> HitActors;
 	bool bActive = false;
 };

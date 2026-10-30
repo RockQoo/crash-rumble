@@ -47,6 +47,13 @@ public:
 	void Save();
 	void NotifyChanged() { OnChanged.Broadcast(); }
 
+	/**
+	 * GameData JSON의 기본값 (항목 이름 → 값). 비어 있는 항목은 코드 기본값.
+	 * 저장된 값(사용자가 바꾼 값)이 없는 항목만 새 기본값을 따른다. 저장/초기화 비교 기준도 이 기본값.
+	 */
+	void ApplyJsonDefaults(const TMap<FName, float>& Values);
+	const UCRTuningSettings* GetDefaults() const { return Defaults; }
+
 	FCROnTuningChanged OnChanged;
 
 private:
@@ -55,6 +62,13 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UCRTuningSettings> Settings;
+
+	/** 코드 기본값 + GameData JSON. */
+	UPROPERTY()
+	TObjectPtr<UCRTuningSettings> Defaults;
+
+	/** 저장본에서 불러온(사용자가 바꾼) 항목. JSON 기본값이 바뀌어도 덮어쓰지 않는다. */
+	TSet<FName> SavedNames;
 
 	IConsoleObject* TuneCommand = nullptr;
 };

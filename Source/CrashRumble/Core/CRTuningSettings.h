@@ -341,7 +341,7 @@ public:
 	// 미사일 (이타노 서커스)
 	UPROPERTY() float MissileDamage = 40.f;
 	UPROPERTY() float MissileInterval = 1.2f;
-	UPROPERTY() int32 MissileCount = 6;
+	UPROPERTY() int32 MissileCount = 1;
 	UPROPERTY() float MissileRadius = 170.f;
 	UPROPERTY() float MissileStartSpeed = 350.f;
 	UPROPERTY() float MissileAcceleration = 1600.f;
@@ -457,4 +457,89 @@ public:
 	UPROPERTY() float BattleTeamDistance = 700.f;
 	UPROPERTY() float BattleSpread = 350.f;
 	UPROPERTY() bool bBattleSpectate = true;
+
+	// 무기 기본형 + 업그레이드로 켜는 스위치 (16단계, 업그레이드는 Content/GameData/upgrades.json)
+	UPROPERTY() int32 SwordDual = 0;
+	UPROPERTY() int32 LaserBeams = 1;
+	UPROPERTY() float LaserSpread = 12.f;
+	UPROPERTY() int32 ProjectilePellets = 1;
+	UPROPERTY() float ProjectileSpread = 14.f;
+	UPROPERTY() int32 LightningChain = 0;
+	UPROPERTY() float LightningChainRange = 500.f;
+	UPROPERTY() int32 MissileHoming = 0;
+	UPROPERTY() int32 MissileSalvo = 0;
+	UPROPERTY() float MissileRange = 2500.f;
+	UPROPERTY() int32 FlameTiles = 1;
+	UPROPERTY() float FlameTileSpacing = 170.f;
+	UPROPERTY() float FlameDotDamage = 6.f;
+	UPROPERTY() float FlameDotTime = 2.f;
+
+	// 패시브 스킬 (자동 발동, 피해·쿨다운 외 스탯은 액티브 기본값을 따름)
+	UPROPERTY() float PassiveRange = 1300.f;
+	UPROPERTY() float PassiveSwordDamage = 12.f;
+	UPROPERTY() float PassiveSwordInterval = 0.4f;
+	UPROPERTY() int32 PassiveSwordCount = 2;
+	UPROPERTY() float PassiveSwordRadius = 150.f;
+	UPROPERTY() float PassiveSwordSpeed = 220.f;
+	UPROPERTY() float PassiveSwordSize = 1.f;
+	UPROPERTY() float PassiveLaserDamage = 10.f;
+	UPROPERTY() float PassiveLaserInterval = 1.2f;
+	UPROPERTY() float PassiveProjectileDamage = 12.f;
+	UPROPERTY() float PassiveProjectileInterval = 0.7f;
+	UPROPERTY() float PassiveLightningDamage = 25.f;
+	UPROPERTY() float PassiveLightningInterval = 1.6f;
+	UPROPERTY() float PassiveMissileDamage = 30.f;
+	UPROPERTY() float PassiveMissileInterval = 2.f;
+	UPROPERTY() float PassiveFlameDamage = 6.f;
+	UPROPERTY() float PassiveFlameInterval = 0.6f;
+
+	// 캐릭터 스탯 (GAS Attribute 기본값). 공격력·공격속도·이동속도는 % 보너스
+	UPROPERTY() float PlayerAttack = 0.f;
+	UPROPERTY() float PlayerAttackSpeed = 0.f;
+	UPROPERTY() float PlayerDefense = 0.f;
+	UPROPERTY() float PlayerMoveSpeed = 0.f;
+	UPROPERTY() float PlayerCritChance = 5.f;
+	UPROPERTY() float MonsterAttack = 0.f;
+	UPROPERTY() float MonsterAttackSpeed = 0.f;
+	UPROPERTY() float MonsterDefense = 0.f;
+	UPROPERTY() float MonsterMoveSpeedBonus = 0.f;
+	UPROPERTY() float MonsterCritChance = 0.f;
+	UPROPERTY() float CritMultiplier = 1.5f;
+	UPROPERTY() float DefenseConstant = 100.f;
+
+	// 인게임 웨이브 (한 방향에서 계속 몰려옴)
+	UPROPERTY() float WaveInterval = 2.f;
+	UPROPERTY() int32 WaveMinCount = 1;
+	UPROPERTY() int32 WaveMaxCount = 3;
+	UPROPERTY() float WaveRampSeconds = 45.f;
+	UPROPERTY() int32 WaveMaxAlive = 60;
+	UPROPERTY() float WaveSpawnDistance = 2200.f;
+	UPROPERTY() float WaveSpawnWidth = 2400.f;
+	UPROPERTY() int32 WaveSwordRatio = 5;
+	UPROPERTY() int32 WaveGunRatio = 3;
+	UPROPERTY() int32 WaveLauncherRatio = 2;
+	UPROPERTY() float WaveMoveSpeed = 260.f;
+	UPROPERTY() float WaveGunRange = 900.f;
+	UPROPERTY() float WaveLauncherRange = 1300.f;
+	UPROPERTY() float WaveMonsterHealth = 100.f;
+	UPROPERTY() float WaveMonsterDamageScale = 0.5f;
+	UPROPERTY() float WaveFireIntervalScale = 3.f;
+	UPROPERTY() float WaveCorpseTime = 1.5f;
+
+	// 골드 (임시 동전)
+	UPROPERTY() int32 CoinMin = 1;
+	UPROPERTY() int32 CoinMax = 3;
+	UPROPERTY() int32 CoinValue = 5;
+	UPROPERTY() float CoinScatter = 260.f;
+	UPROPERTY() float CoinMagnetRadius = 300.f;
+	UPROPERTY() float CoinMagnetSpeed = 1400.f;
+	UPROPERTY() float CoinLifetime = 30.f;
+	UPROPERTY() float GoldRollSpeed = 6.f;
+	UPROPERTY() bool bTrainingGold = true;
+
+	// 도플갱어 / 장비 프리셋
+	UPROPERTY() float DoppelOffset = 170.f;
+	UPROPERTY() float DoppelCooldown = 10.f;
+	UPROPERTY() float DoppelHealthScale = 0.5f;
+	UPROPERTY() float PresetSwapCooldown = 0.5f;
 };

@@ -130,7 +130,7 @@ void UCRFeedbackSubsystem::OnHit(AActor* Attacker, ACRCharacter* Victim, ECRWeap
 
 	if (Tuning.bDamageNumbers)
 	{
-		AddDamageNumber(HitLocation, Feel.Damage, Weapon);
+		AddDamageNumber(HitLocation, Feel.Damage, Weapon, 1.f, Feel.bCritical);
 	}
 
 	if (Tuning.bHitStop && Feel.HitStop > 0.f)
@@ -464,7 +464,7 @@ void UCRFeedbackSubsystem::UpdateHitStop()
 	}
 }
 
-void UCRFeedbackSubsystem::AddDamageNumber(const FVector& Location, float Value, ECRWeaponType Weapon)
+void UCRFeedbackSubsystem::AddDamageNumber(const FVector& Location, float Value, ECRWeaponType Weapon, float Scale, bool bCritical)
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 
@@ -473,7 +473,8 @@ void UCRFeedbackSubsystem::AddDamageNumber(const FVector& Location, float Value,
 	Number.Value = Value;
 	Number.Duration = Tuning.DamageNumberDuration;
 	Number.ScreenJitter = FVector2D(FMath::FRandRange(-20.f, 20.f), FMath::FRandRange(-8.f, 8.f));
-	Number.Color = GetWeaponColor(Weapon);
+	Number.Color = bCritical ? FLinearColor(1.f, 0.2f, 0.08f) : GetWeaponColor(Weapon);
+	Number.Scale = Scale * (bCritical ? 1.5f : 1.f);
 
 	if (DamageNumbers.Num() < MaxDamageNumbers)
 	{

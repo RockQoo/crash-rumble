@@ -270,11 +270,31 @@ ACRCharacter* UCRTargetSpawnerSubsystem::FindNearestEnemy(const ACRCharacter* Se
 		return nullptr;
 	}
 	const FVector From = Self->GetActorLocation();
+	if (Self->GetTeam() == ECRTeam::Monster)
+	{
+		// 웨이브 몬스터: 플레이어와 그 도플갱어 중 가까운 쪽
+		ACRCharacter* Player = Cast<ACRCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
+		ACRCharacter* Best = nullptr;
+		float BestDistSq = TNumericLimits<float>::Max();
+		for (ACRCharacter* Candidate : { Player, Player ? Player->GetDoppel() : nullptr })
+		{
+			if (Candidate && !Candidate->IsDead() && !Candidate->IsHidden())
+			{
+				const float DistSq = FVector::DistSquared2D(From, Candidate->GetActorLocation());
+				if (DistSq < BestDistSq)
+				{
+					BestDistSq = DistSq;
+					Best = Candidate;
+				}
+			}
+		}
+		return Best;
+	}
 	ACRCharacter* Best = nullptr;
 	float BestDistSq = TNumericLimits<float>::Max();
 	for (ACRCharacter* Other : ActiveTargets)
 	{
-		if (!Other || Other->GetTeam() == ECRTeam::None || Other->GetTeam() == Self->GetTeam() || Other->IsDead() || Other->IsInPool())
+		if (!Other || Other->GetTeam() == ECRTeam::None || Other->GetTeam() == ECRTeam::Monster || Other->GetTeam() == Self->GetTeam() || Other->IsDead() || Other->IsInPool())
 		{
 			continue;
 		}

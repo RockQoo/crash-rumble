@@ -396,6 +396,28 @@ void UCRFxSubsystem::SpawnFlame(const FVector& GroundCenter, float Radius, float
 	Proc.Lifetime = Duration;
 }
 
+int32 UCRFxSubsystem::SpawnGroundMarker(const FVector& GroundCenter, float Radius, float Duration, const FLinearColor& Color)
+{
+	FProc& Proc = NextProc();
+	Proc.Kind = EProcKind::Marker;
+	Proc.A = GroundCenter;
+	Proc.Size = Radius;
+	Proc.Lifetime = FMath::Max(Duration, 0.05f);
+	Proc.Color = Color;
+	return Proc.Seed;
+}
+
+void UCRFxSubsystem::EndGroundMarker(int32 Id)
+{
+	for (FProc& Proc : Procs)
+	{
+		if (Proc.bAlive && Proc.Kind == EProcKind::Marker && Proc.Seed == Id)
+		{
+			Proc.Age = Proc.Lifetime; // 다음 갱신에서 사라짐
+		}
+	}
+}
+
 void UCRFxSubsystem::SpawnSmokePuff(const FVector& Location, float Size, const FVector& Direction, bool bRing, float Lifetime)
 {
 	{
@@ -809,6 +831,17 @@ void UCRFxSubsystem::DrawProc(const FProc& Proc, FRandomStream& Random)
 				Emit(ECRFxShape::Pyramid, FTransform(Tilt.Quaternion(), Base, FVector(Radius / 50.f, Radius / 50.f, Height / 100.f)), Color, 1.f);
 			}
 		}
+		break;
+	}
+	case EProcKind::Marker:
+	{
+		// 테두리 도넛은 그대로, 안쪽 원판이 떨어질 때까지 차오른다 (장마다 밝기 깜빡임)
+		const float RingScale = Proc.Size / 50.f;
+		const FVector Center = Proc.A + FVector(0.f, 0.f, 3.f);
+		const float Blink = (FxDrawCount % 2) == 0 ? 1.f : 0.7f;
+		Emit(ECRFxShape::Donut, FTransform(FQuat::Identity, Center, FVector(RingScale, RingScale, 0.12f)), Proc.Color * Blink, 1.f);
+		const float Fill = FMath::Clamp(Alpha, 0.05f, 1.f) * RingScale;
+		Emit(ECRFxShape::Sphere, FTransform(FQuat::Identity, Center, FVector(Fill, Fill, 0.015f)), Proc.Color * 0.45f, 1.f);
 		break;
 	}
 	}

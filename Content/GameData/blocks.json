@@ -1,0 +1,10 @@
+{
+  "blocks": {
+    "grass": { "health": 2, "color": [0.36, 0.68, 0.26] },
+    "dirt": { "health": 2, "color": [0.52, 0.34, 0.2] },
+    "stone": { "health": 4, "color": [0.52, 0.53, 0.58] },
+    "brick": { "health": 3, "color": [0.72, 0.3, 0.22] },
+    "wood": { "health": 2, "color": [0.62, 0.43, 0.22] },
+    "crystal": { "health": 1, "color": [0.5, 2.2, 3.0] }
+  }
+}

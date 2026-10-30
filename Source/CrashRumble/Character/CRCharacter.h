@@ -11,6 +11,8 @@ class UAbilitySystemComponent;
 class UCameraComponent;
 class UCRAttributeSet;
 class UCRCharacterAppearance;
+class UCRLoadoutComponent;
+class UStaticMesh;
 class UCRViewComponent;
 class UCRWeaponComponent;
 class UMaterialInterface;
@@ -34,6 +36,7 @@ enum class ECRTeam : uint8
 	None,
 	Red,
 	Blue,
+	Monster, // 인게임 웨이브 몬스터: 팀 없는 쪽(플레이어, 도플갱어)만 공격
 };
 
 /**
@@ -92,6 +95,25 @@ public:
 
 	UCRViewComponent* GetViewComponent() const { return ViewComponent; }
 	UCRWeaponComponent* GetWeaponComponent() const { return WeaponComponent; }
+	UCRLoadoutComponent* GetLoadout() const { return Loadout; }
+
+	/**
+	 * 좌클릭(0) / 우클릭(1): 그 칸의 액티브 스킬을 오른손에 들고 누르고 있는다.
+	 * 둘 다 누르면 나중에 누른 칸, 하나를 떼면 남은 칸으로. 우클릭 칸이 비어 있으면 펀치.
+	 * 도플갱어가 있으면 같이 누른다.
+	 */
+	void SetSlotHeld(int32 Slot, bool bHeld);
+
+	/** 도플갱어면 주인 (아니면 nullptr). */
+	ACRCharacter* GetHero() const { return Hero.Get(); }
+	bool IsDoppel() const { return Hero.IsValid(); }
+	ACRCharacter* GetDoppel() const { return Doppel.Get(); }
+	/** G: 도플갱어를 부르거나 돌려보낸다. 화면 알림 문구를 돌려준다. */
+	FString ToggleDoppel();
+	void DismissDoppel();
+	float GetDoppelCooldownLeft() const;
+	/** 풀에서 꺼낸 캐릭터를 InHero의 도플갱어로: 장비·스탯 복사, 보라색, 옆에서 같이 움직이고 같은 방향으로 공격. */
+	void SetupAsDoppel(ACRCharacter* InHero);
 	UStaticMeshComponent* FindPart(FName Id) const;
 
 	float GetHealth() const;
@@ -140,6 +162,9 @@ protected:
 	TObjectPtr<UCRWeaponComponent> WeaponComponent;
 
 	UPROPERTY(VisibleAnywhere, Category = "Combat")
+	TObjectPtr<UCRLoadoutComponent> Loadout;
+
+	UPROPERTY(VisibleAnywhere, Category = "Combat")
 	TObjectPtr<UAbilitySystemComponent> AbilitySystem;
 
 	UPROPERTY()
@@ -158,6 +183,18 @@ private:
 	void UpdateChase(float DeltaSeconds);
 	void UpdateBattle(float DeltaSeconds);
 	float GetTunedMaxHealth() const;
+
+	// 장비 (로드아웃)
+	void HandleEquipmentChanged();
+	void EquipSlotWeapon(int32 Slot);
+	/** 캐릭터 스탯(공격력 등) 기본값을 튜닝에서 Attribute로. */
+	void ApplyStatAttributes();
+	/** 투구 외형: 모양(모자 / 둥근 투구 / 왕관)과 색. */
+	void ApplyHelmetLook();
+	/** 도플갱어: 주인 옆으로 따라가고 같은 쪽을 본다. */
+	void UpdateDoppel(float DeltaSeconds);
+	/** 몸 파츠 색을 Tint 쪽으로 (nullptr이면 원래 색). */
+	void SetBodyTint(const FLinearColor* Tint);
 	void UpdatePawnBlocking();
 
 	// 사망 연출: 몸은 맞은 방향으로 넘어지고, 투구(모자)와 무기가 벗겨져 튕긴다 (물리 엔진 없이 직접 계산)
@@ -273,6 +310,19 @@ private:
 	bool bMonster = false;
 	bool bInPool = false;
 	FVector HomeLocation = FVector::ZeroVector;
+
+	// 장비 / 도플갱어
+	bool bSlotHeld[2] = { false, false };
+	int32 CurrentSlot = 0;
+	bool bStarterGiven = false;
+	TWeakObjectPtr<ACRCharacter> Hero;
+	TWeakObjectPtr<ACRCharacter> Doppel;
+	double DoppelReadyTime = 0.0;
+	FTimerHandle ReleaseTimer;
+	TArray<FLinearColor> PartBaseColors; // PartComponents와 같은 순서
+	TMap<FName, TPair<TObjectPtr<UStaticMesh>, FTransform>> HatDefaults;
+	bool bHasHelmetColor = false;
+	FLinearColor HelmetColor = FLinearColor::Black;
 
 	ECRTeam Team = ECRTeam::None;
 	TWeakObjectPtr<ACRCharacter> TargetEnemy;

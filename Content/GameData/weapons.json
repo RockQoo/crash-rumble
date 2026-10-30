@@ -1,0 +1,20 @@
+{
+  "tuning": {
+    "Sword": { "Damage": 25, "Interval": 0.45, "SwingDuration": 0.18, "ArcAngle": 150, "Length": 90, "Dual": 0 },
+    "Laser": { "Damage": 10, "Interval": 0.08, "Pierce": 0, "Beams": 1, "Spread": 12 },
+    "Projectile": { "Damage": 20, "Interval": 0.25, "Pierce": 0, "Size": 1, "Speed": 3000, "Pellets": 1, "Spread": 14 },
+    "Lightning": { "Damage": 30, "Interval": 0.35, "Range": 2500, "Chain": 0, "ChainRange": 500 },
+    "Missile": { "Damage": 40, "Interval": 1.2, "Count": 1, "Radius": 170, "CraterRadius": 110, "Homing": 0, "Salvo": 0, "Range": 2500 },
+    "Flame": { "Damage": 15, "Interval": 0.6, "Radius": 90, "Range": 1500, "Tiles": 1, "TileSpacing": 170, "DotDamage": 6, "DotTime": 2 },
+    "Punch": { "Damage": 35, "Interval": 0.35 },
+    "Passive": {
+      "Range": 1300,
+      "SwordDamage": 12, "SwordInterval": 0.4, "SwordCount": 2, "SwordRadius": 150, "SwordSpeed": 220, "SwordSize": 1,
+      "LaserDamage": 10, "LaserInterval": 1.2,
+      "ProjectileDamage": 12, "ProjectileInterval": 0.7,
+      "LightningDamage": 25, "LightningInterval": 1.6,
+      "MissileDamage": 30, "MissileInterval": 2,
+      "FlameDamage": 6, "FlameInterval": 0.6
+    }
+  }
+}

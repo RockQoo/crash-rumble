@@ -1,0 +1,7 @@
+{
+  "helmets": [
+    { "id": "helmet.cap", "name": "모자", "shape": "cap", "color": [0.02, 0.02, 0.025] },
+    { "id": "helmet.knight", "name": "투구", "shape": "knight", "color": [0.55, 0.58, 0.65] },
+    { "id": "helmet.crown", "name": "왕관", "shape": "crown", "color": [1.4, 0.95, 0.15] }
+  ]
+}

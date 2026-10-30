@@ -18,7 +18,6 @@
 #include "GAS/CRWeaponAbilities.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/App.h"
-#include "Core/CRTargetSpawner.h"
 #include "Engine/OverlapResult.h"
 #include "Map/CRBlockArena.h"
 #include "Weapon/CRMissile.h"
@@ -50,20 +49,45 @@ namespace
 	const FLinearColor LightningGunColor(0.4f, 0.8f, 1.6f);
 	const FLinearColor MissileFlashColor(1.f, 0.7f, 0.3f);
 	const FLinearColor FlameGunColor(1.f, 0.3f, 0.8f);
+	const FLinearColor SwordBladeColor(0.85f, 0.9f, 1.f);
 
-	// 미사일 표적: 커서 근처(300cm)에 적이 있으면 그 적.
-	// 없으면 앞쪽 일정 거리 안의 적들에게 나눠 보내고, 적도 없으면 사거리 안 바닥
+	// 미사일 유도 표적: 커서 근처(300cm)에 적이 있으면 그 적, 없으면 앞쪽 일정 거리 안의 적들에게 나눠 보낸다
 	constexpr float MissileLockRadius = 300.f;
-	constexpr float MissileSeekRange = 2500.f;
 	constexpr float MissileSeekCone = 0.3f;
-	constexpr float MissileMaxGroundRange = 3000.f;
+	constexpr float SalvoSpacing = 0.05f;
+	constexpr float SingleSpacing = 0.12f;  // 일제 사격이 아닌 여러 발 간격
 	constexpr float SuperMissileSpacingScale = 0.5f;
+	constexpr float MissileScatter = 0.8f;   // 두 번째 발부터 조준점 주변(폭발 반경 비율)으로 흩뿌림
+	constexpr float PassiveLaunchHeight = 120.f;
 	constexpr float GlowIntensity = 12.f;
+	constexpr int32 MaxBeams = 24;
 
 	FVector SwordHandLocation(float Yaw)
 	{
 		const float Rad = FMath::DegreesToRadians(Yaw);
 		return FVector(FMath::Cos(Rad) * SwingRadius, FMath::Sin(Rad) * SwingRadius, SwingHeight);
+	}
+
+	/** 여러 발일 때 k번째 발의 좌우 각도 (Count발을 Spread도 안에 고르게). */
+	float SpreadYaw(int32 Index, int32 Count, float Spread)
+	{
+		return Count > 1 ? FMath::Lerp(-Spread * 0.5f, Spread * 0.5f, float(Index) / (Count - 1)) : 0.f;
+	}
+
+	bool TraceGround(const UWorld* World, const FVector& Point, const AActor* Ignore, FVector& OutGround)
+	{
+		FHitResult Hit;
+		FCollisionObjectQueryParams GroundTypes;
+		GroundTypes.AddObjectTypesToQuery(ECC_WorldStatic);
+		GroundTypes.AddObjectTypesToQuery(ECC_WorldDynamic);
+		if (World->LineTraceSingleByObjectType(Hit, Point + FVector(0.f, 0.f, 300.f), Point - FVector(0.f, 0.f, 2000.f), GroundTypes,
+			FCollisionQueryParams(SCENE_QUERY_STAT(CRWeaponGround), false, Ignore)))
+		{
+			OutGround = Hit.ImpactPoint;
+			return true;
+		}
+		OutGround = Point;
+		return false;
 	}
 }
 
@@ -73,7 +97,7 @@ UCRWeaponComponent::UCRWeaponComponent()
 	PrimaryComponentTick.TickGroup = TG_PrePhysics;
 }
 
-void UCRWeaponComponent::Initialize(USceneComponent* InHand)
+void UCRWeaponComponent::Initialize(USceneComponent* InHand, USceneComponent* InOffHand)
 {
 	if (!InHand)
 	{
@@ -86,6 +110,14 @@ void UCRWeaponComponent::Initialize(USceneComponent* InHand)
 	WeaponRoot->SetUsingAbsoluteScale(true); // 손 구의 축소 스케일을 무기에 물려주지 않는다
 	WeaponRoot->RegisterComponent();
 
+	if (InOffHand)
+	{
+		OffHandRoot = NewObject<USceneComponent>(Owner, TEXT("OffHandRoot"));
+		OffHandRoot->SetupAttachment(InOffHand);
+		OffHandRoot->SetUsingAbsoluteScale(true);
+		OffHandRoot->RegisterComponent();
+	}
+
 	BuildVisuals();
 	Equip(ECRWeaponType::None);
 }
@@ -95,6 +127,16 @@ void UCRWeaponComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	OnSwingHit.Unbind();
 	OnSwingFinished.Unbind();
 	Super::EndPlay(EndPlayReason);
+}
+
+FCRSkillStats UCRWeaponComponent::GetStats(ECRWeaponType Family, ECRSkillForm Form) const
+{
+	return CRSkill::GetStats(GetOwner(), Family, Form);
+}
+
+bool UCRWeaponComponent::IsDualActive() const
+{
+	return Equipped == ECRWeaponType::Sword && OffHandRoot && GetStats(ECRWeaponType::Sword, ECRSkillForm::Active).GetFlag(ECRStat::Dual);
 }
 
 UStaticMeshComponent* UCRWeaponComponent::MakePart(USceneComponent* Parent, const TCHAR* MeshPath, const FVector& Location,
@@ -140,13 +182,19 @@ void UCRWeaponComponent::BuildVisuals()
 	MuzzleLight->SetCastShadows(false);
 	MuzzleLight->SetVisibility(false);
 	MuzzleLight->RegisterComponent();
+}
 
-	// 빔은 월드 좌표로 직접 배치
-	LaserBeam = MakePart(nullptr, CylinderMesh, FVector::ZeroVector, FVector(1.f), FRotator::ZeroRotator, LaserColor, true, GlowIntensity);
-	LaserBeam->SetUsingAbsoluteLocation(true);
-	LaserBeam->SetUsingAbsoluteRotation(true);
-	LaserBeam->SetUsingAbsoluteScale(true);
-	LaserBeam->SetVisibility(false);
+void UCRWeaponComponent::BuildOffHandVisual()
+{
+	if (!OffHandRoot || OffHandParts.Num() > 0)
+	{
+		return;
+	}
+	const FRotator AlongX(-90.f, 0.f, 0.f);
+	OffHandParts.Add(MakePart(OffHandRoot, CylinderMesh, FVector(0, 0, 0), FVector(0.05f, 0.05f, 0.2f), AlongX, FLinearColor(0.25f, 0.12f, 0.05f), false));
+	OffHandParts.Add(MakePart(OffHandRoot, CubeMesh, FVector(10, 0, 0), FVector(0.05f, 0.3f, 0.05f), FRotator::ZeroRotator, FLinearColor(1.f, 0.75f, 0.2f), false));
+	OffHandBlade = MakePart(OffHandRoot, CubeMesh, FVector::ZeroVector, FVector(1.f), FRotator::ZeroRotator, SwordBladeColor, false);
+	OffHandParts.Add(OffHandBlade);
 }
 
 void UCRWeaponComponent::BuildVisual(ECRWeaponType Type)
@@ -164,7 +212,7 @@ void UCRWeaponComponent::BuildVisual(ECRWeaponType Type)
 			FCRWeaponVisual& Visual = Visuals.Add(ECRWeaponType::Sword);
 			Visual.Parts.Add(MakePart(WeaponRoot, CylinderMesh, FVector(0, 0, 0), FVector(0.05f, 0.05f, 0.2f), AlongX, FLinearColor(0.25f, 0.12f, 0.05f), false));
 			Visual.Parts.Add(MakePart(WeaponRoot, CubeMesh, FVector(10, 0, 0), FVector(0.05f, 0.3f, 0.05f), FRotator::ZeroRotator, FLinearColor(1.f, 0.75f, 0.2f), false));
-			SwordBlade = MakePart(WeaponRoot, CubeMesh, FVector::ZeroVector, FVector(1.f), FRotator::ZeroRotator, FLinearColor(0.85f, 0.9f, 1.f), false);
+			SwordBlade = MakePart(WeaponRoot, CubeMesh, FVector::ZeroVector, FVector(1.f), FRotator::ZeroRotator, SwordBladeColor, false);
 			Visual.Parts.Add(SwordBlade);
 			UpdateSwordBlade();
 		}
@@ -245,6 +293,7 @@ void UCRWeaponComponent::Equip(ECRWeaponType Type)
 			Part->SetVisibility(Pair.Key == Type);
 		}
 	}
+	RefreshFromStats();
 
 	if (bSwinging)
 	{
@@ -264,11 +313,28 @@ void UCRWeaponComponent::Equip(ECRWeaponType Type)
 		if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
 		{
 			const FVector Tip = Type == ECRWeaponType::Sword
-				? WeaponRoot->GetComponentTransform().TransformPosition(FVector(BladeStart + UCRTuningSubsystem::GetSettings(this).SwordLength, 0.f, 0.f))
+				? WeaponRoot->GetComponentTransform().TransformPosition(FVector(BladeStart + BladeLength, 0.f, 0.f))
 				: GetMuzzleLocation();
 			Fx->SpawnSparkle(Tip, UCRTuningSubsystem::GetSettings(this).SparkleSize, WeaponRoot);
 		}
 	}
+}
+
+void UCRWeaponComponent::RefreshFromStats()
+{
+	const bool bDual = IsDualActive();
+	if (bDual)
+	{
+		BuildOffHandVisual();
+	}
+	for (UStaticMeshComponent* Part : OffHandParts)
+	{
+		if (Part)
+		{
+			Part->SetVisibility(bDual);
+		}
+	}
+	UpdateSwordBlade();
 }
 
 void UCRWeaponComponent::RefreshSurfaceMaterial()
@@ -345,13 +411,18 @@ void UCRWeaponComponent::TryFire()
 
 	if (ASC->TryActivateAbilityByClass(GetAbilityClass(Equipped)))
 	{
-		const FCRWeaponFeel Feel = CRWeapon::GetFeel(UCRTuningSubsystem::GetSettings(this), Equipped);
-		NextFireTime = WeaponClock + Feel.Interval;
+		const FCRSkillStats Stats = GetStats(Equipped, ECRSkillForm::Active);
+		// 웨이브 몬스터는 플레이어 무기보다 느리게 쏜다
+		const float Scale = Snowman->GetTeam() == ECRTeam::Monster ? UCRTuningSubsystem::GetSettings(this).WaveFireIntervalScale : 1.f;
+		NextFireTime = WeaponClock + CRSkill::GetAttackInterval(Snowman, FMath::Max(Stats.Get(ECRStat::Interval), 0.02f)) * Scale;
 	}
 }
 
 void UCRWeaponComponent::StartSwing(FCRSwingHitDelegate InOnHit, FSimpleDelegate InOnFinished)
 {
+	const FCRSkillStats Stats = GetStats(ECRWeaponType::Sword, ECRSkillForm::Active);
+	SwingDuration = FMath::Max(Stats.Get(ECRStat::SwingTime), 0.01f);
+	SwingArc = FMath::Clamp(Stats.Get(ECRStat::Arc), 10.f, 360.f);
 	OnSwingHit = InOnHit;
 	OnSwingFinished = InOnFinished;
 	bSwinging = true;
@@ -359,6 +430,7 @@ void UCRWeaponComponent::StartSwing(FCRSwingHitDelegate InOnHit, FSimpleDelegate
 	RecoverTime = 0.f;
 	SwingHitActors.Reset();
 	PrevBladeSamples.Reset();
+	PrevOffBladeSamples.Reset();
 }
 
 void UCRWeaponComponent::UpdateSwing(float DeltaTime)
@@ -372,25 +444,37 @@ void UCRWeaponComponent::UpdateSwing(float DeltaTime)
 		return;
 	}
 
-	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
 	const bool bFirst = SwingTime == 0.f;
 	SwingTime += DeltaTime;
 
-	const float Alpha = FMath::Clamp(SwingTime / FMath::Max(Tuning.SwordSwingDuration, 0.01f), 0.f, 1.f);
+	const float Alpha = FMath::Clamp(SwingTime / SwingDuration, 0.f, 1.f);
 	const float Eased = 1.f - FMath::Pow(1.f - Alpha, 3.f); // 빠르게 나가서 끝에서 감속
-	const float HalfArc = Tuning.SwordArcAngle * 0.5f;
+	const float HalfArc = SwingArc * 0.5f; // 360 = 몸을 한 바퀴 도는 회전 베기
 	const float Yaw = FMath::Lerp(HalfArc, -HalfArc, Eased);
 
 	HandLocation = SwordHandLocation(Yaw);
 	HandRotation = FRotator(FMath::Lerp(10.f, -5.f, Eased), Yaw, 0.f);
 	bHasHandPose = true;
 
-	// 손 위치를 이번 프레임 값으로 반영한 뒤 칼날 스윕
+	// 손 위치를 이번 프레임 값으로 반영한 뒤 칼날 스윕 (쌍검이면 왼손도 좌우 반대로)
 	if (USceneComponent* Hand = WeaponRoot->GetAttachParent())
 	{
 		Hand->SetRelativeLocationAndRotation(HandLocation, HandRotation);
 	}
-	SweepBlade(bFirst);
+	SweepBlade(WeaponRoot, PrevBladeSamples, bFirst);
+	if (IsDualActive())
+	{
+		FVector OffLocation;
+		FRotator OffRotation;
+		if (GetOffHandPose(OffLocation, OffRotation))
+		{
+			if (USceneComponent* OffHand = OffHandRoot->GetAttachParent())
+			{
+				OffHand->SetRelativeLocationAndRotation(OffLocation, OffRotation);
+			}
+			SweepBlade(OffHandRoot, PrevOffBladeSamples, bFirst);
+		}
+	}
 
 	if (Alpha >= 1.f)
 	{
@@ -403,21 +487,21 @@ void UCRWeaponComponent::UpdateSwing(float DeltaTime)
 	}
 }
 
-void UCRWeaponComponent::SweepBlade(bool bFirstSample)
+void UCRWeaponComponent::SweepBlade(USceneComponent* Root, TArray<FVector>& PrevSamples, bool bFirstSample)
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
-	const FTransform RootTransform = WeaponRoot->GetComponentTransform();
+	const FTransform RootTransform = Root->GetComponentTransform();
 
 	TArray<FVector> Samples;
 	Samples.Reserve(BladeSampleCount);
 	for (int32 i = 0; i < BladeSampleCount; ++i)
 	{
 		const float T = (i + 1.f) / BladeSampleCount;
-		Samples.Add(RootTransform.TransformPosition(FVector(BladeStart + Tuning.SwordLength * T, 0.f, 0.f)));
+		Samples.Add(RootTransform.TransformPosition(FVector(BladeStart + BladeLength * T, 0.f, 0.f)));
 	}
-	if (bFirstSample || PrevBladeSamples.Num() != Samples.Num())
+	if (bFirstSample || PrevSamples.Num() != Samples.Num())
 	{
-		PrevBladeSamples = Samples;
+		PrevSamples = Samples;
 	}
 
 	FCollisionObjectQueryParams ObjectParams;
@@ -428,7 +512,7 @@ void UCRWeaponComponent::SweepBlade(bool bFirstSample)
 	for (int32 i = 0; i < Samples.Num(); ++i)
 	{
 		TArray<FHitResult> Hits;
-		GetWorld()->SweepMultiByObjectType(Hits, PrevBladeSamples[i], Samples[i], FQuat::Identity, ObjectParams, Shape, Params);
+		GetWorld()->SweepMultiByObjectType(Hits, PrevSamples[i], Samples[i], FQuat::Identity, ObjectParams, Shape, Params);
 		for (const FHitResult& Hit : Hits)
 		{
 			AActor* HitActor = Hit.GetActor();
@@ -439,16 +523,19 @@ void UCRWeaponComponent::SweepBlade(bool bFirstSample)
 			}
 		}
 	}
-	PrevBladeSamples = Samples;
+	PrevSamples = Samples;
 }
 
 void UCRWeaponComponent::UpdateSwordBlade()
 {
-	if (SwordBlade)
+	BladeLength = GetStats(ECRWeaponType::Sword, ECRSkillForm::Active).Get(ECRStat::Length);
+	for (UStaticMeshComponent* Blade : { SwordBlade.Get(), OffHandBlade.Get() })
 	{
-		const float Length = UCRTuningSubsystem::GetSettings(this).SwordLength;
-		SwordBlade->SetRelativeLocation(FVector(BladeStart + Length * 0.5f, 0.f, 0.f));
-		SwordBlade->SetRelativeScale3D(FVector(Length / 100.f, 0.08f, 0.02f));
+		if (Blade)
+		{
+			Blade->SetRelativeLocation(FVector(BladeStart + BladeLength * 0.5f, 0.f, 0.f));
+			Blade->SetRelativeScale3D(FVector(BladeLength / 100.f, 0.08f, 0.02f));
+		}
 	}
 }
 
@@ -551,10 +638,33 @@ bool UCRWeaponComponent::GetHandPose(FVector& OutLocation, FRotator& OutRotation
 	return true;
 }
 
+bool UCRWeaponComponent::GetOffHandPose(FVector& OutLocation, FRotator& OutRotation) const
+{
+	if (!bHasHandPose || !IsDualActive())
+	{
+		return false;
+	}
+	// 오른손 자세를 몸 가운데 면(XZ)에 대해 뒤집는다
+	OutLocation = FVector(HandLocation.X, -HandLocation.Y, HandLocation.Z);
+	OutRotation = FRotator(HandRotation.Pitch, -HandRotation.Yaw, -HandRotation.Roll);
+	return true;
+}
+
 FVector UCRWeaponComponent::GetMuzzleLocation() const
 {
 	const FCRWeaponVisual* Visual = Visuals.Find(Equipped);
 	return WeaponRoot->GetComponentTransform().TransformPosition(Visual ? Visual->MuzzleOffset : FVector::ZeroVector);
+}
+
+FVector UCRWeaponComponent::GetAimPoint() const
+{
+	const AActor* Owner = GetOwner();
+	FVector AimPoint = Owner->GetActorLocation() + Owner->GetActorForwardVector() * 1000.f;
+	if (const ACRCharacter* Snowman = Cast<ACRCharacter>(Owner))
+	{
+		Snowman->GetWeaponAimPoint(AimPoint);
+	}
+	return AimPoint;
 }
 
 FVector UCRWeaponComponent::GetFireDirection(const FVector& Start) const
@@ -573,75 +683,113 @@ FVector UCRWeaponComponent::GetFireDirection(const FVector& Start) const
 	return WeaponRoot->GetForwardVector();
 }
 
-int32 UCRWeaponComponent::FireLaser(TArray<FHitResult>& OutTargetHits)
+void UCRWeaponComponent::FireLaser()
+{
+	const FVector Start = GetMuzzleLocation();
+	ShootLaser(Start, GetFireDirection(Start), ECRSkillForm::Active);
+	PlayFireFeedback();
+}
+
+void UCRWeaponComponent::ShootLaser(const FVector& Start, const FVector& Direction, ECRSkillForm Form)
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
-	const FVector Start = GetMuzzleLocation();
-	const FVector End = Start + GetFireDirection(Start) * Tuning.LaserRange;
-
-	// 눈사람을 맞히면 그 대상을 빼고 다시 쏜다 (관통 수만큼)
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(CRLaser), false, GetOwner());
-	FVector BeamEnd = End;
-	const int32 MaxTargets = FMath::Max(Tuning.LaserPierce, 0) + 1;
-	const ACRCharacter* Shooter = Cast<ACRCharacter>(GetOwner());
-	const ECRTeam ShooterTeam = Shooter ? Shooter->GetTeam() : ECRTeam::None;
+	const FCRSkillStats Stats = GetStats(ECRWeaponType::Laser, Form);
+	AActor* Owner = GetOwner();
+	const int32 BeamCount = FMath::Clamp(Stats.GetInt(ECRStat::Count), 1, 12);
+	const int32 MaxTargets = FMath::Max(Stats.GetInt(ECRStat::Pierce), 0) + 1;
+	const float Width = Tuning.LaserBeamWidth * FMath::Max(Stats.Get(ECRStat::Size), 0.1f);
 	constexpr int32 MaxPassThrough = 16; // 아군/시체를 통과하는 최대 횟수
-	for (int32 Iteration = 0; Iteration < MaxTargets + MaxPassThrough; ++Iteration)
+
+	for (int32 Beam = 0; Beam < BeamCount; ++Beam)
 	{
-		FHitResult Hit;
-		if (!GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, CRCombat::GetWeaponQueryParams(), Params))
+		const FVector Dir = Direction.RotateAngleAxis(SpreadYaw(Beam, BeamCount, Stats.Get(ECRStat::Spread)), FVector::UpVector);
+		const FVector End = Start + Dir * Stats.Get(ECRStat::Range);
+
+		// 눈사람을 맞히면 그 대상을 빼고 다시 쏜다 (관통 수만큼)
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(CRLaser), false, Owner);
+		FVector BeamEnd = End;
+		int32 Hits = 0;
+		for (int32 Iteration = 0; Iteration < MaxTargets + MaxPassThrough; ++Iteration)
 		{
-			break;
-		}
-		if (!Cast<ACRCharacter>(Hit.GetActor()))
-		{
-			// 벽/바닥: 빔이 여기서 끝나고 작은 불꽃 (블럭이면 HP 1)
-			BeamEnd = Hit.ImpactPoint;
-			CRCombat::DamageWorldByGun(Hit, GetOwner());
-			if (UCRFeedbackSubsystem* Feedback = UCRFeedbackSubsystem::Get(this))
+			FHitResult Hit;
+			if (!GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, CRCombat::GetWeaponQueryParams(), Params))
 			{
-				Feedback->SpawnImpactParticles(Hit.ImpactPoint, Hit.ImpactNormal, LaserColor, 0.5f);
+				break;
 			}
-			break;
+			ACRCharacter* HitSnowman = Cast<ACRCharacter>(Hit.GetActor());
+			if (!HitSnowman)
+			{
+				// 벽/바닥: 빔이 여기서 끝나고 작은 불꽃 (블럭이면 HP 1)
+				BeamEnd = Hit.ImpactPoint;
+				CRCombat::DamageWorldByGun(Hit, Owner);
+				if (UCRFeedbackSubsystem* Feedback = UCRFeedbackSubsystem::Get(this))
+				{
+					Feedback->SpawnImpactParticles(Hit.ImpactPoint, Hit.ImpactNormal, LaserColor, 0.5f);
+				}
+				break;
+			}
+			// 쓰러진 눈사람과 아군(같은 팀, 도플갱어)은 빔이 통과
+			if (HitSnowman->IsDead() || !CRCombat::IsHostile(Owner, HitSnowman))
+			{
+				Params.AddIgnoredActor(HitSnowman);
+				continue;
+			}
+			CRCombat::ApplyWeaponHit(Owner, HitSnowman, ECRWeaponType::Laser, Hit, Form);
+			if (++Hits >= MaxTargets)
+			{
+				BeamEnd = Hit.ImpactPoint;
+				break;
+			}
+			Params.AddIgnoredActor(HitSnowman);
 		}
-		// 쓰러진 눈사람과 (팀 전투) 아군은 빔이 통과
-		const ACRCharacter* HitSnowman = Cast<ACRCharacter>(Hit.GetActor());
-		if (HitSnowman->IsDead() || (ShooterTeam != ECRTeam::None && HitSnowman->GetTeam() == ShooterTeam))
-		{
-			Params.AddIgnoredActor(Hit.GetActor());
-			continue;
-		}
-		OutTargetHits.Add(Hit);
-		if (OutTargetHits.Num() >= MaxTargets)
-		{
-			BeamEnd = Hit.ImpactPoint;
-			break;
-		}
-		Params.AddIgnoredActor(Hit.GetActor());
+		AddBeam(Start, BeamEnd, Width);
 	}
+}
 
-	LaserBeamStart = Start;
-	LaserBeamEnd = BeamEnd;
-	LaserBeamTimeLeft = Tuning.LaserBeamDuration;
-
-	PlayFireFeedback();
-	return OutTargetHits.Num();
+void UCRWeaponComponent::AddBeam(const FVector& Start, const FVector& End, float Width)
+{
+	if (Beams.Num() >= MaxBeams)
+	{
+		Beams.RemoveAt(0, 1, EAllowShrinking::No);
+	}
+	FBeamFx& Beam = Beams.AddDefaulted_GetRef();
+	Beam.Start = Start;
+	Beam.End = End;
+	Beam.Width = Width;
+	Beam.TimeLeft = UCRTuningSubsystem::GetSettings(this).LaserBeamDuration;
 }
 
 void UCRWeaponComponent::FireProjectile()
+{
+	const FVector Start = GetMuzzleLocation();
+	ShootProjectiles(Start, GetFireDirection(Start), ECRSkillForm::Active);
+	PlayFireFeedback();
+}
+
+void UCRWeaponComponent::ShootProjectiles(const FVector& Start, const FVector& Direction, ECRSkillForm Form)
 {
 	UCRActorPoolSubsystem* Pool = UCRActorPoolSubsystem::Get(this);
 	if (!Pool)
 	{
 		return;
 	}
-	const FVector Start = GetMuzzleLocation();
-	const FVector Direction = GetFireDirection(Start);
-	if (ACRProjectile* Projectile = Pool->Acquire<ACRProjectile>(FTransform(Direction.Rotation(), Start)))
+	const FCRSkillStats Stats = GetStats(ECRWeaponType::Projectile, Form);
+	const int32 Pellets = FMath::Clamp(Stats.GetInt(ECRStat::Count), 1, 20);
+	const float Spread = Stats.Get(ECRStat::Spread);
+	for (int32 i = 0; i < Pellets; ++i)
 	{
-		Projectile->Launch(GetOwner(), Direction);
+		// 산탄: 부채꼴로 고르게 + 살짝 흔들림
+		const float Jitter = Pellets > 1 ? FMath::FRandRange(-0.15f, 0.15f) * Spread / Pellets : 0.f;
+		FVector Dir = Direction.RotateAngleAxis(SpreadYaw(i, Pellets, Spread) + Jitter, FVector::UpVector);
+		if (Pellets > 1)
+		{
+			Dir = (Dir + FVector(0.f, 0.f, FMath::FRandRange(-0.03f, 0.03f))).GetSafeNormal();
+		}
+		if (ACRProjectile* Projectile = Pool->Acquire<ACRProjectile>(FTransform(Dir.Rotation(), Start)))
+		{
+			Projectile->Launch(GetOwner(), Dir, Form);
+		}
 	}
-	PlayFireFeedback();
 }
 
 void UCRWeaponComponent::SetHandOverride(const FVector& Location, const FRotator& Rotation, float Duration)
@@ -651,16 +799,25 @@ void UCRWeaponComponent::SetHandOverride(const FVector& Location, const FRotator
 	OverrideTimeLeft = Duration;
 }
 
-void UCRWeaponComponent::FireLightning(TArray<FHitResult>& OutTargetHits)
+void UCRWeaponComponent::FireLightning()
+{
+	const FVector Start = GetMuzzleLocation();
+	ShootLightning(Start, Start + GetFireDirection(Start) * 100.f, ECRSkillForm::Active);
+	PlayFireFeedback();
+}
+
+void UCRWeaponComponent::ShootLightning(const FVector& Start, const FVector& AimPoint, ECRSkillForm Form)
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
-	const FVector Start = GetMuzzleLocation();
-	const FVector End = Start + GetFireDirection(Start) * Tuning.LightningRange;
+	const FCRSkillStats Stats = GetStats(ECRWeaponType::Lightning, Form);
+	AActor* Owner = GetOwner();
+	const FVector Direction = (AimPoint - Start).GetSafeNormal();
+	const FVector End = Start + Direction * FMath::Max(Stats.Get(ECRStat::Range), FVector::Dist(Start, AimPoint) + 100.f);
+	UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this);
 
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(CRLightning), false, GetOwner());
-	const ACRCharacter* Shooter = Cast<ACRCharacter>(GetOwner());
-	const ECRTeam ShooterTeam = Shooter ? Shooter->GetTeam() : ECRTeam::None;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CRLightning), false, Owner);
 	FVector BoltEnd = End;
+	ACRCharacter* FirstTarget = nullptr;
 	for (int32 Iteration = 0; Iteration < 16; ++Iteration)
 	{
 		FHitResult Hit;
@@ -668,182 +825,269 @@ void UCRWeaponComponent::FireLightning(TArray<FHitResult>& OutTargetHits)
 		{
 			break;
 		}
-		const ACRCharacter* HitSnowman = Cast<ACRCharacter>(Hit.GetActor());
-		if (HitSnowman && (HitSnowman->IsDead() || (ShooterTeam != ECRTeam::None && HitSnowman->GetTeam() == ShooterTeam)))
+		ACRCharacter* HitSnowman = Cast<ACRCharacter>(Hit.GetActor());
+		if (HitSnowman && (HitSnowman->IsDead() || !CRCombat::IsHostile(Owner, HitSnowman)))
 		{
-			Params.AddIgnoredActor(Hit.GetActor());
+			Params.AddIgnoredActor(HitSnowman);
 			continue;
 		}
 		// 끝점은 대상 중심이 아니라 표면 (중심이면 끝 섬광이 몸 안에 묻혀 목에 링처럼 보인다)
 		BoltEnd = Hit.ImpactPoint;
 		if (HitSnowman)
 		{
-			OutTargetHits.Add(Hit);
+			FirstTarget = HitSnowman;
+			CRCombat::ApplyWeaponHit(Owner, HitSnowman, ECRWeaponType::Lightning, Hit, Form);
 		}
-		else if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+		else
 		{
-			CRCombat::DamageWorld(Hit, Tuning.LightningBlockDamage, GetOwner());
+			CRCombat::DamageWorld(Hit, Tuning.LightningBlockDamage, Owner);
 			// 바닥에 맞으면 큐브 잔해 8개
-			if (Tuning.bCubeDebris)
+			if (Fx && Tuning.bCubeDebris)
 			{
-				Fx->SpawnDebris(Hit.ImpactPoint, Hit.ImpactNormal, 8, FLinearColor(0.55f, 0.55f, 0.6f), FLinearColor(0.35f, 0.35f, 0.4f), 1.f, Hit.ImpactPoint.Z - 1.f);
+				Fx->SpawnDebris(Hit.ImpactPoint, Hit.ImpactNormal, 8, FLinearColor(0.55f, 0.55f, 0.6f), FLinearColor(0.35f, 0.33f, 0.4f), 1.f, Hit.ImpactPoint.Z - 1.f);
 			}
 		}
 		break;
 	}
-	if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
+	if (Fx)
 	{
 		Fx->SpawnLightning(Start, BoltEnd, Tuning.LightningBoltDuration);
 	}
-	PlayFireFeedback();
+
+	// 체인 라이트닝: 맞은 대상에서 가까운 다음 적으로 튕긴다 (치지직)
+	const int32 Chain = FMath::Clamp(Stats.GetInt(ECRStat::Chain), 0, 20);
+	TArray<ACRCharacter*> Struck;
+	ACRCharacter* From = FirstTarget;
+	if (From)
+	{
+		Struck.Add(From);
+	}
+	for (int32 i = 0; i < Chain && From; ++i)
+	{
+		const FVector FromPoint = From->GetActorLocation() + FVector(0.f, 0.f, 20.f);
+		ACRCharacter* Next = CRCombat::FindNearestHostile(Owner, FromPoint, Stats.Get(ECRStat::ChainRange), &Struck);
+		if (!Next)
+		{
+			break;
+		}
+		const FVector ToPoint = Next->GetActorLocation() + FVector(0.f, 0.f, 20.f);
+		if (Fx)
+		{
+			Fx->SpawnLightning(FromPoint, ToPoint, Tuning.LightningBoltDuration * 0.8f);
+		}
+		FHitResult Hit(Next, nullptr, ToPoint, (FromPoint - ToPoint).GetSafeNormal());
+		Hit.bBlockingHit = true;
+		CRCombat::ApplyWeaponHitFrom(Owner, Next, ECRWeaponType::Lightning, Hit, FromPoint, -1.f, Form);
+		Struck.Add(Next);
+		From = Next;
+	}
 }
 
-void UCRWeaponComponent::FireMissiles(int32 Count, bool bSuper)
+void UCRWeaponComponent::FireMissiles(int32 CountOverride, bool bSuper)
 {
+	ShootMissiles(GetAimPoint(), ECRSkillForm::Active, CountOverride, bSuper);
+}
+
+void UCRWeaponComponent::ShootMissiles(const FVector& InAimPoint, ECRSkillForm Form, int32 CountOverride, bool bSuper)
+{
+	const FCRSkillStats Stats = GetStats(ECRWeaponType::Missile, Form);
 	const ACRCharacter* Snowman = Cast<ACRCharacter>(GetOwner());
-	FVector AimPoint = GetOwner()->GetActorLocation() + GetOwner()->GetActorForwardVector() * 1000.f;
-	if (Snowman)
-	{
-		Snowman->GetWeaponAimPoint(AimPoint);
-	}
 	const AActor* Owner = GetOwner();
 	const FVector From = Owner->GetActorLocation();
-	const ECRTeam OwnerTeam = Snowman ? Snowman->GetTeam() : ECRTeam::None;
-	auto IsEnemy = [Snowman, OwnerTeam](const ACRCharacter* Candidate)
-	{
-		return Candidate && Candidate != Snowman && !Candidate->IsDead() && !Candidate->IsInPool() && !Candidate->IsHidden()
-			&& (OwnerTeam == ECRTeam::None || (Candidate->GetTeam() != ECRTeam::None && Candidate->GetTeam() != OwnerTeam));
-	};
+	const int32 Count = FMath::Clamp(CountOverride >= 0 ? CountOverride : Stats.GetInt(ECRStat::Count), 1, 64);
+	const bool bHoming = bSuper || Stats.GetFlag(ECRStat::Homing);
+	const bool bSalvo = bSuper || Stats.GetFlag(ECRStat::Salvo);
 
-	MissileTargets.Reset();
-	MissileTargetPoint = AimPoint;
+	// 사거리 안으로 당기고 바닥에 붙인다
+	FVector AimPoint = InAimPoint;
+	const FVector Flat = AimPoint - From;
+	const float Range = Stats.Get(ECRStat::Range);
+	if (Flat.Size2D() > Range)
+	{
+		AimPoint = From + Flat.GetSafeNormal2D() * Range;
+		AimPoint.Z = InAimPoint.Z;
+	}
+	FVector Ground;
+	TraceGround(GetWorld(), AimPoint, Owner, Ground);
 
-	// 1) 커서 근처(300cm)의 적 하나 (맵에 놓인 허수아비 포함)
-	TArray<FOverlapResult> Overlaps;
-	FCollisionObjectQueryParams Objects;
-	Objects.AddObjectTypesToQuery(ECC_Pawn);
-	GetWorld()->OverlapMultiByObjectType(Overlaps, AimPoint, FQuat::Identity, Objects, FCollisionShape::MakeSphere(MissileLockRadius),
-		FCollisionQueryParams(SCENE_QUERY_STAT(CRMissileLock), false, Owner));
-	float Best = UE_BIG_NUMBER;
-	ACRCharacter* Locked = nullptr;
-	for (const FOverlapResult& Overlap : Overlaps)
+	// 유도: 1) 커서 근처(300cm)의 적 하나 2) 없으면 앞쪽 사거리 안의 가까운 적들에게 나눠 보낸다
+	TArray<TWeakObjectPtr<AActor>> Targets;
+	if (bHoming)
 	{
-		ACRCharacter* Candidate = Cast<ACRCharacter>(Overlap.GetActor());
-		const float Distance = Candidate ? FVector::DistSquared(Candidate->GetActorLocation(), AimPoint) : UE_BIG_NUMBER;
-		if (IsEnemy(Candidate) && Distance < Best)
-		{
-			Best = Distance;
-			Locked = Candidate;
-		}
-	}
-	if (Locked)
-	{
-		MissileTargets.Add(Locked);
-	}
-	else
-	{
-		// 2) 숄더뷰로 지평선을 조준하면 커서 아래가 너무 멀다: 앞쪽의 가까운 적들에게 나눠 보낸다
-		TArray<FOverlapResult> Nearby;
-		GetWorld()->OverlapMultiByObjectType(Nearby, From, FQuat::Identity, Objects, FCollisionShape::MakeSphere(MissileSeekRange),
-			FCollisionQueryParams(SCENE_QUERY_STAT(CRMissileSeek), false, Owner));
-		TArray<TPair<float, ACRCharacter*>> Candidates;
-		const FVector Forward = (AimPoint - From).GetSafeNormal2D();
-		for (const FOverlapResult& Overlap : Nearby)
+		TArray<FOverlapResult> Overlaps;
+		FCollisionObjectQueryParams Objects;
+		Objects.AddObjectTypesToQuery(ECC_Pawn);
+		GetWorld()->OverlapMultiByObjectType(Overlaps, AimPoint, FQuat::Identity, Objects, FCollisionShape::MakeSphere(MissileLockRadius),
+			FCollisionQueryParams(SCENE_QUERY_STAT(CRMissileLock), false, Owner));
+		float Best = UE_BIG_NUMBER;
+		ACRCharacter* Locked = nullptr;
+		for (const FOverlapResult& Overlap : Overlaps)
 		{
 			ACRCharacter* Candidate = Cast<ACRCharacter>(Overlap.GetActor());
-			if (IsEnemy(Candidate))
+			const float Distance = Candidate ? FVector::DistSquared(Candidate->GetActorLocation(), AimPoint) : UE_BIG_NUMBER;
+			if (Candidate && !Candidate->IsDead() && !Candidate->IsInPool() && !Candidate->IsHidden() && CRCombat::IsHostile(Owner, Candidate)
+				&& Distance < Best)
 			{
-				const FVector To = Candidate->GetActorLocation() - From;
-				if (FVector::DotProduct(To.GetSafeNormal2D(), Forward) > MissileSeekCone)
-				{
-					Candidates.AddUnique(TPair<float, ACRCharacter*>(To.SizeSquared(), Candidate));
-				}
+				Best = Distance;
+				Locked = Candidate;
 			}
 		}
-		Candidates.Sort([](const TPair<float, ACRCharacter*>& A, const TPair<float, ACRCharacter*>& B) { return A.Key < B.Key; });
-		for (int32 i = 0; i < Candidates.Num() && i < Count; ++i)
+		if (Locked)
 		{
-			MissileTargets.Add(Candidates[i].Value);
+			Targets.Add(Locked);
 		}
-		// 3) 적도 없으면 사거리 안 바닥
-		const FVector Flat = AimPoint - From;
-		if (Flat.Size2D() > MissileMaxGroundRange)
+		else
 		{
-			MissileTargetPoint = From + Flat.GetSafeNormal2D() * MissileMaxGroundRange - FVector(0.f, 0.f, 100.f);
+			TArray<FOverlapResult> Nearby;
+			GetWorld()->OverlapMultiByObjectType(Nearby, From, FQuat::Identity, Objects, FCollisionShape::MakeSphere(Range),
+				FCollisionQueryParams(SCENE_QUERY_STAT(CRMissileSeek), false, Owner));
+			TArray<TPair<float, ACRCharacter*>> Candidates;
+			const FVector Forward = (AimPoint - From).GetSafeNormal2D();
+			for (const FOverlapResult& Overlap : Nearby)
+			{
+				ACRCharacter* Candidate = Cast<ACRCharacter>(Overlap.GetActor());
+				if (Candidate && !Candidate->IsDead() && !Candidate->IsInPool() && !Candidate->IsHidden() && CRCombat::IsHostile(Owner, Candidate))
+				{
+					const FVector To = Candidate->GetActorLocation() - From;
+					if (FVector::DotProduct(To.GetSafeNormal2D(), Forward) > MissileSeekCone)
+					{
+						Candidates.AddUnique(TPair<float, ACRCharacter*>(To.SizeSquared(), Candidate));
+					}
+				}
+			}
+			Candidates.Sort([](const TPair<float, ACRCharacter*>& A, const TPair<float, ACRCharacter*>& B) { return A.Key < B.Key; });
+			for (int32 i = 0; i < Candidates.Num() && i < Count; ++i)
+			{
+				Targets.Add(Candidates[i].Value);
+			}
 		}
 	}
-	PendingMissiles = FMath::Max(Count, 1);
-	MissileSalvoSize = PendingMissiles;
-	MissileSalvoIndex = 0;
-	MissileSpacing = 0.05f * (bSuper ? SuperMissileSpacingScale : 1.f);
-	NextMissileTime = WeaponClock;
+
+	const float Spacing = bSalvo ? SalvoSpacing * (bSuper ? SuperMissileSpacingScale : 1.f) : SingleSpacing;
+	const float Radius = Stats.Get(ECRStat::Radius);
+	const float FirstLaunch = PendingMissiles.Num() > 0 ? FMath::Max(PendingMissiles.Last().LaunchTime + Spacing, WeaponClock) : WeaponClock;
+	for (int32 i = 0; i < Count; ++i)
+	{
+		FPendingMissile& Pending = PendingMissiles.AddDefaulted_GetRef();
+		Pending.Target = Targets.Num() > 0 ? Targets[i % Targets.Num()] : nullptr;
+		// 유도 대상이 없으면 조준점 (두 번째 발부터 주변에 흩뿌림)
+		FVector Point = Ground;
+		if (i > 0)
+		{
+			const FVector2D Offset = FMath::RandPointInCircle(Radius * MissileScatter);
+			TraceGround(GetWorld(), Ground + FVector(Offset.X, Offset.Y, 0.f), Owner, Point);
+		}
+		Pending.TargetPoint = Point;
+		Pending.Form = Form;
+		Pending.bSalvo = bSalvo;
+		Pending.SalvoIndex = i;
+		Pending.SalvoSize = Count;
+		Pending.LaunchTime = FirstLaunch + i * Spacing;
+	}
 	UpdateMissileQueue();
 }
 
 void UCRWeaponComponent::UpdateMissileQueue()
 {
-	while (PendingMissiles > 0 && WeaponClock >= NextMissileTime)
+	int32 Launched = 0;
+	while (Launched < PendingMissiles.Num() && WeaponClock >= PendingMissiles[Launched].LaunchTime)
 	{
-		LaunchOneMissile();
-		--PendingMissiles;
-		NextMissileTime += MissileSpacing;
+		LaunchMissile(PendingMissiles[Launched]);
+		++Launched;
+	}
+	if (Launched > 0)
+	{
+		PendingMissiles.RemoveAt(0, Launched, EAllowShrinking::No);
 	}
 }
 
-void UCRWeaponComponent::LaunchOneMissile()
+void UCRWeaponComponent::LaunchMissile(const FPendingMissile& Pending)
 {
 	UCRActorPoolSubsystem* Pool = UCRActorPoolSubsystem::Get(this);
-	if (!Pool || !WeaponRoot)
+	const AActor* Owner = GetOwner();
+	if (!Pool || !WeaponRoot || !Owner)
 	{
 		return;
 	}
-	const AActor* Owner = GetOwner();
-	// 위 + 약간 뒤 + 좌우로 크게 부채꼴. 한 발씩 다른 방향
-	const float Fan = MissileSalvoSize > 1 ? FMath::Lerp(-1.f, 1.f, float(MissileSalvoIndex) / (MissileSalvoSize - 1)) : 0.f;
-	++MissileSalvoIndex;
-	const FVector Direction = (FVector::UpVector * 1.f - Owner->GetActorForwardVector() * 0.1f
-		+ Owner->GetActorRightVector() * (Fan * 1.3f + FMath::FRandRange(-0.2f, 0.2f)) + FMath::VRand() * 0.15f).GetSafeNormal();
-	const FVector Start = GetMuzzleLocation();
+	const bool bFromHand = Pending.Form == ECRSkillForm::Active && Equipped == ECRWeaponType::Missile;
+	const FVector Start = bFromHand ? GetMuzzleLocation() : Owner->GetActorLocation() + FVector(0.f, 0.f, PassiveLaunchHeight);
+	FVector Direction;
+	if (Pending.bSalvo)
+	{
+		// 이타노 서커스: 위 + 약간 뒤 + 좌우로 크게 부채꼴, 한 발씩 다른 방향
+		const float Fan = Pending.SalvoSize > 1 ? FMath::Lerp(-1.f, 1.f, float(Pending.SalvoIndex) / (Pending.SalvoSize - 1)) : 0.f;
+		Direction = (FVector::UpVector * 1.f - Owner->GetActorForwardVector() * 0.1f
+			+ Owner->GetActorRightVector() * (Fan * 1.3f + FMath::FRandRange(-0.2f, 0.2f)) + FMath::VRand() * 0.15f).GetSafeNormal();
+	}
+	else
+	{
+		// 기본: 조준 지점 쪽으로 높게 쏘아 올려 포물선처럼 떨어진다
+		const FVector Goal = Pending.Target.IsValid() ? Pending.Target->GetActorLocation() : Pending.TargetPoint;
+		Direction = ((Goal - Start).GetSafeNormal2D() + FVector(0.f, 0.f, 1.1f)).GetSafeNormal();
+	}
 	if (ACRMissile* Missile = Pool->Acquire<ACRMissile>(FTransform(Direction.Rotation(), Start)))
 	{
-		AActor* Target = MissileTargets.Num() > 0 ? MissileTargets[(MissileSalvoIndex - 1) % MissileTargets.Num()].Get() : nullptr;
-		Missile->Launch(GetOwner(), Direction, Target, MissileTargetPoint);
+		Missile->Launch(GetOwner(), Direction, Pending.Target.Get(), Pending.TargetPoint, Pending.Form);
 	}
+	if (bFromHand)
+	{
+		PlayFireFeedback();
+	}
+}
+
+void UCRWeaponComponent::FireFlame()
+{
+	const AActor* Owner = GetOwner();
+	const FVector AimPoint = GetAimPoint();
+	FVector Direction = (AimPoint - Owner->GetActorLocation()).GetSafeNormal2D();
+	if (Direction.IsNearlyZero())
+	{
+		Direction = Owner->GetActorForwardVector();
+	}
+	ShootFlame(AimPoint, Direction, ECRSkillForm::Active);
 	PlayFireFeedback();
 }
 
-FVector UCRWeaponComponent::FireFlame()
+void UCRWeaponComponent::ShootFlame(const FVector& InAimPoint, const FVector& Direction, ECRSkillForm Form)
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
-	const AActor* Owner = GetOwner();
-	const ACRCharacter* Snowman = Cast<ACRCharacter>(Owner);
-	FVector AimPoint = Owner->GetActorLocation() + Owner->GetActorForwardVector() * 400.f;
-	if (Snowman)
+	const FCRSkillStats Stats = GetStats(ECRWeaponType::Flame, Form);
+	AActor* Owner = GetOwner();
+	const FVector From = Owner->GetActorLocation();
+
+	// 사거리 안으로 당긴다
+	FVector AimPoint = InAimPoint;
+	const FVector Flat = AimPoint - From;
+	if (Flat.Size2D() > Stats.Get(ECRStat::Range))
 	{
-		Snowman->GetWeaponAimPoint(AimPoint);
+		AimPoint = From + Flat.GetSafeNormal2D() * Stats.Get(ECRStat::Range);
 	}
-	// 사거리 안으로 당기고, 그 지점 바닥에 세운다
-	FVector Flat = AimPoint - Owner->GetActorLocation();
-	if (Flat.Size2D() > Tuning.FlameRange)
+	const int32 Tiles = FMath::Clamp(Stats.GetInt(ECRStat::Count), 1, 12);
+	const float Radius = Stats.Get(ECRStat::Radius);
+	const FVector Step = Direction.GetSafeNormal2D() * Stats.Get(ECRStat::Length);
+	UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this);
+	TSet<ACRCharacter*> Burned;
+	for (int32 i = 0; i < Tiles; ++i)
 	{
-		AimPoint = Owner->GetActorLocation() + Flat.GetSafeNormal2D() * Tuning.FlameRange;
+		// 조준 지점부터 바깥쪽으로 한 칸씩
+		FVector Ground;
+		TraceGround(GetWorld(), AimPoint + Step * i, Owner, Ground);
+		if (Fx)
+		{
+			Fx->SpawnFlame(Ground, Radius, Tuning.FlameHeight, Tuning.FlameDuration);
+		}
+		// 불꽃 기둥 가운데 높이에서 반경 판정 + 화상
+		TArray<ACRCharacter*> Victims;
+		CRCombat::ApplyRadialHit(Owner, ECRWeaponType::Flame, Ground + FVector(0.f, 0.f, Tuning.FlameHeight * 0.35f), Radius + 40.f, -1.f, Form, &Victims);
+		for (ACRCharacter* Victim : Victims)
+		{
+			if (!Burned.Contains(Victim))
+			{
+				Burned.Add(Victim);
+				CRCombat::ApplyBurn(Owner, Victim, Stats.Get(ECRStat::DotDamage), Stats.Get(ECRStat::DotTime));
+			}
+		}
 	}
-	FVector Ground = AimPoint;
-	FHitResult Hit;
-	FCollisionObjectQueryParams GroundTypes;
-	GroundTypes.AddObjectTypesToQuery(ECC_WorldStatic);
-	GroundTypes.AddObjectTypesToQuery(ECC_WorldDynamic);
-	if (GetWorld()->LineTraceSingleByObjectType(Hit, AimPoint + FVector(0.f, 0.f, 300.f), AimPoint - FVector(0.f, 0.f, 2000.f), GroundTypes,
-		FCollisionQueryParams(SCENE_QUERY_STAT(CRFlameGround), false, GetOwner())))
-	{
-		Ground = Hit.ImpactPoint;
-	}
-	if (UCRFxSubsystem* Fx = UCRFxSubsystem::Get(this))
-	{
-		Fx->SpawnFlame(Ground, Tuning.FlameRadius, Tuning.FlameHeight, Tuning.FlameDuration);
-	}
-	PlayFireFeedback();
-	return Ground;
 }
 
 void UCRWeaponComponent::PlayFireFeedback()
@@ -892,23 +1136,36 @@ void UCRWeaponComponent::UpdateEffects(float RealDeltaTime)
 		}
 	}
 
-	if (LaserBeamTimeLeft > 0.f)
+	// 레이저 빔: 원기둥(Z축, 높이 100)을 시작~끝 사이에 늘림. 메시는 필요한 만큼만 만들어 재사용
+	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	Beams.RemoveAll([](const FBeamFx& Beam) { return Beam.TimeLeft <= 0.f; });
+	while (BeamMeshes.Num() < Beams.Num())
 	{
-		const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
-		const float Fade = FMath::Clamp(LaserBeamTimeLeft / FMath::Max(Tuning.LaserBeamDuration, 0.001f), 0.f, 1.f);
-		const FVector Delta = LaserBeamEnd - LaserBeamStart;
-		const float Length = Delta.Size();
-		const float Width = Tuning.LaserBeamWidth * Fade / 100.f;
-
-		// 원기둥(Z축, 높이 100)을 시작~끝 사이에 늘림
-		LaserBeam->SetWorldLocationAndRotation(LaserBeamStart + Delta * 0.5f, FRotationMatrix::MakeFromZ(Delta.GetSafeNormal()).Rotator());
-		LaserBeam->SetWorldScale3D(FVector(Width, Width, Length / 100.f));
-		LaserBeam->SetVisibility(Length > 1.f);
-
-		LaserBeamTimeLeft -= RealDeltaTime;
-		if (LaserBeamTimeLeft <= 0.f)
+		UStaticMeshComponent* Mesh = MakePart(nullptr, CylinderMesh, FVector::ZeroVector, FVector(1.f), FRotator::ZeroRotator, LaserColor, true, GlowIntensity);
+		Mesh->SetUsingAbsoluteLocation(true);
+		Mesh->SetUsingAbsoluteRotation(true);
+		Mesh->SetUsingAbsoluteScale(true);
+		BeamMeshes.Add(Mesh);
+	}
+	for (int32 i = 0; i < BeamMeshes.Num(); ++i)
+	{
+		UStaticMeshComponent* Mesh = BeamMeshes[i];
+		if (!Beams.IsValidIndex(i))
 		{
-			LaserBeam->SetVisibility(false);
+			if (Mesh->IsVisible())
+			{
+				Mesh->SetVisibility(false);
+			}
+			continue;
 		}
+		FBeamFx& Beam = Beams[i];
+		const float Fade = FMath::Clamp(Beam.TimeLeft / FMath::Max(Tuning.LaserBeamDuration, 0.001f), 0.f, 1.f);
+		const FVector Delta = Beam.End - Beam.Start;
+		const float Length = Delta.Size();
+		const float Width = Beam.Width * Fade / 100.f;
+		Mesh->SetWorldLocationAndRotation(Beam.Start + Delta * 0.5f, FRotationMatrix::MakeFromZ(Delta.GetSafeNormal()).Rotator());
+		Mesh->SetWorldScale3D(FVector(Width, Width, Length / 100.f));
+		Mesh->SetVisibility(Length > 1.f);
+		Beam.TimeLeft -= RealDeltaTime;
 	}
 }

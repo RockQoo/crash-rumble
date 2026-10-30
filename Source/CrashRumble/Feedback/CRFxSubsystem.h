@@ -51,6 +51,9 @@ public:
 	void SpawnLightning(const FVector& Start, const FVector& End, float Duration = 0.32f);
 	/** 폴리곤 불꽃: 삼각뿔 22개, 장마다 재추첨. */
 	void SpawnFlame(const FVector& GroundCenter, float Radius, float Height, float Duration);
+	/** 바닥 범위 예고 (런처): 빨간 도넛 테두리 + 안쪽 원판이 Duration 동안 차오른다. EndGroundMarker용 ID를 돌려준다. */
+	int32 SpawnGroundMarker(const FVector& GroundCenter, float Radius, float Duration, const FLinearColor& Color);
+	void EndGroundMarker(int32 Id);
 	/** 미사일 연기 한 덩이. bRing이면 진행 방향에 수직인 도넛 링도. */
 	void SpawnSmokePuff(const FVector& Location, float Size, const FVector& Direction, bool bRing, float Lifetime = -1.f);
 	/** 큰 폭발 연기 덩이 (드럼통): Velocity로 솟았다가 감속, 이후 천천히 떠오르며 계속 부풀고 흰색 → 회색 → 작아지며 사라짐. */
@@ -107,6 +110,7 @@ private:
 		Kanada,
 		Lightning,
 		Flame,
+		Marker,
 	};
 
 	/** 그릴 때마다 모양을 새로 만드는 이펙트. */

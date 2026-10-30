@@ -72,9 +72,11 @@ void ACRProjectile::BeginPlay()
 	}
 }
 
-void ACRProjectile::Launch(AActor* InShooter, const FVector& Direction)
+void ACRProjectile::Launch(AActor* InShooter, const FVector& Direction, ECRSkillForm InForm)
 {
 	const UCRTuningSettings& Tuning = UCRTuningSubsystem::GetSettings(this);
+	const FCRSkillStats Stats = CRSkill::GetStats(InShooter, ECRWeaponType::Projectile, InForm);
+	Form = InForm;
 
 	if (AActor* Previous = Shooter.Get())
 	{
@@ -83,16 +85,16 @@ void ACRProjectile::Launch(AActor* InShooter, const FVector& Direction)
 	Shooter = InShooter;
 	Collision->IgnoreActorWhenMoving(InShooter, true);
 
-	const float Size = FMath::Max(Tuning.ProjectileSize, 0.05f);
+	const float Size = FMath::Max(Stats.Get(ECRStat::Size), 0.05f);
 	Collision->SetSphereRadius(BaseRadius * Size);
 	Mesh->SetRelativeScale3D(FVector(BaseRadius * 2.f * Size / 100.f));
 
 	LifeLeft = Tuning.ProjectileLifetime;
-	PierceLeft = FMath::Max(Tuning.ProjectilePierce, 0);
+	PierceLeft = FMath::Max(Stats.GetInt(ECRStat::Pierce), 0);
 	HitActors.Reset();
 	Movement->ProjectileGravityScale = Tuning.ProjectileGravity;
 	Movement->SetUpdatedComponent(Collision);
-	Movement->Velocity = Direction.GetSafeNormal() * Tuning.ProjectileSpeed;
+	Movement->Velocity = Direction.GetSafeNormal() * FMath::Max(Stats.Get(ECRStat::Speed), 100.f);
 	Movement->Activate(true);
 	Movement->UpdateComponentVelocity();
 }
@@ -142,7 +144,7 @@ void ACRProjectile::HandleOverlap(UPrimitiveComponent* OverlappedComponent, AAct
 		Hit = FHitResult(OtherActor, OtherComp, GetActorLocation(), -GetVelocity().GetSafeNormal());
 	}
 
-	if (CRCombat::ApplyWeaponHit(Shooter.Get(), OtherActor, ECRWeaponType::Projectile, Hit))
+	if (CRCombat::ApplyWeaponHit(Shooter.Get(), OtherActor, ECRWeaponType::Projectile, Hit, Form))
 	{
 		HitActors.Add(OtherActor);
 		if (PierceLeft-- <= 0)

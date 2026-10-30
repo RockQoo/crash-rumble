@@ -450,6 +450,85 @@ const TArray<FCRTuningItem>& UCRTuningSettings::GetItems()
 		CR_TUNE("팀 전투", BattleTeamDistance, "진영 간 거리(절반)", 200.f, 2000.f, 50.f);
 		CR_TUNE("팀 전투", BattleSpread, "진영 퍼짐 반경", 50.f, 1500.f, 25.f);
 		CR_TUNE_BOOL("팀 전투", bBattleSpectate, "관전 (플레이어 숨김)");
+
+		CR_TUNE("무기 기본형", SwordDual, "칼: 쌍검 (0/1)", 0.f, 1.f, 1.f);
+		CR_TUNE("무기 기본형", LaserBeams, "레이저: 줄기 수", 1.f, 12.f, 1.f);
+		CR_TUNE("무기 기본형", LaserSpread, "레이저: 여러 줄기 퍼짐(도)", 0.f, 90.f, 1.f);
+		CR_TUNE("무기 기본형", ProjectilePellets, "총: 산탄 탄 수", 1.f, 20.f, 1.f);
+		CR_TUNE("무기 기본형", ProjectileSpread, "총: 산탄 퍼짐(도)", 0.f, 90.f, 1.f);
+		CR_TUNE("무기 기본형", LightningChain, "번개: 체인 튕기는 수", 0.f, 20.f, 1.f);
+		CR_TUNE("무기 기본형", LightningChainRange, "번개: 체인 거리", 100.f, 2000.f, 25.f);
+		CR_TUNE("무기 기본형", MissileHoming, "런처: 유도 (0/1)", 0.f, 1.f, 1.f);
+		CR_TUNE("무기 기본형", MissileSalvo, "런처: 일제 사격 궤적 (0/1)", 0.f, 1.f, 1.f);
+		CR_TUNE("무기 기본형", MissileRange, "런처: 사거리", 300.f, 6000.f, 50.f);
+		CR_TUNE("무기 기본형", FlameTiles, "불: 칸 수", 1.f, 12.f, 1.f);
+		CR_TUNE("무기 기본형", FlameTileSpacing, "불: 칸 간격", 50.f, 500.f, 10.f);
+		CR_TUNE("무기 기본형", FlameDotDamage, "불: 화상 초당 피해", 0.f, 200.f, 1.f);
+		CR_TUNE("무기 기본형", FlameDotTime, "불: 화상 지속(초)", 0.f, 10.f, 0.1f);
+
+		CR_TUNE("패시브 스킬", PassiveRange, "자동 조준 거리", 200.f, 5000.f, 50.f);
+		CR_TUNE("패시브 스킬", PassiveSwordDamage, "칼날 회전: 데미지", 0.f, 200.f, 1.f);
+		CR_TUNE("패시브 스킬", PassiveSwordInterval, "칼날 회전: 같은 적 다시 때리기(초)", 0.05f, 3.f, 0.05f);
+		CR_TUNE("패시브 스킬", PassiveSwordCount, "칼날 회전: 칼날 수", 1.f, 12.f, 1.f);
+		CR_TUNE("패시브 스킬", PassiveSwordRadius, "칼날 회전: 반경", 50.f, 600.f, 10.f);
+		CR_TUNE("패시브 스킬", PassiveSwordSpeed, "칼날 회전: 속도(도/초)", 20.f, 1080.f, 10.f);
+		CR_TUNE("패시브 스킬", PassiveSwordSize, "칼날 회전: 칼날 크기", 0.3f, 4.f, 0.1f);
+		CR_TUNE("패시브 스킬", PassiveLaserDamage, "자동 레이저: 데미지", 0.f, 200.f, 1.f);
+		CR_TUNE("패시브 스킬", PassiveLaserInterval, "자동 레이저: 쿨다운(초)", 0.05f, 10.f, 0.05f);
+		CR_TUNE("패시브 스킬", PassiveProjectileDamage, "자동 사격: 데미지", 0.f, 200.f, 1.f);
+		CR_TUNE("패시브 스킬", PassiveProjectileInterval, "자동 사격: 쿨다운(초)", 0.05f, 10.f, 0.05f);
+		CR_TUNE("패시브 스킬", PassiveLightningDamage, "낙뢰: 데미지", 0.f, 500.f, 1.f);
+		CR_TUNE("패시브 스킬", PassiveLightningInterval, "낙뢰: 쿨다운(초)", 0.05f, 10.f, 0.05f);
+		CR_TUNE("패시브 스킬", PassiveMissileDamage, "자동 런처: 데미지", 0.f, 500.f, 1.f);
+		CR_TUNE("패시브 스킬", PassiveMissileInterval, "자동 런처: 쿨다운(초)", 0.05f, 10.f, 0.05f);
+		CR_TUNE("패시브 스킬", PassiveFlameDamage, "불 발자국: 데미지", 0.f, 200.f, 1.f);
+		CR_TUNE("패시브 스킬", PassiveFlameInterval, "불 발자국: 쿨다운(초)", 0.05f, 10.f, 0.05f);
+
+		CR_TUNE("캐릭터 스탯", PlayerAttack, "플레이어 공격력 (%)", 0.f, 500.f, 5.f);
+		CR_TUNE("캐릭터 스탯", PlayerAttackSpeed, "플레이어 공격속도 (%)", 0.f, 500.f, 5.f);
+		CR_TUNE("캐릭터 스탯", PlayerDefense, "플레이어 방어력", 0.f, 500.f, 5.f);
+		CR_TUNE("캐릭터 스탯", PlayerMoveSpeed, "플레이어 이동속도 (%)", -50.f, 300.f, 5.f);
+		CR_TUNE("캐릭터 스탯", PlayerCritChance, "플레이어 치명타 확률 (%)", 0.f, 100.f, 1.f);
+		CR_TUNE("캐릭터 스탯", MonsterAttack, "몬스터 공격력 (%)", 0.f, 500.f, 5.f);
+		CR_TUNE("캐릭터 스탯", MonsterAttackSpeed, "몬스터 공격속도 (%)", 0.f, 500.f, 5.f);
+		CR_TUNE("캐릭터 스탯", MonsterDefense, "몬스터 방어력", 0.f, 500.f, 5.f);
+		CR_TUNE("캐릭터 스탯", MonsterMoveSpeedBonus, "몬스터 이동속도 (%)", -50.f, 300.f, 5.f);
+		CR_TUNE("캐릭터 스탯", MonsterCritChance, "몬스터 치명타 확률 (%)", 0.f, 100.f, 1.f);
+		CR_TUNE("캐릭터 스탯", CritMultiplier, "치명타 피해 배율", 1.f, 5.f, 0.05f);
+		CR_TUNE("캐릭터 스탯", DefenseConstant, "방어력 공식 상수 (피해 × K / (K + 방어력))", 10.f, 1000.f, 10.f);
+
+		CR_TUNE("인게임 웨이브", WaveInterval, "스폰 간격(초)", 0.2f, 10.f, 0.1f);
+		CR_TUNE("인게임 웨이브", WaveMinCount, "한 번에 최소", 1.f, 20.f, 1.f);
+		CR_TUNE("인게임 웨이브", WaveMaxCount, "한 번에 최대", 1.f, 30.f, 1.f);
+		CR_TUNE("인게임 웨이브", WaveRampSeconds, "이 시간마다 한 번에 +1 (초)", 5.f, 300.f, 5.f);
+		CR_TUNE("인게임 웨이브", WaveMaxAlive, "동시 최대", 1.f, 300.f, 1.f);
+		CR_TUNE("인게임 웨이브", WaveSpawnDistance, "스폰 거리 (플레이어 북쪽)", 500.f, 6000.f, 50.f);
+		CR_TUNE("인게임 웨이브", WaveSpawnWidth, "스폰 가로 폭", 200.f, 8000.f, 100.f);
+		CR_TUNE("인게임 웨이브", WaveSwordRatio, "무기 비율: 칼", 0.f, 10.f, 1.f);
+		CR_TUNE("인게임 웨이브", WaveGunRatio, "무기 비율: 총", 0.f, 10.f, 1.f);
+		CR_TUNE("인게임 웨이브", WaveLauncherRatio, "무기 비율: 런처", 0.f, 10.f, 1.f);
+		CR_TUNE("인게임 웨이브", WaveMoveSpeed, "몬스터 이동 속도", 50.f, 1000.f, 10.f);
+		CR_TUNE("인게임 웨이브", WaveGunRange, "총 몬스터 사격 거리", 200.f, 3000.f, 50.f);
+		CR_TUNE("인게임 웨이브", WaveLauncherRange, "런처 몬스터 사격 거리", 200.f, 4000.f, 50.f);
+		CR_TUNE("인게임 웨이브", WaveMonsterHealth, "몬스터 체력", 1.f, 5000.f, 10.f);
+		CR_TUNE("인게임 웨이브", WaveMonsterDamageScale, "몬스터가 주는 피해 배율", 0.f, 3.f, 0.05f);
+		CR_TUNE("인게임 웨이브", WaveFireIntervalScale, "몬스터 공격 간격 배율 (클수록 느리게 쏨)", 0.5f, 10.f, 0.1f);
+		CR_TUNE("인게임 웨이브", WaveCorpseTime, "쓰러진 몬스터 사라지기까지(초)", 0.2f, 10.f, 0.1f);
+
+		CR_TUNE("골드", CoinMin, "몬스터당 동전 최소", 0.f, 20.f, 1.f);
+		CR_TUNE("골드", CoinMax, "몬스터당 동전 최대", 0.f, 20.f, 1.f);
+		CR_TUNE("골드", CoinValue, "동전 하나 골드", 1.f, 1000.f, 1.f);
+		CR_TUNE("골드", CoinScatter, "흩어지는 세기", 0.f, 1000.f, 10.f);
+		CR_TUNE("골드", CoinMagnetRadius, "자석 반경", 50.f, 2000.f, 10.f);
+		CR_TUNE("골드", CoinMagnetSpeed, "빨려오는 최대 속도", 100.f, 5000.f, 50.f);
+		CR_TUNE("골드", CoinLifetime, "바닥에 남는 시간(초)", 1.f, 120.f, 1.f);
+		CR_TUNE("골드", GoldRollSpeed, "골드 숫자 드르륵 속도", 1.f, 30.f, 0.5f);
+		CR_TUNE_BOOL("골드", bTrainingGold, "훈련장 허수아비도 골드 떨굼");
+
+		CR_TUNE("도플갱어 / 프리셋", DoppelOffset, "도플갱어 옆 거리", 50.f, 600.f, 10.f);
+		CR_TUNE("도플갱어 / 프리셋", DoppelCooldown, "도플갱어 죽은 뒤 쿨다운(초)", 0.f, 60.f, 0.5f);
+		CR_TUNE("도플갱어 / 프리셋", DoppelHealthScale, "도플갱어 체력 배율", 0.05f, 2.f, 0.05f);
+		CR_TUNE("도플갱어 / 프리셋", PresetSwapCooldown, "프리셋 교체 쿨다운(초)", 0.f, 5.f, 0.1f);
 	}
 	return Items;
 }
@@ -499,7 +578,7 @@ FText UCRTuningSettings::GetCategoryDescription(const FString& Category)
 		Descriptions.Add(TEXT("먼지 링"), FText::FromString(TEXT("높은 곳에서 착지하면 바닥에 납작한 도넛이 퍼지고 먼지 구체가 밀려난다. 블럭이 떨어져 부서질 때도.")));
 		Descriptions.Add(TEXT("집중선"), FText::FromString(TEXT("화면 가장자리에서 가운데로 모이는 선. 필살기(최대), 큰 붕괴, Shift 달리기.")));
 		Descriptions.Add(TEXT("번개"), FText::FromString(TEXT("4번 번개: 지그재그 줄기 + 가지 2개 + 양 끝 섬광. 그릴 때마다 모양이 새로 바뀐다.")));
-		Descriptions.Add(TEXT("미사일"), FText::FromString(TEXT("5번 미사일 일제 사격(이타노 서커스): 느리게 출발해 크게 돌다가 급하게 모인다.")));
+		Descriptions.Add(TEXT("미사일"), FText::FromString(TEXT("5번 런처: 기본은 조준 지점에 1발 + 빨간 범위 예고. 업그레이드로 발 수·폭발 범위·크레이터·유도·일제 사격(이타노 서커스: 느리게 출발해 크게 돌다가 급하게 모인다).")));
 		Descriptions.Add(TEXT("미사일 연기"), FText::FromString(TEXT("미사일 뒤에 남는 연기 덩이와 가끔 생기는 도넛 링. 흰 발광 → 흰 연기 → 회색, 위로 떠오르며 사라진다.")));
 		Descriptions.Add(TEXT("폴리곤 불꽃"), FText::FromString(TEXT("6번 불꽃: 조준 지점 바닥에 삼각뿔들이 솟는다. 자홍 → 분홍 → 하늘색 끝, 장마다 모양이 바뀐다.")));
 		Descriptions.Add(TEXT("펀치"), FText::FromString(TEXT("우클릭 왼손 펀치: 손이 한 프레임에 뻗고(스미어), 맞으면 때린 쪽 히트스톱 + 별 + 카나다 빛 + 임팩트 프레임.")));
@@ -509,6 +588,12 @@ FText UCRTuningSettings::GetCategoryDescription(const FString& Category)
 		Descriptions.Add(TEXT("훈련장"), FText::FromString(TEXT("폭발 드럼통(TNT)과 DPS 허수아비. 드럼통은 구체 폭발 + 큐브 잔해 + 카나다 빛 + 연기 기둥(불덩이가 주황 → 빨강 → 적갈색 연기가 되어 솟고, 아래 덩이부터 작아지며 사라짐), 주변 드럼통 연쇄 폭발. 폭발 수치는 미사일과 별개. 미리보기: 앞에 드럼통을 놓고 1초 뒤 터뜨린다.")));
 		Descriptions.Add(TEXT("다수 타격 테스트"), FText::FromString(TEXT("몬스터 체력, 이동 속도, 생성 반경.")));
 		Descriptions.Add(TEXT("팀 전투"), FText::FromString(TEXT("레드 vs 블루 팀 전투 수치.")));
+		Descriptions.Add(TEXT("무기 기본형"), FText::FromString(TEXT("로그라이크 기본형 수치. 쌍검·산탄·체인·유도·일제 사격·여러 칸 불은 업그레이드(업그레이드 탭, Content/GameData/upgrades.json)로 켜거나 늘린다. 이 값은 업그레이드 0단계 기준.")));
+		Descriptions.Add(TEXT("패시브 스킬"), FText::FromString(TEXT("패시브 칸에 끼운 스킬은 쿨다운마다 자동 발동: 칼 = 주변을 도는 칼날, 레이저·총 = 가까운 적 자동 사격, 번개 = 낙뢰, 런처 = 가까운 적에게 한 발, 불 = 발밑에 불 장판. 피해·쿨다운 외 스탯은 액티브 기본값을 따르고, 업그레이드는 형태별로 따로.")));
+		Descriptions.Add(TEXT("캐릭터 스탯"), FText::FromString(TEXT("공격력·공격속도·방어력·체력·이동속도·치명타 확률 (GAS Attribute). 최종 피해 = 무기 피해 × (1 + 공격력/100) × 치명타 배율 × K / (K + 방어력). 체력은 전투 탭.")));
+		Descriptions.Add(TEXT("인게임 웨이브"), FText::FromString(TEXT("인게임: 플레이어 북쪽 화면 밖 가로줄에서 몬스터가 계속 몰려온다 (칼 / 총 / 런처). 훈련장에서는 옵션창 몬스터 탭의 웨이브 버튼 또는 CRWave start|stop.")));
+		Descriptions.Add(TEXT("골드"), FText::FromString(TEXT("몬스터가 죽으면 노란 동전(임시 오브젝트)이 흩어지고, 가까이 가면 자석처럼 빨려와 인벤토리 골드 숫자가 드르륵 올라간다.")));
+		Descriptions.Add(TEXT("도플갱어 / 프리셋"), FText::FromString(TEXT("G: 내 장비를 복사한 보라색 도플갱어가 옆에서 같이 움직이고 내가 공격할 때 같은 방향으로 공격. X: 장비 프리셋 1 ↔ 2 교체.")));
 	}
 	const FText* Found = Descriptions.Find(Category);
 	return Found ? *Found : FText::GetEmpty();

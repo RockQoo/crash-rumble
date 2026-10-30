@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Widgets/SCompoundWidget.h"
 
+class UCRLoadoutComponent;
 class UCRTuningSubsystem;
 
 DECLARE_DELEGATE_OneParam(FCROnSpawnTargets, int32);
@@ -33,6 +34,11 @@ public:
 		SLATE_EVENT(FSimpleDelegate, OnStopBenchmark)
 		SLATE_ATTRIBUTE(FText, BenchmarkText)
 		SLATE_ATTRIBUTE(FText, StatusText)
+		/** 업그레이드 탭: 이 로드아웃(플레이어)의 업그레이드 단계를 올리고 내린다. */
+		SLATE_ARGUMENT(TWeakObjectPtr<UCRLoadoutComponent>, Loadout)
+		/** 몬스터 탭의 웨이브 시작 / 중지. */
+		SLATE_EVENT(FSimpleDelegate, OnStartWave)
+		SLATE_EVENT(FSimpleDelegate, OnStopWave)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -47,6 +53,7 @@ private:
 	TSharedRef<SWidget> MakeItemRow(const struct FCRTuningItem& Item, const FSlateFontInfo& Font);
 	TSharedRef<SWidget> MakeSpawnPage(const FArguments& InArgs, const FSlateFontInfo& HeaderFont, const FSlateFontInfo& Font);
 	TSharedRef<SWidget> MakeBenchmarkControls(const FArguments& InArgs, const FSlateFontInfo& Font);
+	TSharedRef<SWidget> MakeUpgradePage(const FSlateFontInfo& HeaderFont, const FSlateFontInfo& Font);
 	void ResetCategory(const FString& Category);
 
 	TWeakObjectPtr<UCRTuningSubsystem> Subsystem;
@@ -58,4 +65,8 @@ private:
 	FCROnSpawnTargets OnStartBattle;
 	FSimpleDelegate OnStartBenchmark;
 	FSimpleDelegate OnStopBenchmark;
+	FSimpleDelegate OnStartWave;
+	FSimpleDelegate OnStopWave;
+	TWeakObjectPtr<UCRLoadoutComponent> Loadout;
+	FText UpgradeMessage;
 };

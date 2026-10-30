@@ -124,6 +124,8 @@ private:
 	FString MapName;
 	FString MapPath;
 	FDateTime MapTimestamp;
+	/** 맵 파일 "regen" (false면 지형 재생 안 함). */
+	bool bMapRegen = true;
 	float FileCheckTimer = 0.f;
 	FString StatusMessage;
 

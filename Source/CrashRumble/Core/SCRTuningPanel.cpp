@@ -1,5 +1,7 @@
 ﻿#include "Core/SCRTuningPanel.h"
 
+#include "Character/CRLoadoutComponent.h"
+#include "Core/CRGameData.h"
 #include "Core/CRTuningSettings.h"
 #include "Core/CRTuningSubsystem.h"
 #include "Styling/CoreStyle.h"
@@ -141,6 +143,154 @@ TSharedRef<SWidget> SCRTuningPanel::MakeSpawnPage(const FArguments& InArgs, cons
 		];
 	}
 	Page->AddSlot().AutoHeight()[ BattleButtons ];
+
+	// 인게임 웨이브를 훈련장에서 시험 (북쪽에서 칼 / 총 / 런처 몬스터가 계속 몰려옴)
+	Page->AddSlot().AutoHeight().Padding(0.f, 12.f, 0.f, 4.f)
+	[
+		SNew(STextBlock).Text(FText::FromString(TEXT("인게임 웨이브 (북쪽에서 계속)"))).Font(HeaderFont).ColorAndOpacity(FLinearColor(1.f, 0.6f, 0.8f))
+	];
+	Page->AddSlot().AutoHeight()
+	[
+		SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().FillWidth(1.f).Padding(0.f, 0.f, 4.f, 0.f)
+		[
+			SNew(SButton)
+			.HAlign(HAlign_Center)
+			.Text(FText::FromString(TEXT("웨이브 시작")))
+			.OnClicked_Lambda([this]()
+			{
+				OnStartWave.ExecuteIfBound();
+				return FReply::Handled();
+			})
+		]
+		+ SHorizontalBox::Slot().FillWidth(1.f)
+		[
+			SNew(SButton)
+			.HAlign(HAlign_Center)
+			.Text(FText::FromString(TEXT("웨이브 중지")))
+			.OnClicked_Lambda([this]()
+			{
+				OnStopWave.ExecuteIfBound();
+				return FReply::Handled();
+			})
+		]
+	];
+	return Page;
+}
+
+TSharedRef<SWidget> SCRTuningPanel::MakeUpgradePage(const FSlateFontInfo& HeaderFont, const FSlateFontInfo& Font)
+{
+	TSharedRef<SVerticalBox> Page = SNew(SVerticalBox);
+	Page->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 8.f)
+	[
+		SNew(SHorizontalBox)
+		+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+		[
+			SNew(STextBlock).Text(FText::FromString(TEXT("업그레이드 (플레이어)"))).Font(HeaderFont).ColorAndOpacity(FLinearColor(0.55f, 0.8f, 1.f))
+		]
+		+ SHorizontalBox::Slot().AutoWidth()
+		[
+			SNew(SButton)
+			.Text(FText::FromString(TEXT("전부 0단계")))
+			.OnClicked_Lambda([this]()
+			{
+				if (Loadout.IsValid())
+				{
+					Loadout->ResetUpgrades();
+					UpgradeMessage = FText::FromString(TEXT("업그레이드 초기화"));
+				}
+				return FReply::Handled();
+			})
+		]
+	];
+	Page->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 10.f)
+	[
+		SNew(SBorder)
+		.BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
+		.BorderBackgroundColor(FLinearColor(0.08f, 0.1f, 0.16f, 1.f))
+		.Padding(8.f)
+		[
+			SNew(STextBlock)
+			.Text(FText::FromString(TEXT("로그라이크 업그레이드 시험: 단계를 올리면 그 스킬(액티브 / 패시브 따로)에 바로 반영된다. 정의는 Content/GameData/upgrades.json (고치면 바로 다시 읽음, 이 탭은 옵션창을 다시 열면 갱신). 콘솔: CRUpgrade <id> [단계], CRUpgradeReset.")))
+			.Font(Font).AutoWrapText(true).ColorAndOpacity(FLinearColor(0.85f, 0.88f, 0.95f))
+		]
+	];
+	Page->AddSlot().AutoHeight().Padding(0.f, 0.f, 0.f, 6.f)
+	[
+		SNew(STextBlock).Text_Lambda([this]() { return UpgradeMessage; }).Font(Font).ColorAndOpacity(FLinearColor(1.f, 0.85f, 0.4f))
+	];
+
+	const UCRGameDataSubsystem* Data = Loadout.IsValid() ? UCRGameDataSubsystem::Get(Loadout.Get()) : nullptr;
+	if (!Data)
+	{
+		Page->AddSlot().AutoHeight()[ SNew(STextBlock).Text(FText::FromString(TEXT("캐릭터로 플레이할 때만 (타격 체크 / 인게임)"))).Font(Font) ];
+		return Page;
+	}
+	FString LastSkill;
+	for (const FCRUpgradeDef& Def : Data->GetUpgrades())
+	{
+		const FString Skill = CRSkill::MakeSkillItem(Def.Family, Def.Form).ToString();
+		if (Skill != LastSkill)
+		{
+			LastSkill = Skill;
+			const FString Title = FString::Printf(TEXT("%s (%s)"), *CRSkill::GetFamilyLabel(Def.Family),
+				Def.Form == ECRSkillForm::Active ? TEXT("액티브") : TEXT("패시브"));
+			Page->AddSlot().AutoHeight().Padding(0.f, 10.f, 0.f, 2.f)
+			[
+				SNew(STextBlock).Text(FText::FromString(Title)).Font(HeaderFont).ColorAndOpacity(Def.Form == ECRSkillForm::Active
+					? FLinearColor(0.5f, 0.75f, 1.f) : FLinearColor(0.5f, 1.f, 0.6f))
+			];
+		}
+		const FName Id = Def.Id;
+		const int32 MaxLevel = Def.MaxLevel;
+		auto Change = [this, Id](int32 Delta)
+		{
+			if (Loadout.IsValid())
+			{
+				FString Message;
+				Loadout->SetUpgradeLevel(Id, Loadout->GetUpgradeLevel(Id) + Delta, &Message);
+				UpgradeMessage = FText::FromString(Message);
+			}
+			return FReply::Handled();
+		};
+		Page->AddSlot().AutoHeight().Padding(0.f, 1.f)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center)
+			[
+				SNew(STextBlock)
+				.Text(FText::FromString(FString::Printf(TEXT("%s  ·  %s"), *Def.Name, *Def.Desc)))
+				.ToolTipText(FText::FromString(FString::Printf(TEXT("id: %s%s"), *Def.Id.ToString(),
+					Def.Requires.IsNone() ? TEXT("") : *FString::Printf(TEXT(" · 선행: %s"), *Def.Requires.ToString()))))
+				.Font(Font).AutoWrapText(true)
+			]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(6.f, 0.f, 2.f, 0.f)
+			[
+				SNew(SButton).Text(FText::FromString(TEXT("－"))).OnClicked_Lambda([Change]() { return Change(-1); })
+			]
+			+ SHorizontalBox::Slot().AutoWidth().VAlign(VAlign_Center).Padding(4.f, 0.f)
+			[
+				SNew(SBox).WidthOverride(46.f).HAlign(HAlign_Center)
+				[
+					SNew(STextBlock)
+					.Text_Lambda([this, Id, MaxLevel]()
+					{
+						const int32 Level = Loadout.IsValid() ? Loadout->GetUpgradeLevel(Id) : 0;
+						return FText::FromString(FString::Printf(TEXT("%d / %d"), Level, MaxLevel));
+					})
+					.ColorAndOpacity_Lambda([this, Id]()
+					{
+						return Loadout.IsValid() && Loadout->GetUpgradeLevel(Id) > 0 ? FLinearColor(1.f, 0.85f, 0.3f) : FLinearColor(0.6f, 0.6f, 0.65f);
+					})
+					.Font(Font)
+				]
+			]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(2.f, 0.f, 0.f, 0.f)
+			[
+				SNew(SButton).Text(FText::FromString(TEXT("＋"))).OnClicked_Lambda([Change]() { return Change(1); })
+			]
+		];
+	}
 	return Page;
 }
 
@@ -186,7 +336,8 @@ void SCRTuningPanel::ResetCategory(const FString& Category)
 	{
 		return;
 	}
-	const UCRTuningSettings* Defaults = GetDefault<UCRTuningSettings>();
+	// 기본값 = 코드 기본값 + GameData JSON
+	const UCRTuningSettings* Defaults = Subsystem->GetDefaults() ? Subsystem->GetDefaults() : GetDefault<UCRTuningSettings>();
 	for (const FCRTuningItem& Item : UCRTuningSettings::GetItems())
 	{
 		if (Item.Category.ToString() == Category)
@@ -207,6 +358,9 @@ void SCRTuningPanel::Construct(const FArguments& InArgs)
 	OnStartBattle = InArgs._OnStartBattle;
 	OnStartBenchmark = InArgs._OnStartBenchmark;
 	OnStopBenchmark = InArgs._OnStopBenchmark;
+	OnStartWave = InArgs._OnStartWave;
+	OnStopWave = InArgs._OnStopWave;
+	Loadout = InArgs._Loadout;
 
 	const FSlateFontInfo TitleFont = FCoreStyle::GetDefaultFontStyle("Bold", 18);
 	const FSlateFontInfo HeaderFont = FCoreStyle::GetDefaultFontStyle("Bold", 13);
@@ -219,6 +373,11 @@ void SCRTuningPanel::Construct(const FArguments& InArgs)
 	{
 		TabNames.Add(TEXT("몬스터 · 팀전"));
 		Pages.Add(MakeSpawnPage(InArgs, HeaderFont, RowFont));
+	}
+	if (Loadout.IsValid())
+	{
+		TabNames.Add(TEXT("업그레이드"));
+		Pages.Add(MakeUpgradePage(HeaderFont, RowFont));
 	}
 
 	TSharedPtr<SVerticalBox> CurrentRows;

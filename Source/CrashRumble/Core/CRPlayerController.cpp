@@ -5,7 +5,11 @@
 #include "Camera/CRViewComponent.h"
 #include "Character/CRCharacter.h"
 #include "Core/CRTuningSubsystem.h"
+#include "Core/SCRInventoryPanel.h"
 #include "Core/SCRTuningPanel.h"
+#include "Character/CRLoadoutComponent.h"
+#include "Core/CRGameData.h"
+#include "Core/CRWaveSubsystem.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputComponent.h"
@@ -505,9 +509,14 @@ void ACRPlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		{
 			GEngine->GameViewport->RemoveViewportWidgetContent(HelpOverlay.ToSharedRef());
 		}
+		if (InventoryOverlay.IsValid())
+		{
+			GEngine->GameViewport->RemoveViewportWidgetContent(InventoryOverlay.ToSharedRef());
+		}
 	}
 	OptionsPanel.Reset();
 	HelpOverlay.Reset();
+	InventoryOverlay.Reset();
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -541,6 +550,10 @@ void ACRPlayerController::CreateInputAssets()
 	FxStepAction = MakeAction(TEXT("IA_FxStep"), EInputActionValueType::Boolean);
 	CharStepAction = MakeAction(TEXT("IA_CharStep"), EInputActionValueType::Boolean);
 	ImpactAction = MakeAction(TEXT("IA_Impact"), EInputActionValueType::Boolean);
+	InventoryAction = MakeAction(TEXT("IA_Inventory"), EInputActionValueType::Boolean);
+	DoppelAction = MakeAction(TEXT("IA_Doppel"), EInputActionValueType::Boolean);
+	PresetAction = MakeAction(TEXT("IA_Preset"), EInputActionValueType::Boolean);
+	RestartAction = MakeAction(TEXT("IA_Restart"), EInputActionValueType::Boolean);
 
 	MappingContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Default"));
 
@@ -583,7 +596,11 @@ void ACRPlayerController::CreateInputAssets()
 	MappingContext->MapKey(SuperAction, EKeys::F);
 	MappingContext->MapKey(FxStepAction, EKeys::T);
 	MappingContext->MapKey(CharStepAction, EKeys::Y);
-	MappingContext->MapKey(ImpactAction, EKeys::I);
+	MappingContext->MapKey(ImpactAction, EKeys::O);
+	MappingContext->MapKey(InventoryAction, EKeys::I);
+	MappingContext->MapKey(DoppelAction, EKeys::G);
+	MappingContext->MapKey(PresetAction, EKeys::X);
+	MappingContext->MapKey(RestartAction, EKeys::R);
 	MappingContext->MapKey(ZoomAction, EKeys::MouseWheelAxis);
 }
 
@@ -614,10 +631,16 @@ void ACRPlayerController::SetupInputComponent()
 		Input->BindAction(MissileAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSelectMissile);
 		Input->BindAction(FlameAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSelectFlame);
 		Input->BindAction(PunchAction, ETriggerEvent::Started, this, &ACRPlayerController::OnPunch);
+		Input->BindAction(PunchAction, ETriggerEvent::Completed, this, &ACRPlayerController::OnPunchReleased);
+		Input->BindAction(PunchAction, ETriggerEvent::Canceled, this, &ACRPlayerController::OnPunchReleased);
 		Input->BindAction(SuperAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSuper);
 		Input->BindAction(FxStepAction, ETriggerEvent::Started, this, &ACRPlayerController::OnToggleFxStep);
 		Input->BindAction(CharStepAction, ETriggerEvent::Started, this, &ACRPlayerController::OnToggleCharStep);
 		Input->BindAction(ImpactAction, ETriggerEvent::Started, this, &ACRPlayerController::OnToggleImpact);
+		Input->BindAction(InventoryAction, ETriggerEvent::Started, this, &ACRPlayerController::OnToggleInventory);
+		Input->BindAction(DoppelAction, ETriggerEvent::Started, this, &ACRPlayerController::OnDoppel);
+		Input->BindAction(PresetAction, ETriggerEvent::Started, this, &ACRPlayerController::OnSwapPreset);
+		Input->BindAction(RestartAction, ETriggerEvent::Started, this, &ACRPlayerController::OnRestart);
 	}
 }
 
@@ -637,7 +660,7 @@ void ACRPlayerController::OnFirePressed()
 		EditBlocks(false);
 		return;
 	}
-	SetTriggerHeld(true);
+	GetPawn<ACRCharacter>()->SetSlotHeld(0, true);
 }
 
 void ACRPlayerController::EditBlocks(bool bCrater)
@@ -667,31 +690,25 @@ void ACRPlayerController::EditBlocks(bool bCrater)
 
 void ACRPlayerController::OnFireReleased()
 {
-	SetTriggerHeld(false);
+	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
+	{
+		Snowman->SetSlotHeld(0, false);
+	}
 }
 
 void ACRPlayerController::OnSelectSword()
 {
-	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
-	{
-		Snowman->GetWeaponComponent()->Equip(ECRWeaponType::Sword);
-	}
+	SelectWeapon(ECRWeaponType::Sword);
 }
 
 void ACRPlayerController::OnSelectLaser()
 {
-	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
-	{
-		Snowman->GetWeaponComponent()->Equip(ECRWeaponType::Laser);
-	}
+	SelectWeapon(ECRWeaponType::Laser);
 }
 
 void ACRPlayerController::OnSelectProjectile()
 {
-	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
-	{
-		Snowman->GetWeaponComponent()->Equip(ECRWeaponType::Projectile);
-	}
+	SelectWeapon(ECRWeaponType::Projectile);
 }
 
 void ACRPlayerController::OnPossess(APawn* InPawn)
@@ -701,6 +718,12 @@ void ACRPlayerController::OnPossess(APawn* InPawn)
 	if (ACRCharacter* Snowman = Cast<ACRCharacter>(InPawn))
 	{
 		Snowman->GetViewComponent()->OnViewModeChanged.AddUObject(this, &ACRPlayerController::HandleViewModeChanged);
+		// 인게임: 북쪽(+X)이 화면 위가 되도록 돌리고 탑뷰로 고정
+		if (IsInGameMode() && Snowman->GetViewComponent()->GetViewMode() != ECRViewMode::TopDown)
+		{
+			SetControlRotation(FRotator(-30.f, 0.f, 0.f));
+			Snowman->ToggleViewMode();
+		}
 	}
 	RefreshInputMode();
 }
@@ -738,6 +761,10 @@ void ACRPlayerController::OnLook(const FInputActionValue& Value)
 {
 	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
 	{
+		if (IsInventoryOpen())
+		{
+			return; // 인벤토리 중에는 마우스로 시점을 돌리지 않는다
+		}
 		Snowman->LookInput(Value.Get<FVector2D>());
 	}
 	else if (GetPawn())
@@ -784,9 +811,11 @@ void ACRPlayerController::OnFastReleased()
 
 void ACRPlayerController::SelectWeapon(ECRWeaponType Type)
 {
-	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
+	// 인게임은 장착 칸(인벤토리)으로만 바꾼다. 훈련장 숫자키 = 좌클릭 칸에 그 무기
+	ACRCharacter* Snowman = GetPawn<ACRCharacter>();
+	if (Snowman && !IsInGameMode())
 	{
-		Snowman->GetWeaponComponent()->Equip(Type);
+		Snowman->GetLoadout()->QuickEquipActive(Type);
 	}
 }
 
@@ -809,7 +838,8 @@ void ACRPlayerController::OnPunch()
 {
 	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
 	{
-		Snowman->TryPunch();
+		// 우클릭 칸 스킬 (비어 있으면 펀치)
+		Snowman->SetSlotHeld(1, true);
 	}
 	else
 	{
@@ -894,15 +924,19 @@ FText ACRPlayerController::GetHelpText() const
 		const ACRInGameGameMode* GameMode = GetWorld()->GetAuthGameMode<ACRInGameGameMode>();
 		const FString MapFile = GameMode && !GameMode->GetMapFile().IsEmpty() ? GameMode->GetMapFile() : TEXT("없음");
 		return FText::FromString(FString::Printf(
-			TEXT("[인게임] 내용은 타격 테스트 뒤 결정 · 맵 파일: %s · WASD 이동 · 좌클릭 공격 · 우클릭 펀치 · 1~6 무기 · F 필살기 · V 시점 · Tab 옵션 · Esc 타이틀"), *MapFile));
+			TEXT("[인게임] 맵: %s · WASD 이동 · Shift 달리기 · 좌클릭 / 우클릭 = 장착한 액티브 (우클릭이 비면 펀치) · I 인벤토리 · X 프리셋 교체 · G 도플갱어 · F 필살기 · Tab 옵션 · Esc 타이틀"), *MapFile));
 	}
 	default:
-		return FText::FromString(TEXT("[타격 체크] WASD 이동 · Shift 달리기 · 좌클릭 공격 · 우클릭 펀치 · 1 칼 / 2 레이저 / 3 투사체 / 4 번개 / 5 미사일 / 6 불꽃 · F 필살기 · V 시점 · T / Y 2코마 · I 임팩트 · Tab 옵션 · Esc 타이틀"));
+		return FText::FromString(TEXT("[타격 체크] WASD 이동 · Shift 달리기 · 좌클릭 / 우클릭 = 장착한 액티브 (우클릭이 비면 펀치) · 1 칼 / 2 레이저 / 3 총 / 4 번개 / 5 런처 / 6 불 (좌클릭 칸) · I 인벤토리 · X 프리셋 · G 도플갱어 · F 필살기 · V 시점 · T / Y 2코마 · O 임팩트 · Tab 옵션(업그레이드 탭) · Esc 타이틀"));
 	}
 }
 
 void ACRPlayerController::OnToggleView()
 {
+	if (IsInGameMode())
+	{
+		return; // 인게임은 탑뷰 고정
+	}
 	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
 	{
 		Snowman->ToggleViewMode();
@@ -934,9 +968,18 @@ void ACRPlayerController::ToggleOptions()
 	else
 	{
 		SetTriggerHeld(false);
+		ACRCharacter* Snowman = GetPawn<ACRCharacter>();
+		if (Snowman)
+		{
+			Snowman->SetSlotHeld(0, false);
+			Snowman->SetSlotHeld(1, false);
+		}
 		TWeakObjectPtr<ACRPlayerController> WeakThis(this);
 		OptionsPanel = SNew(SCRTuningPanel)
 			.Subsystem(UCRTuningSubsystem::Get(this))
+			.Loadout(Snowman ? Snowman->GetLoadout() : nullptr)
+			.OnStartWave_Lambda([WeakThis]() { if (WeakThis.IsValid()) { WeakThis->CRWave(TEXT("start")); } })
+			.OnStopWave_Lambda([WeakThis]() { if (WeakThis.IsValid()) { WeakThis->CRWave(TEXT("stop")); } })
 			.ShowSpawnPage(CRModes::GetCurrent(this) == ECRMode::HitCheck)
 			.OnCloseRequested(FSimpleDelegate::CreateUObject(this, &ACRPlayerController::ToggleOptions))
 			.OnBackToTitle(FSimpleDelegate::CreateUObject(this, &ACRPlayerController::GoToTitle))
@@ -981,6 +1024,17 @@ void ACRPlayerController::RefreshInputMode()
 		return;
 	}
 
+	// 인벤토리: 게임은 계속 (키보드는 게임으로), 커서 표시
+	if (InventoryOverlay.IsValid())
+	{
+		FInputModeGameAndUI Mode;
+		Mode.SetHideCursorDuringCapture(false);
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::LockAlways);
+		SetInputMode(Mode);
+		SetShowMouseCursor(true);
+		return;
+	}
+
 	const ACRCharacter* Snowman = GetPawn<ACRCharacter>();
 	const bool bTopDown = Snowman && Snowman->GetViewComponent()->GetViewMode() == ECRViewMode::TopDown;
 	if (bTopDown)
@@ -996,4 +1050,208 @@ void ACRPlayerController::RefreshInputMode()
 		SetInputMode(FInputModeGameOnly());
 		SetShowMouseCursor(false);
 	}
+}
+
+bool ACRPlayerController::IsInGameMode() const
+{
+	return CRModes::GetCurrent(this) == ECRMode::InGame;
+}
+
+void ACRPlayerController::OnPunchReleased()
+{
+	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
+	{
+		Snowman->SetSlotHeld(1, false);
+	}
+}
+
+void ACRPlayerController::OnToggleInventory()
+{
+	ToggleInventory();
+}
+
+void ACRPlayerController::ToggleInventory()
+{
+	if (!GEngine || !GEngine->GameViewport)
+	{
+		return;
+	}
+	if (InventoryOverlay.IsValid())
+	{
+		GEngine->GameViewport->RemoveViewportWidgetContent(InventoryOverlay.ToSharedRef());
+		InventoryOverlay.Reset();
+	}
+	else if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
+	{
+		// 화면 왼쪽 가운데. 패널 밖은 클릭이 게임으로 그대로 간다
+		InventoryOverlay = SNew(SBox)
+			.HAlign(HAlign_Left)
+			.VAlign(VAlign_Center)
+			.Padding(FMargin(24.f, 0.f, 0.f, 0.f))
+			.Visibility(EVisibility::SelfHitTestInvisible)
+			[
+				SNew(SCRInventoryPanel).Loadout(Snowman->GetLoadout())
+			];
+		GEngine->GameViewport->AddViewportWidgetContent(InventoryOverlay.ToSharedRef(), OptionsZOrder - 1);
+	}
+	RefreshInputMode();
+}
+
+void ACRPlayerController::OnDoppel()
+{
+	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
+	{
+		const FString Message = Snowman->ToggleDoppel();
+		if (!Message.IsEmpty())
+		{
+			ShowToast(Message);
+		}
+	}
+}
+
+void ACRPlayerController::OnSwapPreset()
+{
+	ACRCharacter* Snowman = GetPawn<ACRCharacter>();
+	if (Snowman && Snowman->GetLoadout()->SwapPreset())
+	{
+		ShowToast(FString::Printf(TEXT("장비 프리셋 %d"), Snowman->GetLoadout()->GetPresetIndex() + 1));
+	}
+}
+
+void ACRPlayerController::OnRestart()
+{
+	const UCRWaveSubsystem* Wave = UCRWaveSubsystem::Get(this);
+	if (Wave && Wave->IsGameOver())
+	{
+		SetPause(false);
+		CRModes::Open(this, ECRMode::InGame);
+	}
+}
+
+void ACRPlayerController::CRUpgrade(const FString& Id, int32 Level)
+{
+	if (!GetPawn())
+	{
+		FTimerHandle Retry;
+		GetWorldTimerManager().SetTimer(Retry, FTimerDelegate::CreateWeakLambda(this, [this, Id, Level]() { CRUpgrade(Id, Level); }), 0.5f, false);
+		return;
+	}
+	ACRCharacter* Snowman = GetPawn<ACRCharacter>();
+	const UCRGameDataSubsystem* Data = UCRGameDataSubsystem::Get(this);
+	if (!Snowman || !Data)
+	{
+		return;
+	}
+	if (Id.IsEmpty())
+	{
+		for (const FCRUpgradeDef& Def : Data->GetUpgrades())
+		{
+			UE_LOG(LogTemp, Display, TEXT("%s (%s) %d/%d : %s"), *Def.Id.ToString(), *Def.Name,
+				Snowman->GetLoadout()->GetUpgradeLevel(Def.Id), Def.MaxLevel, *Def.Desc);
+		}
+		return;
+	}
+	UCRLoadoutComponent* Loadout = Snowman->GetLoadout();
+	const FName UpgradeId(*Id);
+	FString Message;
+	Loadout->SetUpgradeLevel(UpgradeId, Level < 0 ? Loadout->GetUpgradeLevel(UpgradeId) + 1 : Level, &Message);
+	ShowToast(Message);
+}
+
+void ACRPlayerController::CRUpgradeReset()
+{
+	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
+	{
+		Snowman->GetLoadout()->ResetUpgrades();
+		ShowToast(TEXT("업그레이드 초기화"));
+	}
+}
+
+void ACRPlayerController::CRWave(const FString& Command)
+{
+	if (!GetPawn())
+	{
+		FTimerHandle Retry;
+		GetWorldTimerManager().SetTimer(Retry, FTimerDelegate::CreateWeakLambda(this, [this, Command]() { CRWave(Command); }), 0.5f, false);
+		return;
+	}
+	UCRWaveSubsystem* Wave = UCRWaveSubsystem::Get(this);
+	if (!Wave)
+	{
+		return;
+	}
+	if (Command.Equals(TEXT("stop"), ESearchCase::IgnoreCase))
+	{
+		Wave->StopRun();
+		ShowToast(TEXT("웨이브 중지"));
+	}
+	else
+	{
+		Wave->StartRun(IsInGameMode());
+		ShowToast(TEXT("웨이브 시작: 북쪽에서 몬스터가 몰려온다"));
+	}
+}
+
+void ACRPlayerController::CRGold(int32 Amount)
+{
+	if (ACRCharacter* Snowman = GetPawn<ACRCharacter>())
+	{
+		Snowman->GetLoadout()->AddGold(Amount);
+	}
+}
+
+void ACRPlayerController::CRDoppel()
+{
+	if (!GetPawn())
+	{
+		FTimerHandle Retry;
+		GetWorldTimerManager().SetTimer(Retry, FTimerDelegate::CreateWeakLambda(this, [this]() { CRDoppel(); }), 0.5f, false);
+		return;
+	}
+	OnDoppel();
+}
+
+void ACRPlayerController::CRInventory()
+{
+	if (!GetPawn())
+	{
+		FTimerHandle Retry;
+		GetWorldTimerManager().SetTimer(Retry, FTimerDelegate::CreateWeakLambda(this, [this]() { CRInventory(); }), 0.5f, false);
+		return;
+	}
+	ToggleInventory();
+}
+
+void ACRPlayerController::CREquip(const FString& Kind, int32 Slot, const FString& Item)
+{
+	if (!GetPawn())
+	{
+		FTimerHandle Retry;
+		GetWorldTimerManager().SetTimer(Retry, FTimerDelegate::CreateWeakLambda(this, [this, Kind, Slot, Item]() { CREquip(Kind, Slot, Item); }), 0.5f, false);
+		return;
+	}
+	ACRCharacter* Snowman = GetPawn<ACRCharacter>();
+	if (!Snowman)
+	{
+		return;
+	}
+	UCRLoadoutComponent* Loadout = Snowman->GetLoadout();
+	const ECRSlotKind SlotKind = Kind.Equals(TEXT("passive"), ESearchCase::IgnoreCase) ? ECRSlotKind::Passive
+		: Kind.Equals(TEXT("helmet"), ESearchCase::IgnoreCase) ? ECRSlotKind::Helmet : ECRSlotKind::Active;
+	// 아이템 ID가 "gun"처럼 짧으면 칸 종류에 맞춰 붙인다
+	FString ItemId = Item;
+	if (!ItemId.Contains(TEXT(".")))
+	{
+		ItemId = (SlotKind == ECRSlotKind::Passive ? TEXT("passive.") : SlotKind == ECRSlotKind::Helmet ? TEXT("helmet.") : TEXT("active.")) + ItemId;
+	}
+	for (int32 i = 0; i < UCRLoadoutComponent::InventorySize; ++i)
+	{
+		if (Loadout->GetSlotItem({ ECRSlotKind::Inventory, i }) == FName(*ItemId))
+		{
+			const bool bMoved = Loadout->MoveItem({ ECRSlotKind::Inventory, i }, { SlotKind, Slot });
+			ShowToast(bMoved ? FString::Printf(TEXT("장착: %s"), *ItemId) : FString::Printf(TEXT("장착 실패: %s"), *ItemId));
+			return;
+		}
+	}
+	ShowToast(FString::Printf(TEXT("가방에 %s 없음"), *ItemId));
 }
