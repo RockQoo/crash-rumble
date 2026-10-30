@@ -247,6 +247,11 @@ void UCRGameDataSubsystem::ParseFile(const FString& Path, TMap<FName, float>& Ou
 			}
 			FCRHelmetDef Def;
 			Def.Id = FName(*Id);
+			if (FindHelmet(Def.Id))
+			{
+				Warnings.Add(FString::Printf(TEXT("%s: 투구 id %s 중복"), *File, *Id));
+				continue;
+			}
 			(*Object)->TryGetStringField(TEXT("name"), Def.Name);
 			(*Object)->TryGetStringField(TEXT("shape"), Shape);
 			Def.Shape = Shape.IsEmpty() ? FName(TEXT("cap")) : FName(*Shape);
