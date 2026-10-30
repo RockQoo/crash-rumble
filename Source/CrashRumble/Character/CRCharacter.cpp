@@ -1720,7 +1720,7 @@ void ACRCharacter::HandleEquipmentChanged()
 	}
 	EquipSlotWeapon(CurrentSlot);
 	WeaponComponent->RefreshFromStats();
-	// 런처를 뺐으면 (프리셋 교체 포함) 그 형태로 밀려 있던 미사일은 쏘지 않는다
+	// 런처를 뺐으면 (프리셋 교체 포함) 그 형태로 밀려 있던 미사일은 쏘지 않는다 (필살기 일제 사격은 CancelMissiles가 남김)
 	bool bActiveLauncher = false;
 	bool bPassiveLauncher = false;
 	for (int32 i = 0; i < FCRLoadoutPreset::ActiveCount; ++i)

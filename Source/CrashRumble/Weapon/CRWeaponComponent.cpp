@@ -998,6 +998,7 @@ void UCRWeaponComponent::ShootMissiles(const FVector& InAimPoint, ECRSkillForm F
 		Pending.TargetPoint = Point;
 		Pending.Form = Form;
 		Pending.bSalvo = bSalvo;
+		Pending.bSuper = bSuper;
 		Pending.SalvoIndex = i;
 		Pending.SalvoSize = Count;
 		Pending.LaunchTime = FirstLaunch + i * Spacing;
@@ -1017,7 +1018,7 @@ void UCRWeaponComponent::CancelActions()
 
 void UCRWeaponComponent::CancelMissiles(ECRSkillForm Form)
 {
-	PendingMissiles.RemoveAll([Form](const FPendingMissile& Pending) { return Pending.Form == Form; });
+	PendingMissiles.RemoveAll([Form](const FPendingMissile& Pending) { return Pending.Form == Form && !Pending.bSuper; });
 }
 
 void UCRWeaponComponent::UpdateMissileQueue()

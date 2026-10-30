@@ -50,7 +50,7 @@ public:
 	/** 사망·풀 반납: 휘두르던 스윙을 끊고 대기 중인 미사일을 버린다. */
 	void CancelActions();
 
-	/** 런처를 장비에서 뺐을 때: 그 형태(액티브/패시브)의 대기 미사일만 버린다. */
+	/** 런처를 장비에서 뺐을 때: 그 형태(액티브/패시브)의 대기 미사일만 버린다 (필살기 일제 사격은 남김). */
 	void CancelMissiles(ECRSkillForm Form);
 
 	/** 무기 메시들의 부모 (손에 붙어 있음). 사망 시 통째로 떼어 날린다. */
@@ -113,6 +113,8 @@ private:
 		FVector TargetPoint = FVector::ZeroVector;
 		ECRSkillForm Form = ECRSkillForm::Active;
 		bool bSalvo = false;
+		/** 필살기 일제 사격 (장비와 무관하므로 장비 변경으로 취소하지 않는다). */
+		bool bSuper = false;
 		int32 SalvoIndex = 0;
 		int32 SalvoSize = 1;
 		float LaunchTime = 0.f;
