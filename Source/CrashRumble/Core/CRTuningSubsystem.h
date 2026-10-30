@@ -67,7 +67,7 @@ private:
 	UPROPERTY()
 	TObjectPtr<UCRTuningSettings> Defaults;
 
-	/** 저장본에서 불러온(사용자가 바꾼) 항목. JSON 기본값이 바뀌어도 덮어쓰지 않는다. */
+	/** 사용자가 바꾼(기본값과 다른) 항목. JSON 기본값이 바뀌어도 덮어쓰지 않는다. Load/SetValue/Save가 갱신. */
 	TSet<FName> SavedNames;
 
 	IConsoleObject* TuneCommand = nullptr;

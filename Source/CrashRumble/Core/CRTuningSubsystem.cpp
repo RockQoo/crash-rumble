@@ -55,6 +55,15 @@ void UCRTuningSubsystem::SetValue(FName Name, float Value)
 	if (const FCRTuningItem* Item = UCRTuningSettings::FindItem(Name))
 	{
 		Item->SetValue(Settings, Value);
+		// 사용자 수정 목록도 Save()와 같은 기준 (기본값과 다르면 수정)
+		if (FMath::IsNearlyEqual(Item->GetValue(Settings), Item->GetValue(Defaults), 1e-4f))
+		{
+			SavedNames.Remove(Name);
+		}
+		else
+		{
+			SavedNames.Add(Name);
+		}
 		NotifyChanged();
 	}
 }
@@ -75,12 +84,15 @@ void UCRTuningSubsystem::Save()
 	// 기본값(코드 + GameData JSON)과 다른 값만 저장 → 기본값을 바꾸면 손대지 않은 항목은 새 기본값을 따른다
 	UCRTuningSave* SaveObject = NewObject<UCRTuningSave>(this);
 	SaveObject->Version = UCRTuningSave::CurrentVersion;
+	// 저장 목록이 곧 사용자 수정 목록. 기본값으로 되돌린 항목은 다시 JSON 기본값을 따른다
+	SavedNames.Reset();
 	for (const FCRTuningItem& Item : UCRTuningSettings::GetItems())
 	{
 		const float Value = Item.GetValue(Settings);
 		if (!FMath::IsNearlyEqual(Value, Item.GetValue(Defaults), 1e-4f))
 		{
 			SaveObject->Values.Add(Item.GetName(), Value);
+			SavedNames.Add(Item.GetName());
 		}
 	}
 	UGameplayStatics::SaveGameToSlot(SaveObject, SaveSlotName, 0);
