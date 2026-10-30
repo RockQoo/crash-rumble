@@ -515,6 +515,7 @@ public:
 	UPROPERTY() int32 WaveMaxAlive = 60;
 	UPROPERTY() float WaveSpawnDistance = 2200.f;
 	UPROPERTY() float WaveSpawnWidth = 2400.f;
+	// 칼:총:런처. 셋 다 0이면 칼·총·레이저·런처 1:1:1:1
 	UPROPERTY() int32 WaveSwordRatio = 5;
 	UPROPERTY() int32 WaveGunRatio = 3;
 	UPROPERTY() int32 WaveLauncherRatio = 2;

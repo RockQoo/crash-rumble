@@ -15,6 +15,9 @@ namespace
 	const FLinearColor SwordAccent(0.95f, 0.12f, 0.1f);
 	const FLinearColor GunAccent(1.f, 0.55f, 0.05f);
 	const FLinearColor LauncherAccent(0.55f, 0.15f, 0.95f);
+	const FLinearColor LaserAccent(0.1f, 0.85f, 0.95f);
+	// 비율을 전부 0으로 두면 네 무기를 1:1:1:1로 섞는다
+	const ECRWeaponType EvenMix[] = { ECRWeaponType::Sword, ECRWeaponType::Projectile, ECRWeaponType::Laser, ECRWeaponType::Missile };
 }
 
 UCRWaveSubsystem* UCRWaveSubsystem::Get(const UObject* WorldContext)
@@ -150,7 +153,9 @@ void UCRWaveSubsystem::SpawnBatch()
 
 	const int32 SwordWeight = FMath::Max(Tuning.WaveSwordRatio, 0);
 	const int32 GunWeight = FMath::Max(Tuning.WaveGunRatio, 0);
-	const int32 TotalWeight = FMath::Max(SwordWeight + GunWeight + FMath::Max(Tuning.WaveLauncherRatio, 0), 1);
+	const int32 LauncherWeight = FMath::Max(Tuning.WaveLauncherRatio, 0);
+	const bool bEvenMix = SwordWeight + GunWeight + LauncherWeight == 0;
+	const int32 TotalWeight = bEvenMix ? UE_ARRAY_COUNT(EvenMix) : SwordWeight + GunWeight + LauncherWeight;
 	// 보폭이 합과 서로소여야 모든 칸을 돈다 (합이 7의 배수일 때 보폭 7이면 한 무기만 나왔다)
 	int32 Stride = 7;
 	while (TotalWeight > 1 && FMath::GreatestCommonDivisor(Stride, TotalWeight) != 1)
@@ -170,9 +175,11 @@ void UCRWaveSubsystem::SpawnBatch()
 	{
 		// 비율대로 고르게 섞는다 (5:3:2 → 10마리 중 칼 5, 총 3, 런처 2)
 		const int32 Slot = (SpawnSerial++ * Stride) % TotalWeight;
-		const ECRWeaponType Weapon = Slot < SwordWeight ? ECRWeaponType::Sword
+		const ECRWeaponType Weapon = bEvenMix ? EvenMix[Slot]
+			: Slot < SwordWeight ? ECRWeaponType::Sword
 			: Slot < SwordWeight + GunWeight ? ECRWeaponType::Projectile : ECRWeaponType::Missile;
-		const FLinearColor Accent = Weapon == ECRWeaponType::Sword ? SwordAccent : Weapon == ECRWeaponType::Projectile ? GunAccent : LauncherAccent;
+		const FLinearColor Accent = Weapon == ECRWeaponType::Sword ? SwordAccent : Weapon == ECRWeaponType::Projectile ? GunAccent
+			: Weapon == ECRWeaponType::Laser ? LaserAccent : LauncherAccent;
 
 		// 플레이어 북쪽 화면 밖 가로줄 아무 데서나, 바닥 위에 (구덩이면 다시 뽑기)
 		bool bFound = false;
