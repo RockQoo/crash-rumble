@@ -47,6 +47,9 @@ public:
 	void Equip(ECRWeaponType Type);
 	ECRWeaponType GetEquipped() const { return Equipped; }
 
+	/** 사망·풀 반납: 휘두르던 스윙을 끊고 대기 중인 미사일을 버린다. */
+	void CancelActions();
+
 	/** 무기 메시들의 부모 (손에 붙어 있음). 사망 시 통째로 떼어 날린다. */
 	USceneComponent* GetWeaponRoot() const { return WeaponRoot; }
 

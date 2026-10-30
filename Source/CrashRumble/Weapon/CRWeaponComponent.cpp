@@ -294,6 +294,10 @@ void UCRWeaponComponent::Equip(ECRWeaponType Type)
 		}
 	}
 	RefreshFromStats();
+	if (!bChanged)
+	{
+		return; // 같은 무기 재장착(같은 버튼 재입력, 장비 갱신): 스윙·발사 대기시간 유지
+	}
 
 	if (bSwinging)
 	{
@@ -985,6 +989,16 @@ void UCRWeaponComponent::ShootMissiles(const FVector& InAimPoint, ECRSkillForm F
 		Pending.LaunchTime = FirstLaunch + i * Spacing;
 	}
 	UpdateMissileQueue();
+}
+
+void UCRWeaponComponent::CancelActions()
+{
+	if (bSwinging)
+	{
+		bSwinging = false;
+		OnSwingFinished.ExecuteIfBound();
+	}
+	PendingMissiles.Reset();
 }
 
 void UCRWeaponComponent::UpdateMissileQueue()

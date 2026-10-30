@@ -290,7 +290,7 @@ void ACRCharacter::Die()
 	bDead = true;
 	AbilitySystem->AddLooseGameplayTag(CRTags::State_Dead);
 	WeaponComponent->SetTriggerHeld(false);
-	WeaponComponent->Equip(WeaponComponent->GetEquipped()); // 휘두르던 중이면 끊는다
+	WeaponComponent->CancelActions(); // 휘두르던 스윙, 밀린 미사일을 끊는다
 	TargetEnemy.Reset();
 	UpdatePawnBlocking(); // 시체가 길을 막지 않게
 
