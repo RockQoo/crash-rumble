@@ -6,6 +6,7 @@
 |---|---|---|---|
 | 2026-10-29 | `8345b065ce50c2014fa774e8892417e948c86ee3` | `a7ded158035446207faae7be835d1ef930896abc` | [전체 리뷰](2026-10-29_8345b06_a7ded15.md), [CSV·config 분리 설계](2026-10-29_data-config.md) |
 | 2026-10-30 | (위 리뷰에 대한 답) | `f84e466` | [Claude 검토 · 반영 결과](2026-10-30_claude-검토.md) |
+| 2026-10-31 | `a7ded15` (**제외**) | `c7c550a` | [후속 리뷰](2026-10-31_a7ded15_c7c550a.md), [Claude 검토 원문](2026-10-31_claude-검토.md), [검토 정리·보정](2026-10-31_검토-정리.md) |
 
 - 전체 29개 커밋의 이력과 종료 커밋의 주요 C++ 소스, 설정, 맵 데이터를 대상으로 한 정적 리뷰다. 모든 커밋의 모든 diff를 개별 검증한 것은 아니다.
 - 시작 커밋도 포함한다. `git diff 8345b06 a7ded15`는 최초 커밋 자체를 제외하므로 전체 범위와 같지 않다.
@@ -15,10 +16,10 @@
 
 ## 후속 리뷰 명령
 
+로컬 명령 하나로 자료 생성 → Codex 리뷰 → Claude 검토를 실행할 수 있다. [pipeline 사용법](PIPELINE.md)을 참고한다. 체크포인트는 `review-state.json`에 기록한다.
+
 ```powershell
-git log --reverse --oneline a7ded158035446207faae7be835d1ef930896abc..HEAD
-git diff --stat a7ded158035446207faae7be835d1ef930896abc HEAD
-git diff a7ded158035446207faae7be835d1ef930896abc HEAD -- Source Config Content/MapData
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Tools\review-pipeline.ps1
 ```
 
 후속 범위의 시작 커밋은 제외, 종료 커밋은 포함하는 방식으로 기록한다. 새 HEAD의 전체 해시를 문서에 고정한다.
