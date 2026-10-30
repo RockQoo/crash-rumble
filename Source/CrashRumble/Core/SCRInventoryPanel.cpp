@@ -9,7 +9,7 @@
 namespace
 {
 	constexpr float Pad = 16.f;
-	constexpr float Cell = 72.f;
+	constexpr float CellSize = 72.f;
 	constexpr float Gap = 6.f;
 	constexpr float LabelWidth = 70.f;
 	constexpr float HeaderHeight = 30.f;
@@ -18,12 +18,12 @@ namespace
 	constexpr float SectionGap = 22.f;
 	constexpr float InfoHeight = 54.f;
 
-	const float PanelWidth = Pad * 2.f + UCRLoadoutComponent::InventoryColumns * Cell + (UCRLoadoutComponent::InventoryColumns - 1) * Gap;
+	const float PanelWidth = Pad * 2.f + UCRLoadoutComponent::InventoryColumns * CellSize + (UCRLoadoutComponent::InventoryColumns - 1) * Gap;
 	const float TabsY = Pad + HeaderHeight + 6.f;
 	const float ActiveY = TabsY + TabHeight + SectionGap;
-	const float PassiveY = ActiveY + Cell + SectionGap;
-	const float BagY = PassiveY + Cell + SectionGap + 6.f;
-	const float BagHeight = UCRLoadoutComponent::InventoryRows * Cell + (UCRLoadoutComponent::InventoryRows - 1) * Gap;
+	const float PassiveY = ActiveY + CellSize + SectionGap;
+	const float BagY = PassiveY + CellSize + SectionGap + 6.f;
+	const float BagHeight = UCRLoadoutComponent::InventoryRows * CellSize + (UCRLoadoutComponent::InventoryRows - 1) * Gap;
 	const float InfoY = BagY + BagHeight + 12.f;
 	const float PanelHeight = InfoY + InfoHeight + Pad;
 
@@ -94,18 +94,18 @@ const TArray<SCRInventoryPanel::FCell>& SCRInventoryPanel::GetCells() const
 	{
 		for (int32 i = 0; i < FCRLoadoutPreset::ActiveCount; ++i)
 		{
-			Cells.Add({ { ECRSlotKind::Active, i }, FVector2f(Pad + LabelWidth + i * (Cell + Gap), ActiveY) });
+			Cells.Add({ { ECRSlotKind::Active, i }, FVector2f(Pad + LabelWidth + i * (CellSize + Gap), ActiveY) });
 		}
-		Cells.Add({ { ECRSlotKind::Helmet, 0 }, FVector2f(PanelWidth - Pad - Cell, ActiveY) });
+		Cells.Add({ { ECRSlotKind::Helmet, 0 }, FVector2f(PanelWidth - Pad - CellSize, ActiveY) });
 		for (int32 i = 0; i < FCRLoadoutPreset::PassiveCount; ++i)
 		{
-			Cells.Add({ { ECRSlotKind::Passive, i }, FVector2f(Pad + LabelWidth + i * (Cell + Gap), PassiveY) });
+			Cells.Add({ { ECRSlotKind::Passive, i }, FVector2f(Pad + LabelWidth + i * (CellSize + Gap), PassiveY) });
 		}
 		for (int32 i = 0; i < UCRLoadoutComponent::InventorySize; ++i)
 		{
 			const int32 Column = i % UCRLoadoutComponent::InventoryColumns;
 			const int32 Row = i / UCRLoadoutComponent::InventoryColumns;
-			Cells.Add({ { ECRSlotKind::Inventory, i }, FVector2f(Pad + Column * (Cell + Gap), BagY + Row * (Cell + Gap)) });
+			Cells.Add({ { ECRSlotKind::Inventory, i }, FVector2f(Pad + Column * (CellSize + Gap), BagY + Row * (CellSize + Gap)) });
 		}
 	}
 	return Cells;
@@ -115,7 +115,7 @@ const SCRInventoryPanel::FCell* SCRInventoryPanel::FindCell(const FVector2f& Loc
 {
 	for (const FCell& Entry : GetCells())
 	{
-		if (Local.X >= Entry.Position.X && Local.Y >= Entry.Position.Y && Local.X < Entry.Position.X + Cell && Local.Y < Entry.Position.Y + Cell)
+		if (Local.X >= Entry.Position.X && Local.Y >= Entry.Position.Y && Local.X < Entry.Position.X + CellSize && Local.Y < Entry.Position.Y + CellSize)
 		{
 			return &Entry;
 		}
@@ -224,9 +224,9 @@ int32 SCRInventoryPanel::OnPaint(const FPaintArgs& Args, const FGeometry& Geomet
 	}
 	Text(Out, TextLayer, Geometry, FVector2f(Pad + 2.f * (TabWidth + Gap) + 4.f, TabsY + 6.f), TEXT("X: 교체"), SmallFont, DimText);
 
-	Text(Out, TextLayer, Geometry, FVector2f(Pad, ActiveY + Cell * 0.5f - 9.f), TEXT("액티브"), RowFont, FLinearColor(0.55f, 0.75f, 1.f));
-	Text(Out, TextLayer, Geometry, FVector2f(Pad, PassiveY + Cell * 0.5f - 9.f), TEXT("패시브"), RowFont, FLinearColor(0.55f, 1.f, 0.65f));
-	Text(Out, TextLayer, Geometry, FVector2f(PanelWidth - Pad - Cell - 40.f, ActiveY + Cell * 0.5f - 9.f), TEXT("투구"), RowFont, GoldColor);
+	Text(Out, TextLayer, Geometry, FVector2f(Pad, ActiveY + CellSize * 0.5f - 9.f), TEXT("액티브"), RowFont, FLinearColor(0.55f, 0.75f, 1.f));
+	Text(Out, TextLayer, Geometry, FVector2f(Pad, PassiveY + CellSize * 0.5f - 9.f), TEXT("패시브"), RowFont, FLinearColor(0.55f, 1.f, 0.65f));
+	Text(Out, TextLayer, Geometry, FVector2f(PanelWidth - Pad - CellSize - 40.f, ActiveY + CellSize * 0.5f - 9.f), TEXT("투구"), RowFont, GoldColor);
 	Text(Out, TextLayer, Geometry, FVector2f(Pad, BagY - 20.f), TEXT("가방"), RowFont, DimText);
 
 	const FCell* Hovered = bMouseInside ? FindCell(MouseLocal) : nullptr;
@@ -247,9 +247,9 @@ int32 SCRInventoryPanel::OnPaint(const FPaintArgs& Args, const FGeometry& Geomet
 		{
 			Border = FLinearColor(0.85f, 0.85f, 0.95f);
 		}
-		Box(Out, CellLayer, Geometry, Entry.Position - FVector2f(2.f, 2.f), FVector2f(Cell + 4.f, Cell + 4.f), Border);
+		Box(Out, CellLayer, Geometry, Entry.Position - FVector2f(2.f, 2.f), FVector2f(CellSize + 4.f, CellSize + 4.f), Border);
 		const FLinearColor Fill = Item.IsNone() || bSource ? CellColor : SlotColor(Entry.Ref.Kind, Item);
-		Box(Out, CellLayer, Geometry, Entry.Position, FVector2f(Cell, Cell), Fill);
+		Box(Out, CellLayer, Geometry, Entry.Position, FVector2f(CellSize, CellSize), Fill);
 
 		if (Item.IsNone() || bSource)
 		{
@@ -257,13 +257,13 @@ int32 SCRInventoryPanel::OnPaint(const FPaintArgs& Args, const FGeometry& Geomet
 			const TCHAR* Hint = Entry.Ref.Kind == ECRSlotKind::Active ? (Entry.Ref.Index == 0 ? TEXT("좌클릭") : TEXT("우클릭·펀치")) : nullptr;
 			if (Hint)
 			{
-				Text(Out, TextLayer, Geometry, Entry.Position + FVector2f(8.f, Cell * 0.5f - 12.f), Hint, SmallFont, DimText);
+				Text(Out, TextLayer, Geometry, Entry.Position + FVector2f(8.f, CellSize * 0.5f - 12.f), Hint, SmallFont, DimText);
 			}
 			continue;
 		}
 		const FString Label = GetItemLabel(Item);
 		const FVector2f Size = Measure(Label, NameFont);
-		Text(Out, TextLayer, Geometry, Entry.Position + FVector2f((Cell - Size.X) * 0.5f, (Cell - Size.Y) * 0.5f + 4.f), Label, NameFont, TextColor);
+		Text(Out, TextLayer, Geometry, Entry.Position + FVector2f((CellSize - Size.X) * 0.5f, (CellSize - Size.Y) * 0.5f + 4.f), Label, NameFont, TextColor);
 		const FString KindTag = Item.ToString().StartsWith(TEXT("active.")) ? TEXT("액티브") : Item.ToString().StartsWith(TEXT("passive.")) ? TEXT("패시브") : TEXT("투구");
 		Text(Out, TextLayer, Geometry, Entry.Position + FVector2f(5.f, 3.f), KindTag, SmallFont, FLinearColor(1.f, 1.f, 1.f, 0.6f));
 	}
@@ -277,13 +277,13 @@ int32 SCRInventoryPanel::OnPaint(const FPaintArgs& Args, const FGeometry& Geomet
 	// 끌고 있는 아이템은 커서를 따라간다
 	if (bDragging && !DragItem.IsNone())
 	{
-		const FVector2f Position = MouseLocal - FVector2f(Cell * 0.5f, Cell * 0.5f);
+		const FVector2f Position = MouseLocal - FVector2f(CellSize * 0.5f, CellSize * 0.5f);
 		FLinearColor Fill = SlotColor(DragFrom.Kind, DragItem);
 		Fill.A = 0.85f;
-		Box(Out, DragLayer, Geometry, Position, FVector2f(Cell, Cell), Fill);
+		Box(Out, DragLayer, Geometry, Position, FVector2f(CellSize, CellSize), Fill);
 		const FString Label = GetItemLabel(DragItem);
 		const FVector2f Size = Measure(Label, NameFont);
-		Text(Out, DragLayer + 1, Geometry, Position + FVector2f((Cell - Size.X) * 0.5f, (Cell - Size.Y) * 0.5f), Label, NameFont, TextColor);
+		Text(Out, DragLayer + 1, Geometry, Position + FVector2f((CellSize - Size.X) * 0.5f, (CellSize - Size.Y) * 0.5f), Label, NameFont, TextColor);
 	}
 	return DragLayer + 1;
 }

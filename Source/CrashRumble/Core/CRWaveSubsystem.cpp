@@ -10,7 +10,7 @@
 
 namespace
 {
-	constexpr int32 MaxSpawnTries = 6;
+	constexpr int32 MaxWaveSpawnTries = 6;
 	const FVector North(1.f, 0.f, 0.f);
 	const FLinearColor SwordAccent(0.95f, 0.12f, 0.1f);
 	const FLinearColor GunAccent(1.f, 0.55f, 0.05f);
@@ -171,7 +171,7 @@ void UCRWaveSubsystem::SpawnBatch()
 		// 플레이어 북쪽 화면 밖 가로줄 아무 데서나, 바닥 위에 (구덩이면 다시 뽑기)
 		bool bFound = false;
 		FVector Location;
-		for (int32 Try = 0; Try < MaxSpawnTries && !bFound; ++Try)
+		for (int32 Try = 0; Try < MaxWaveSpawnTries && !bFound; ++Try)
 		{
 			const FVector Probe = Player->GetActorLocation() + North * (Tuning.WaveSpawnDistance + FMath::FRandRange(0.f, 300.f))
 				+ Across * FMath::FRandRange(-0.5f, 0.5f) * Tuning.WaveSpawnWidth;

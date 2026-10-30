@@ -17,7 +17,7 @@ namespace
 	const TCHAR* BladeMesh = TEXT("/Engine/BasicShapes/Cube.Cube");
 	const FLinearColor BladeColor(0.85f, 0.9f, 1.f);
 	constexpr int32 MaxOrbitBlades = 12;
-	constexpr float OrbitHeight = -10.f;    // 캡슐 가운데 기준
+	constexpr float OrbitBladeHeight = -10.f;    // 캡슐 가운데 기준
 	constexpr float BladeHitRadius = 35.f;  // 칼날 크기 1일 때
 	constexpr float PassiveOriginHeight = 70.f;
 	constexpr float PassiveRetry = 0.2f;    // 대상이 없으면 이만큼 뒤 다시
@@ -615,7 +615,7 @@ void UCRLoadoutComponent::UpdateOrbit(float DeltaTime, const FCRSkillStats* Stat
 	const float Radius = Stats->Get(ECRStat::Radius);
 	const float Size = FMath::Max(Stats->Get(ECRStat::Size), 0.1f);
 	OrbitAngle = FMath::Fmod(OrbitAngle + Stats->Get(ECRStat::Speed) * DeltaTime, 360.f);
-	const FVector Center = Owner->GetActorLocation() + FVector(0.f, 0.f, OrbitHeight);
+	const FVector Center = Owner->GetActorLocation() + FVector(0.f, 0.f, OrbitBladeHeight);
 	const double Now = GetWorld()->GetTimeSeconds();
 	const float HitInterval = FMath::Max(Stats->Get(ECRStat::Interval), 0.05f);
 	ACRCharacter* Snowman = GetSnowman();

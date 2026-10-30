@@ -21,7 +21,7 @@ namespace
 	constexpr float MagnetAccel = 5000.f;
 	constexpr float BlinkFrom = 0.8f; // 수명 80%부터 깜빡이며 사라질 때를 알림
 	const FLinearColor CoinColor(1.6f, 1.05f, 0.1f);
-	const FTransform HiddenTransform(FQuat::Identity, FVector(0.f, 0.f, -100000.f), FVector::ZeroVector);
+	const FTransform HiddenCoinTransform(FQuat::Identity, FVector(0.f, 0.f, -100000.f), FVector::ZeroVector);
 }
 
 UCRLootSubsystem* UCRLootSubsystem::Get(const UObject* WorldContext)
@@ -264,7 +264,7 @@ void UCRLootSubsystem::Tick(float DeltaTime)
 	if (Need > Have)
 	{
 		TArray<FTransform> Extra;
-		Extra.Init(HiddenTransform, FMath::Max(Need - Have, 32));
+		Extra.Init(HiddenCoinTransform, FMath::Max(Need - Have, 32));
 		CoinMesh->AddInstances(Extra, false, true);
 		for (int32 i = Have; i < CoinMesh->GetInstanceCount(); ++i)
 		{
@@ -277,7 +277,7 @@ void UCRLootSubsystem::Tick(float DeltaTime)
 	}
 	for (int32 i = Need; i < LastDrawn; ++i)
 	{
-		CoinMesh->UpdateInstanceTransform(i, HiddenTransform, true, false, true);
+		CoinMesh->UpdateInstanceTransform(i, HiddenCoinTransform, true, false, true);
 	}
 	LastDrawn = Need;
 	CoinMesh->UpdateBounds();
