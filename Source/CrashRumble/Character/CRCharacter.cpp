@@ -30,6 +30,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "GAS/CRAttributeSet.h"
 #include "GAS/CRCombat.h"
+#include "GAS/CRDamageEffect.h"
 #include "GAS/CRGameplayTags.h"
 #include "GAS/CRWeaponAbilities.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -371,6 +372,7 @@ void ACRCharacter::Revive()
 			Respawn();
 		}
 	}
+	ClearStatusEffects();
 	RestoreFullHealth();
 	AbilitySystem->RemoveLooseGameplayTag(CRTags::State_Dead);
 	bDead = false;
@@ -549,6 +551,14 @@ void ACRCharacter::Reassemble()
 		}
 	}
 	DeathChunks.Reset();
+}
+
+void ACRCharacter::ClearStatusEffects()
+{
+	if (AbilitySystem->AbilityActorInfo.IsValid())
+	{
+		AbilitySystem->RemoveActiveGameplayEffectBySourceEffect(UCRBurnEffect::StaticClass(), nullptr);
+	}
 }
 
 void ACRCharacter::RestoreFullHealth()
@@ -1106,7 +1116,11 @@ void ACRCharacter::OnPoolReleased()
 	bSlotHeld[0] = bSlotHeld[1] = false;
 	GetWorldTimerManager().ClearTimer(ReleaseTimer);
 	TargetEnemy.Reset();
+	ClearStatusEffects(); // 풀 안에서 / 다음 생명에 화상이 이어지지 않게
 	WeaponComponent->SetTriggerHeld(false);
+	// 무기 틱이 남아 있으면 밀린 미사일을 팀 없음(모두에게 적대)으로 쏜다. 다시 쓸 때 SetupAs*가 켠다.
+	WeaponComponent->CancelActions();
+	WeaponComponent->SetComponentTickEnabled(false);
 	GetWorldTimerManager().ClearTimer(ReviveTimer);
 	SetActorHiddenInGame(true);
 	SetActorEnableCollision(false);

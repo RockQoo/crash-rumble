@@ -178,6 +178,7 @@ private:
 	void Die();
 	void Revive();
 	void RestoreFullHealth();
+	void ClearStatusEffects(); // 화상 등 한 생명에 속한 지속 효과 (부활·풀 반납)
 	void ResetPose();
 	void Respawn(); // 몬스터: 하늘에서 / 그 외: 처음 위치로
 	void UpdateChase(float DeltaSeconds);
