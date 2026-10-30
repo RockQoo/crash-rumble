@@ -902,6 +902,20 @@ void UCRWeaponComponent::ShootMissiles(const FVector& InAimPoint, ECRSkillForm F
 	const bool bHoming = bSuper || Stats.GetFlag(ECRStat::Homing);
 	const bool bSalvo = bSuper || Stats.GetFlag(ECRStat::Salvo);
 
+	// 요청이 발 간격(큐 처리량)보다 빠르면 밀린 발사가 끝없이 쌓인다: 같은 형태의 한 묶음이 아직 대기 중이면 버린다
+	if (!bSuper)
+	{
+		int32 Waiting = 0;
+		for (const FPendingMissile& Pending : PendingMissiles)
+		{
+			Waiting += Pending.Form == Form ? 1 : 0;
+		}
+		if (Waiting >= Count)
+		{
+			return;
+		}
+	}
+
 	// 사거리 안으로 당기고 바닥에 붙인다
 	FVector AimPoint = InAimPoint;
 	const FVector Flat = AimPoint - From;
