@@ -232,18 +232,18 @@ void CRCombat::ApplyBurn(AActor* Attacker, ACRCharacter* Victim, float DamagePer
 		return;
 	}
 	bool bCritical = false;
-	const float TickDamage = ScaleDamage(Attacker, Victim, DamagePerSecond * UCRBurnEffect::TickPeriod, false, bCritical);
+	float TickDamage = ScaleDamage(Attacker, Victim, DamagePerSecond * UCRBurnEffect::TickPeriod, false, bCritical);
 
 	// 화상은 대상마다 하나 (UCRBurnEffect 스택 정책: 재적용 = 지속시간 갱신, 틱 주기 유지).
-	// 스택 갱신은 처음 화상의 틱 피해를 그대로 쓰므로, 더 센 화상만 교체한다 (교체 때만 주기가 다시 시작).
+	// 스택 갱신은 기존 스펙을 새 스펙으로 덮어쓰므로(엔진 GameplayEffect.cpp), 약한 불이 센 화상을 깎지 않게 큰 값을 싣는다.
+	// 지우고 다시 걸면 주기가 처음부터 시작해 강약 교차 적용 때 틱이 안 나온다.
 	FGameplayEffectQuery Query;
 	Query.EffectDefinition = UCRBurnEffect::StaticClass();
 	for (const FActiveGameplayEffectHandle& Handle : TargetASC->GetActiveEffects(Query))
 	{
-		const FActiveGameplayEffect* Active = TargetASC->GetActiveGameplayEffect(Handle);
-		if (Active && Active->Spec.GetSetByCallerMagnitude(CRTags::Data_Damage, false) < TickDamage * 0.99f)
+		if (const FActiveGameplayEffect* Active = TargetASC->GetActiveGameplayEffect(Handle))
 		{
-			TargetASC->RemoveActiveGameplayEffect(Handle);
+			TickDamage = FMath::Max(TickDamage, Active->Spec.GetSetByCallerMagnitude(CRTags::Data_Damage, false));
 		}
 	}
 	Spec.Data->SetSetByCallerMagnitude(CRTags::Data_Damage, TickDamage);

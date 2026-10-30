@@ -34,7 +34,7 @@ namespace CRCombat
 	CRASHRUMBLE_API int32 ApplyRadialHit(AActor* Attacker, ECRWeaponType Weapon, const FVector& Center, float Radius, float DamageOverride = -1.f,
 		ECRSkillForm Form = ECRSkillForm::Active, TArray<ACRCharacter*>* OutVictims = nullptr);
 
-	/** 화상: 초당 DamagePerSecond를 Duration초 동안 (공격력·방어력 반영). 대상마다 하나, 다시 걸면 지속시간 갱신·틱 주기 유지, 더 세면 교체. */
+	/** 화상: 초당 DamagePerSecond를 Duration초 동안 (공격력·방어력 반영). 대상마다 하나, 다시 걸면 지속시간 갱신·틱 주기 유지, 틱 피해는 큰 값. */
 	CRASHRUMBLE_API void ApplyBurn(AActor* Attacker, ACRCharacter* Victim, float DamagePerSecond, float Duration);
 
 	/** From 반경 Range 안에서 Self가 때릴 수 있는 살아 있는 가장 가까운 눈사람 (Exclude 제외). */
