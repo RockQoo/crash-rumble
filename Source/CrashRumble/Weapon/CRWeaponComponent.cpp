@@ -1015,6 +1015,11 @@ void UCRWeaponComponent::CancelActions()
 	PendingMissiles.Reset();
 }
 
+void UCRWeaponComponent::CancelMissiles(ECRSkillForm Form)
+{
+	PendingMissiles.RemoveAll([Form](const FPendingMissile& Pending) { return Pending.Form == Form; });
+}
+
 void UCRWeaponComponent::UpdateMissileQueue()
 {
 	int32 Launched = 0;

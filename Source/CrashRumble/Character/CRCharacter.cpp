@@ -1720,6 +1720,25 @@ void ACRCharacter::HandleEquipmentChanged()
 	}
 	EquipSlotWeapon(CurrentSlot);
 	WeaponComponent->RefreshFromStats();
+	// 런처를 뺐으면 (프리셋 교체 포함) 그 형태로 밀려 있던 미사일은 쏘지 않는다
+	bool bActiveLauncher = false;
+	bool bPassiveLauncher = false;
+	for (int32 i = 0; i < FCRLoadoutPreset::ActiveCount; ++i)
+	{
+		bActiveLauncher |= Loadout->GetActiveFamily(i) == ECRWeaponType::Missile;
+	}
+	for (int32 i = 0; i < FCRLoadoutPreset::PassiveCount; ++i)
+	{
+		bPassiveLauncher |= Loadout->GetPassiveFamily(i) == ECRWeaponType::Missile;
+	}
+	if (!bActiveLauncher)
+	{
+		WeaponComponent->CancelMissiles(ECRSkillForm::Active);
+	}
+	if (!bPassiveLauncher)
+	{
+		WeaponComponent->CancelMissiles(ECRSkillForm::Passive);
+	}
 	ApplyHelmetLook();
 	if (ACRCharacter* Mirror = Doppel.Get())
 	{

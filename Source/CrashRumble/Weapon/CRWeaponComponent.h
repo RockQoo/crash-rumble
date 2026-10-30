@@ -50,6 +50,9 @@ public:
 	/** 사망·풀 반납: 휘두르던 스윙을 끊고 대기 중인 미사일을 버린다. */
 	void CancelActions();
 
+	/** 런처를 장비에서 뺐을 때: 그 형태(액티브/패시브)의 대기 미사일만 버린다. */
+	void CancelMissiles(ECRSkillForm Form);
+
 	/** 무기 메시들의 부모 (손에 붙어 있음). 사망 시 통째로 떼어 날린다. */
 	USceneComponent* GetWeaponRoot() const { return WeaponRoot; }
 
